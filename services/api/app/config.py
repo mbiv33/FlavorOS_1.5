@@ -33,6 +33,8 @@ class Settings(BaseSettings):
     api_strict_tenant: bool = False
     dev_client_password: str = "devclient"
     dev_admin_password: str = "devadmin"
+    # When True, skip lifespan DB seed (API starts; tenant routes need DB).
+    api_skip_startup_seed: bool = False
 
     @field_validator("database_url")
     @classmethod

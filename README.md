@@ -105,6 +105,16 @@ The client **Command Center** home polls **`GET /health`** using `NEXT_PUBLIC_AP
 2. Load http://localhost:3000 and http://localhost:3001 — no runtime errors; API status panel shows **ok** when the API is up.
 3. `POST http://localhost:8000/auth/login` with tenant `demo` and seeded credentials returns a Bearer token (use Swagger).
 
+## Troubleshooting
+
+### `Application startup failed` or `role "flavoros" does not exist`
+
+Startup runs a **dev seed** against Postgres. If something is listening on `5432` but it is **not** the Compose database (for example Homebrew Postgres), credentials won’t match and seeding used to abort the whole process.
+
+**Fix:** run `docker compose up -d postgres`, wait until healthy, then `alembic upgrade head` — or set `DATABASE_URL` in `.env` to a user/database that exists on **your** server.
+
+The API **still boots** when the DB is unreachable: you’ll see a warning in the logs; **`GET /health`** works. **`API_SKIP_STARTUP_SEED=true`** skips the seed attempt entirely (optional).
+
 ## Monorepo scripts
 
 | Script | Description |
