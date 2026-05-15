@@ -5,6 +5,7 @@
   "scripts": {
     "dev:client": "pnpm --filter client dev",
     "dev:admin": "pnpm --filter admin dev",
+    "dev:flavoros": "pnpm --filter flavoros dev",
     "lint": "pnpm -r lint",
     "build": "pnpm -r build"
   }
