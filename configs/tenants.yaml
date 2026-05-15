@@ -1,0 +1,8 @@
+# Seed tenants for local development — mirrored in Alembic seed data.
+# Production tenants should be provisioned via admin flows.
+
+tenants:
+  - slug: demo
+    name: Demo Client
+  - slug: acme
+    name: Acme Corp

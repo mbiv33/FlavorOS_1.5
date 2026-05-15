@@ -1,0 +1,3 @@
+environment: production
+api_strict_tenant: true
+log_level: warning

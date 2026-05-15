@@ -1,0 +1,11 @@
+# Declarative app metadata — documentation-of-record for MVP.
+# Runtime loader hook may read this in later phases.
+
+name: FlavorOS
+version: "0.1.0-mvp"
+description: Multi-tenant client operating system — MVP slice
+
+surfaces:
+  client_app: apps/client
+  admin_app: apps/admin
+  api_service: services/api

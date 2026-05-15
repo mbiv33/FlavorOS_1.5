@@ -1,0 +1,7 @@
+# Permission definitions — MVP stub
+
+roles:
+  client:
+    resources: ["profiles:self", "briefings:read"]
+  developer_admin:
+    resources: ["*"]

@@ -1,0 +1,10 @@
+# Role claims aligned with docs/multi_tenant_model.md
+
+roles:
+  client:
+    description: End client using FlavorOS command center
+    surfaces: [client_app]
+
+  developer_admin:
+    description: Operator configuring and monitoring the platform
+    surfaces: [client_app, admin_app]

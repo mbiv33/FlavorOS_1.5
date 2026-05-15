@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://flavoros.local/schemas/profile_slice.json",
+  "title": "ClientProfileSlice",
+  "type": "object",
+  "required": ["display_name"],
+  "properties": {
+    "display_name": { "type": "string", "minLength": 1 },
+    "timezone": { "type": "string" },
+    "preferences": { "type": "object", "additionalProperties": true }
+  },
+  "additionalProperties": false
+}

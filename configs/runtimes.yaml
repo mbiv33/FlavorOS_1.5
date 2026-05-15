@@ -1,0 +1,3 @@
+runtimes:
+  local_next: apps/client + apps/admin on localhost
+  api: services/api

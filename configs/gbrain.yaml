@@ -1,0 +1,3 @@
+# GBrain stub — engine runs via MCP/CLI per CLAUDE.md; see docs/gbrain_integration.md
+
+mode: external_mcp

@@ -1,0 +1,20 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: flavoros-postgres
+    environment:
+      POSTGRES_USER: flavoros
+      POSTGRES_PASSWORD: flavoros
+      POSTGRES_DB: flavoros
+    ports:
+      - "5432:5432"
+    volumes:
+      - flavoros_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U flavoros -d flavoros"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  flavoros_pg:
