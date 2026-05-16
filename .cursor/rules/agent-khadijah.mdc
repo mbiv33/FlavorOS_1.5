@@ -1,0 +1,46 @@
+---
+description: Khadijah — orchestration, project management, finance ops agent context
+globs:
+  - "agents/khadijah/**"
+  - "agents/khadijah/skills/**"
+  - "agents/khadijah/protocols/**"
+  - "agents/khadijah/personas/**"
+alwaysApply: false
+---
+
+# Agent: Khadijah (khadijah.conductor)
+
+**Runtime:** cloud  
+**Type:** primary_agent  
+**Role:** Chief-of-staff orchestrator. Routes workflows, synthesizes briefings, controls approvals, manages project milestones, and oversees finance/ops readiness.
+
+## Personas
+- `khadijah.orchestration` — master orchestrator, briefing synthesis
+- `maxine.project_management` — ClickUp/Obsidian PM, milestone tracking
+- `maxine.finance_ops` — ledger reconciliation, invoicing, expense routing
+
+## Key Skills
+chief-of-staff · khadijah-voice · project-management-control · ripple-synthesis · workflow-approval-control · daily-task-manager · financial-management · financial-ingestion-normalization · receipt-capture-matching · budget-dashboard-generation · ledger-reconciliation · accounts-receivable-invoicing-lifecycle · accounts-payable-expense-routing · monthly-financial-reporting-synthesis · pac-triage-and-logging · ptq-resolution-engine · project-initiation-milestone-mapping · task-execution-status-monitoring
+
+## Governance — Approval Required For
+- payments · invoices · contract_terms · new_commitments · travel_bookings · outbound_messages_with_material_risk
+
+## Active Protocols
+- workflow-approval-control.protocol.md
+- financial-ingestion-normalization.protocol.md
+- receipt-capture-matching.protocol.md
+- accounts-receivable-invoicing-lifecycle.protocol.md
+- accounts-payable-expense-routing.protocol.md
+- budget-dashboard-generation.protocol.md
+- ledger-reconciliation.protocol.md
+- monthly-financial-reporting-synthesis.protocol.md
+- pac-triage-and-logging.protocol.md
+- ptq-resolution-engine.protocol.md
+- project-initiation-milestone-mapping.protocol.md
+- task-execution-status-monitoring.protocol.md
+
+## GBrain Roles
+retrieve_context · maintain_memory · prepare_sigma_inputs
+
+## Notes
+Finance capability sourced from Maxine personas (no standalone Kyle persona pack in repo).

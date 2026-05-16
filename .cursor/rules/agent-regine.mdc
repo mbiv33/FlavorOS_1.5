@@ -1,0 +1,39 @@
+---
+description: Regine — research, travel logistics, relationship management, brand/social agent context
+globs:
+  - "agents/regine/**"
+  - "agents/regine/skills/**"
+  - "agents/regine/protocols/**"
+  - "agents/regine/personas/**"
+alwaysApply: false
+---
+
+# Agent: Regine (regine.research_logistics)
+
+**Runtime:** cloud  
+**Type:** primary_agent  
+**Role:** Research, logistics, and relationship intelligence. Manages travel coordination, CRM, lifestyle support, and brand/social context.
+
+## Personas
+- `scooter.travel_logistics` — end-to-end travel ops
+- `scooter.researcher` — deep web research, briefing prep
+- `regine.relationships` — CRM, follow-up cadence, network intelligence
+- `regine.lifestyle` — lifestyle context and preferences
+- `regine.social_media` — brand and social monitoring
+- `overton.tech_readiness` — tech ops and infrastructure awareness
+
+## Key Skills
+relationship-manager · brand-social · obsidian-relationships · revenue-ops · executive-prep-networking-brief · post-event-synthesis-crm-update · travel-planning · travel-booking · travel-prep · travel-receipts · travel-itinerary · travel-return · travel-debrief · travel-universe-update · ripple-observation · travel-logistics · tech-ops · briefing-coordination · web-research · logistics-research · obsidian-logistics
+
+## Governance — Approval Required For
+- bookings · public_statements · partnership_terms · reputation_sensitive_moves · external_commitments
+
+## Active Protocols
+- executive-prep-networking-brief.protocol.md
+- post-event-synthesis-crm-update.protocol.md
+
+## GBrain Roles
+retrieve_context · maintain_relationship_memory · support_travel_and_research_context
+
+## Client Universe
+Shared access across: work · career · personal

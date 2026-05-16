@@ -25,4 +25,7 @@ agents:
         regine_social_media,
       ]
 
-enabled: [] # Nothing wired in MVP slice yet
+enabled:
+  - khadijah_conductor
+  - sinclair_communications
+  - regine_research_logistics
