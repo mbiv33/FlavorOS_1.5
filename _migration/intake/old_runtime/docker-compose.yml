@@ -1,0 +1,186 @@
+services:
+  # ── Infrastructure ─────────────────────────────────────────────────
+  nats:
+    image: nats:2-alpine
+    command: ["-js"]
+    networks: [flavor]
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    networks: [flavor]
+    volumes: ["redis-data:/data"]
+    restart: unless-stopped
+
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: flavor
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: flavor
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+      - ./infra/postgres/init:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "127.0.0.1:5433:5432"
+    networks: [flavor]
+    restart: unless-stopped
+
+  app-api:
+    build: ./infra/app-api
+    environment:
+      NATS_URL: nats://nats:4222
+      POSTGRES_URL: postgres://flavor:${POSTGRES_PASSWORD}@postgres:5432/flavor
+      FLAVOROS_CLIENT_ID: marcus
+      VAULT_PATH: /vault
+      GMAIL_ACCESS_TOKEN_FILE: /run/flavor/secrets/app-api/gmail.access_token
+      GMAIL_REFRESH_TOKEN_FILE: /run/flavor/secrets/app-api/gmail.refresh_token
+      GOOGLE_OAUTH_CLIENT_ID_FILE: /run/flavor/secrets/app-api/google.client_id
+      GOOGLE_OAUTH_CLIENT_SECRET_FILE: /run/flavor/secrets/app-api/google.client_secret
+    depends_on:
+      nats: { condition: service_started }
+      postgres: { condition: service_started }
+      secrets-loader: { condition: service_healthy }
+    volumes:
+      - ./vault:/vault
+      - secrets-tmpfs:/run/flavor/secrets:ro
+    ports:
+      - "127.0.0.1:8091:8091"
+    networks: [flavor]
+    restart: unless-stopped
+
+  app-ui:
+    image: nginx:alpine
+    volumes:
+      - ./app/ui:/usr/share/nginx/html:ro
+    depends_on:
+      app-api: { condition: service_started }
+    ports:
+      - "127.0.0.1:8090:80"
+    networks: [flavor]
+    restart: unless-stopped
+
+  secrets-loader:
+    build: ./infra/secrets-loader
+    container_name: secrets-loader
+    volumes:
+      - /etc/flavoros/age.key:/etc/flavoros/age.key:ro
+      - ./infra/secrets:/secrets:ro
+      - ./infra/composio.yaml:/grants/composio.yaml:ro
+      - secrets-tmpfs:/run/flavor/secrets
+    environment:
+      GRANTS_FILE: /grants/composio.yaml
+    healthcheck:
+      test: ["CMD", "test", "-f", "/run/flavor/secrets/_shared/openrouter.key"]
+      interval: 5s
+      timeout: 2s
+      retries: 30
+    restart: unless-stopped
+    networks: [flavor]
+
+  openrouter-proxy:
+    build: ./infra/openrouter-proxy
+    environment:
+      ROUTING_CONFIG: /etc/openrouter.yaml
+      OPENROUTER_API_KEY_FILE: /run/flavor/secrets/_shared/openrouter.key
+    volumes:
+      - ./infra/openrouter.yaml:/etc/openrouter.yaml:ro
+      - secrets-tmpfs:/run/flavor/secrets:ro
+    depends_on:
+      secrets-loader: { condition: service_healthy }
+    networks: [flavor]
+    restart: unless-stopped
+
+  composio-init:
+    build: ./infra/composio-init
+    profiles: ["init"]
+    environment:
+      COMPOSIO_API_KEY_FILE: /run/flavor/secrets/khadijah/composio.key
+    volumes:
+      - ./infra/composio.yaml:/etc/flavoros/composio.yaml:ro
+      - ./infra/secrets:/secrets:rw
+      - secrets-tmpfs:/run/flavor/secrets:ro
+    depends_on:
+      secrets-loader: { condition: service_healthy }
+    networks: [flavor]
+    stdin_open: true
+    tty: true
+
+  vault-sync:
+    image: alpine/git
+    entrypoint: ["sh"]
+    command: ["/scripts/sync.sh"]
+    environment:
+      OBSIDIAN_GIT_REMOTE: ${OBSIDIAN_GIT_REMOTE}
+    volumes:
+      - ./vault:/vault
+      - ./infra/vault-sync.sh:/scripts/sync.sh:ro
+    networks: [flavor]
+    restart: unless-stopped
+
+  scheduler:
+    build: ./infra/scheduler
+    environment:
+      NATS_URL: nats://nats:4222
+      SCHEDULES: /etc/schedules.yaml
+    volumes:
+      - ./cron/schedules.yaml:/etc/schedules.yaml:ro
+    depends_on: [nats]
+    networks: [flavor]
+    restart: unless-stopped
+
+  voice-gateway:
+    build: ./infra/voice-gateway
+    container_name: voice-gateway
+    restart: unless-stopped
+    environment:
+      APP_ENV: ${APP_ENV:-production}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      TIMEZONE: ${TIMEZONE:-America/New_York}
+      NATS_URL: nats://nats:4222
+      REDIS_URL: redis://redis:6379
+      POSTGRES_URL: postgres://flavor:${POSTGRES_PASSWORD}@postgres:5432/flavor
+      TWILIO_STREAM_URL: ${TWILIO_STREAM_URL}
+      VOICE_REPLY_MODE: ${VOICE_REPLY_MODE:-test_tone}
+      VOICE_OPENING_MODE: ${VOICE_OPENING_MODE:-disabled}
+      VOICE_ACTIVE_AGENT: ${VOICE_ACTIVE_AGENT:-sinclair}
+      VOICE_STT_MODE: ${VOICE_STT_MODE:-openai_batch}
+      ELEVENLABS_MODEL_ID: ${ELEVENLABS_MODEL_ID:-eleven_flash_v2_5}
+      ELEVENLABS_API_KEY_FILE: /run/flavor/secrets/${VOICE_ACTIVE_AGENT:-sinclair}/elevenlabs.key
+      ELEVENLABS_VOICE_ID_FILE: /run/flavor/secrets/${VOICE_ACTIVE_AGENT:-sinclair}/elevenlabs.voice_id
+      OPENAI_API_KEY_FILE: /run/flavor/secrets/${VOICE_ACTIVE_AGENT:-sinclair}/openai_whisper.key
+      OPENAI_TRANSCRIBE_MODEL: ${OPENAI_TRANSCRIBE_MODEL:-whisper-1}
+      VAULT_PATH: /vault
+    volumes:
+      - ./vault:/vault
+      - ./workspace:/workspace
+      - ./FLAVOROS_CONTEXT.md:/etc/flavoros/FLAVOROS_CONTEXT.md:ro
+      - secrets-tmpfs:/run/flavor/secrets:ro
+    depends_on:
+      - nats
+      - redis
+      - postgres
+    ports:
+      - "127.0.0.1:8088:8088"
+    labels:
+      traefik.enable: "true"
+      traefik.docker.network: "flavoros_flavor"
+      traefik.http.routers.flavoros-voice.rule: "Host(`voice.flavoros.bairyos.com`)"
+      traefik.http.routers.flavoros-voice.entrypoints: "websecure"
+      traefik.http.routers.flavoros-voice.tls.certresolver: "letsencrypt"
+      traefik.http.services.flavoros-voice.loadbalancer.server.port: "8088"
+    networks: [flavor]
+
+volumes:
+  redis-data:
+  pg-data:
+  secrets-tmpfs:
+    driver: local
+    driver_opts:
+      type: tmpfs
+      device: tmpfs
+      o: "size=16m,mode=0700"
+
+networks:
+  flavor:
+    driver: bridge

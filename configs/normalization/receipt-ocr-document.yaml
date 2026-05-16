@@ -1,0 +1,48 @@
+provider: receipt_ocr
+source_object: document
+target_object: receipt_document
+normalization_version: v1
+
+fields:
+  file_hash:
+    source: file_bytes
+    required: true
+    transform: sha256_bytes
+  vendor:
+    source: ocr.vendor
+    required: true
+    transform: trim
+  receipt_date:
+    source: ocr.date
+    required: true
+    transform: flexible_date_parse
+  total_amount_minor:
+    source: ocr.total
+    required: true
+    transform: decimal_to_minor_unsigned
+  tax_amount_minor:
+    source: ocr.tax
+    transform: decimal_to_minor_unsigned
+  currency:
+    source: ocr.currency
+    default: USD
+    transform: uppercase
+  line_items:
+    source: ocr.line_items
+    transform: normalize_receipt_line_items
+
+derived:
+  suggested_route:
+    default: khadijah.finance
+  ocr_status:
+    default: completed
+
+matching:
+  receipt_match_window_days: 5
+  amount_tolerance_minor: 250
+  confidence_formula:
+    - vendor_alias_similarity
+    - amount_delta
+    - date_proximity
+    - context_account_proximity
+

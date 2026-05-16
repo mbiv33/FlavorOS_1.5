@@ -1,0 +1,61 @@
+provider: stripe
+source_object: balance_transaction
+target_object: financial_transaction
+normalization_version: v1
+account:
+  financial_account_lookup:
+    by:
+      - provider
+      - account_alias
+fields:
+  external_transaction_id:
+    source: id
+    required: true
+  transaction_date:
+    source: created
+    required: true
+    transform: epoch_seconds_to_date
+  posted_at:
+    source: created
+    required: true
+    transform: epoch_seconds_to_iso8601
+  amount_minor:
+    source: amount
+    required: true
+    transform: integer_copy
+  currency:
+    source: currency
+    required: true
+    transform: uppercase
+  raw_merchant:
+    source: description
+  clean_merchant:
+    transform: merchant_alias_lookup
+    args:
+      raw_source: description
+  description:
+    source: type
+  category_hint:
+    source: reporting_category
+derived:
+  source_kind: provider_api
+  transaction_direction:
+    transform: signed_amount_to_direction
+    args:
+      source: amount
+  transaction_status:
+    default: posted
+  idempotency_key:
+    source: id
+  immutable_hash:
+    transform: stable_hash
+    args:
+      values:
+        - stripe
+        - id
+        - source
+        - type
+        - amount
+        - currency
+        - created
+

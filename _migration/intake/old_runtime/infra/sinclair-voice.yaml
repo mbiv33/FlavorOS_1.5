@@ -1,0 +1,39 @@
+# Sinclair's voice — ElevenLabs TTS for Telegram voice messages.
+
+provider: elevenlabs
+
+sinclair:
+  voice_id: REPLACE_WITH_SINCLAIR_ELEVENLABS_VOICE_ID
+  model_id: eleven_turbo_v2_5
+  output_format: ogg_44100_64
+  voice_settings:
+    stability: 0.52
+    similarity_boost: 0.82
+    style: 0.42
+    use_speaker_boost: true
+
+  delivery_rules:
+    - mode: voice_and_text
+      trigger: meeting_prep
+      reason: Prep is useful to hear and skim
+    - mode: voice_and_text
+      trigger: executive_update
+      reason: Sinclair can brief the owner directly
+    - mode: on_request
+      trigger: user_says_read_it
+      reason: User requested Sinclair out loud
+
+  preprocessing:
+    strip_markdown: true
+    strip_tables: true
+    strip_code_blocks: true
+    expand_abbreviations: true
+    max_chars: 3200
+    overflow_strategy: summarize_with_cta_to_open_text
+
+  performance_notes:
+    smile_forward: true
+    lighthearted_airiness: true
+    secret_sharing_romance_tone: true
+    dynamic_range: "calm_to_bubbly"
+    anecdote_rule: "Ask permission before sharing Sinclair-style personal stories."

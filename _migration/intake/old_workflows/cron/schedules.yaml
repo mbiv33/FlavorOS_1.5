@@ -1,0 +1,259 @@
+# Master cron. The `scheduler` container reads this and publishes
+# `work_order.<agent>` messages on NATS at the configured times.
+# All times are in the active runtime timezone and operating rules from FLAVOROS_CONTEXT.md.
+
+schedules:
+  # ── Khadijah (orchestration) ──────────────────────────────────────
+  - id: morning_brief
+    cron: "0 8 * * *"
+    agent: khadijah
+    skill: morning-brief
+    notes: Assembles Flavor Brief from all specialists' outputs
+
+  - id: midday_check
+    cron: "30 12 * * 1-5"
+    agent: khadijah
+    skill: midday-pulse
+    notes: Quick triage; only fires Brief if state changed materially
+
+  - id: eod_review
+    cron: "30 17 * * 1-5"
+    agent: khadijah
+    skill: eod-review
+
+  - id: weekly_review
+    cron: "0 18 * * 5"
+    agent: khadijah
+    skill: weekly-review
+    notes: Friday EOD; rolls up wins, misses, next-week priorities
+
+  - id: ripple_synthesis_pulse
+    cron: "0 */6 * * *"
+    agent: khadijah
+    skill: ripple-synthesis
+    args: { pass: pulse }
+    notes: Every 6h. Folds duplicates, mints high-signal ripples, defers ambiguous observations to the deep pass.
+
+  - id: ripple_synthesis_deep
+    cron: "30 23 * * *"
+    agent: khadijah
+    skill: ripple-synthesis
+    args: { pass: deep }
+    notes: Nightly deep pass. Full intersection analysis; produces prioritized findings the morning brief consumes.
+
+  # ── Sinclair (inbox + calendar) ───────────────────────────────────
+  - id: inbox_sweep
+    cron: "*/15 8-18 * * 1-5"
+    agent: sinclair
+    skill: inbox-sweep
+
+  - id: inbox_sweep_offhours
+    cron: "0 */2 * * *"
+    agent: sinclair
+    skill: inbox-sweep
+    args: { mode: minimal }
+
+  - id: calendar_lookahead
+    cron: "0 7,13 * * *"
+    agent: sinclair
+    skill: calendar-lookahead
+
+  - id: meeting_prep
+    cron: "0 18 * * 0-4"
+    agent: sinclair
+    skill: meeting-prep
+    notes: Drafts prep notes in vault for tomorrow's meetings
+
+  # ── Maxine (tasks + projects) ─────────────────────────────────────
+  - id: task_prep
+    cron: "0 2 * * *"
+    agent: maxine
+    skill: daily-task-prep
+
+  - id: project_status
+    cron: "0 9 * * 1"
+    agent: maxine
+    skill: project-status-roundup
+    notes: Monday project pulse for both businesses
+
+  - id: milestone_check
+    cron: "0 10 * * 1-5"
+    agent: maxine
+    skill: milestone-risk-scan
+
+  # ── Kyle (CRM + finance) ──────────────────────────────────────────
+  - id: followup_morning
+    cron: "0 9 * * 1-5"
+    agent: kyle
+    skill: followup-cadence
+
+  - id: followup_afternoon
+    cron: "0 15 * * 1-5"
+    agent: kyle
+    skill: followup-cadence
+
+  - id: vip_health_check
+    cron: "0 10 * * 1"
+    agent: kyle
+    skill: vip-health-check
+
+  - id: weekly_finance_pulse
+    cron: "0 8 * * 1"
+    agent: maxine
+    skill: finance-pulse
+
+  - id: finance_ingest_backfill
+    cron: "15 5 * * *"
+    agent: maxine
+    skill: financial-ingestion-normalization
+    args: { mode: backfill_recovery }
+    notes: Webhook-first remains canonical; this is the replay-safe fallback sweep.
+
+  - id: receipt_match_repair
+    cron: "45 5 * * *"
+    agent: maxine
+    skill: receipt-capture-matching
+    args: { mode: repair_scan }
+    notes: Looks for unmatched receipts or receipted spend missing confirmation.
+
+  - id: monthly_overhead_audit
+    cron: "0 9 1 * *"
+    agent: maxine
+    skill: overhead-audit
+
+  - id: budget_dashboard_refresh
+    cron: "30 8 * * 1-5"
+    agent: maxine
+    skill: budget-dashboard-generation
+    notes: Refreshes the readable budget view from canonical finance state.
+
+  - id: monthly_ledger_close
+    cron: "0 8 2 * *"
+    agent: maxine
+    skill: ledger-reconciliation
+    args: { mode: monthly_close }
+    notes: Runs after month boundary to prepare exceptions, cash projection, and period-lock readiness.
+
+  # ── Kyle (brand + social) ────────────────────────────────────────
+  - id: network_pulse
+    cron: "0 11 * * 1,4"
+    agent: kyle
+    skill: network-pulse
+    notes: Mon/Thu — gaps, warm intros, going-cold VIPs
+
+  - id: event_lookahead
+    cron: "0 16 * * 0"
+    agent: kyle
+    skill: event-lookahead
+    notes: Sunday — preview events for the week
+
+  # ── Scooter (travel) ──────────────────────────────────────────────
+  - id: travel_horizon_scan
+    cron: "0 7 * * 1-5"
+    agent: scooter
+    skill: travel-horizon-scan
+    notes: Looks 14 days out; flags trips needing booking action
+
+  - id: pre_trip_check
+    cron: "0 18 * * *"
+    agent: scooter
+    skill: pre-trip-check
+    notes: Fires only if travel within 72h. Owns prep→active phase transition.
+
+  - id: travel_prep_pulse
+    cron: "0 9 * * *"
+    agent: scooter
+    skill: travel-prep
+    notes: Daily refresh of the Travel Brief during phase=prep. Re-entrant; early-exits when no trip is in prep.
+
+  - id: trip_itinerary_tick
+    cron: "*/15 * * * *"
+    agent: scooter
+    skill: travel-itinerary
+    notes: Live SIGMA tick during active trips. Skill early-exits when no trip is in phase=active, so always-on is safe.
+
+  - id: travel_return_check
+    cron: "0 18 * * *"
+    agent: scooter
+    skill: travel-return
+    notes: Acts on trip-instance SIGMAs in phase=active whose return date has passed. Owns active→return transition.
+
+  - id: travel_debrief_check
+    cron: "0 10 * * *"
+    agent: scooter
+    skill: travel-debrief
+    notes: Acts on trip-instance SIGMAs in phase=return for ≥24h. Owns return→debrief transition; sends the survey, waits for reply, produces the debrief artifact.
+
+  - id: travel_universe_update_check
+    cron: "0 11 * * *"
+    agent: scooter
+    skill: travel-universe-update
+    notes: Acts on trip-instance SIGMAs in phase=debrief whose learnings block is populated. Folds into long-term SIGMAs and closes the trip.
+
+  # ── Scooter (receipts) ────────────────────────────────────────────
+  # Tier 1 always-on cron baseline. Skill is trigger-source-agnostic —
+  # calendar events and email scans, when available, refine timing and
+  # auto-capture without changing this schedule.
+  - id: receipt_check_lunch
+    cron: "30 13 * * *"
+    agent: scooter
+    skill: travel-receipts
+    args: { mode: prompt, window: lunch }
+
+  - id: receipt_check_dinner
+    cron: "0 21 * * *"
+    agent: scooter
+    skill: travel-receipts
+    args: { mode: prompt, window: dinner }
+
+  - id: receipt_morning_followup
+    cron: "30 7 * * *"
+    agent: scooter
+    skill: travel-receipts
+    args: { mode: followup }
+    notes: Surfaces missing receipts in morning briefing; escalates to Maxine after 3 prompts
+
+  # ── Sinclair (wellness) ───────────────────────────────────────────
+  - id: morning_vitals
+    cron: "30 7 * * *"
+    agent: sinclair
+    skill: morning-vitals
+
+  - id: calendar_load_check
+    cron: "0 16 * * 0-4"
+    agent: sinclair
+    skill: calendar-load-check
+    notes: Looks at tomorrow; flags overload to Khadijah
+
+  - id: weekly_perma_v
+    cron: "0 17 * * 0"
+    agent: sinclair
+    skill: perma-v-checkin
+
+  - id: journal_sentiment
+    cron: "0 23 * * *"
+    agent: sinclair
+    skill: journal-sentiment-scan
+    notes: Read-only scan of vault/80-Journal/
+
+  # ── Maxine / Scooter (ops + tech) ─────────────────────────────────
+  - id: bill_radar
+    cron: "0 6 * * *"
+    agent: maxine
+    skill: bill-radar
+    notes: Daily — upcoming due-dates within 7 days
+
+  - id: subscription_audit
+    cron: "0 9 1 * *"
+    agent: maxine
+    skill: subscription-audit
+
+  - id: tech_health
+    cron: "0 4 * * 0"
+    agent: scooter
+    skill: tech-health-check
+
+  - id: domain_renewal_scan
+    cron: "0 5 1 * *"
+    agent: maxine
+    skill: domain-renewal-scan

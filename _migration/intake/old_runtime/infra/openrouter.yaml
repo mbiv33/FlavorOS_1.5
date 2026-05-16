@@ -1,0 +1,60 @@
+# Per-agent model routing through OpenRouter.
+# The openrouter-proxy sidecar reads this and enforces caps + fallbacks.
+
+defaults:
+  provider: openrouter
+  daily_token_cap: 2_000_000
+  retry_on_rate_limit: true
+  log_to: postgres://flavor@postgres/flavor#openrouter_calls
+
+agents:
+  khadijah:
+    primary: anthropic/claude-sonnet-4.6
+    fallback: anthropic/claude-sonnet-4.5
+    daily_token_cap: 4_000_000   # hub gets the most headroom
+    notes: synthesis + user interface; never falls below sonnet
+
+  sinclair:
+    profiles:
+      thinking:
+        primary: anthropic/claude-sonnet-4.6
+        used_for: [high_stakes_draft_email, schedule_decision, sensitive_meeting_prep]
+      fast:
+        primary: openai/gpt-5.4-mini
+        used_for: [inbox_sweep, label_message, archive_decision, simple_draft_email, wellness_checks]
+    daily_token_cap: 3_000_000
+
+  maxine:
+    profiles:
+      thinking:
+        primary: anthropic/claude-sonnet-4.6
+        used_for: [milestone_review, prioritization, goal_alignment]
+      report:
+        primary: openai/gpt-5.4-mini
+        used_for: [task_file_diff, daily_prep, status_summary, invoice_tracking, anomaly_scans]
+    daily_token_cap: 2_500_000
+
+  kyle:
+    profiles:
+      thinking:
+        primary: anthropic/claude-sonnet-4.6
+        used_for: [brand_social, vip_positioning, public_facing_drafts]
+      fast:
+        primary: openai/gpt-5.4-mini
+        used_for: [crm_upkeep, followup_cadence, contact_summaries]
+    daily_token_cap: 1_800_000
+
+  scooter:
+    profiles:
+      thinking:
+        primary: anthropic/claude-sonnet-4.6
+        used_for: [high_stakes_logistics, multi_constraint_brief]
+      fast:
+        primary: openai/gpt-5.4-mini
+        used_for: [travel_research, web_research, vendor_research, trip_summaries, logistics_ranking]
+    daily_token_cap: 1_000_000
+
+cost_breakers:
+  warn_at_pct: 70
+  pause_at_pct: 100
+  notify: khadijah

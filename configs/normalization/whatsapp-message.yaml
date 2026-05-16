@@ -1,0 +1,50 @@
+provider: whatsapp
+source_object: message
+target_object: normalized_item
+normalization_version: v1
+
+thread:
+  external_thread_id: conversation.id
+  title: conversation.title
+
+fields:
+  external_object_id:
+    source: id
+    required: true
+  received_at:
+    source: timestamp
+    transform: unix_seconds_to_iso8601
+    required: true
+  from_entities:
+    source: from
+    transform: normalize_whatsapp_participant
+    required: true
+  to_entities:
+    source: to
+    transform: normalize_whatsapp_participant
+  body_markdown:
+    source: text.body
+    fallback: caption
+    transform: sanitize_markdown
+    required: true
+  direction:
+    source: direction
+    required: true
+
+derived:
+  requires_response:
+    transform: detect_reply_need
+  requires_approval:
+    transform: detect_relationship_or_reputation_risk
+  suggested_route:
+    transform: route_direct_message
+    allowed_routes:
+      - sinclair.communications
+      - regine.relationships
+
+origin:
+  action_type: whatsapp_reply
+  target:
+    conversation_id: conversation.id
+    message_id: id
+

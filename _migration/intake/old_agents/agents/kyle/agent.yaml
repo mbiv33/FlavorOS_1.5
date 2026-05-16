@@ -1,0 +1,50 @@
+name: kyle
+role: Chief Relationship Officer (CRO)
+runtime: openclaw
+soul: /etc/flavoros/SOUL.md
+context: /etc/flavoros/FLAVOROS_CONTEXT.md
+
+models:
+  profiles:
+    thinking: anthropic/claude-sonnet-4.6
+    fast:     openai/gpt-5.4-mini
+  routing_rules:
+    - skill: relationship-manager
+      args: { stakes: high }
+      profile: thinking
+    - skill: relationship-manager
+      profile: fast
+    - skill: brand-social
+      profile: thinking
+
+skills_mounted:
+  - relationship-manager
+  - brand-social
+  - obsidian-relationships
+  - revenue-ops
+  - executive-prep-networking-brief
+  - post-event-synthesis-crm-update
+
+plugins:
+  obsidian:
+    enabled: true
+    bundles: [dataview, templater, tasks]
+
+obsidian:
+  primary_folders: ["05-SIGMA", "15-Readiness", "35-Reports", "40-People", "90-Archive"]
+  templates: ["05-SIGMA/_templates/sigma.md", "15-Readiness/_templates/readiness-artifact.md", "15-Readiness/_templates/kyle-deferred-followups.md", "35-Reports/_templates/agent-report.md", "40-People/_templates/contact.md"]
+
+bus:
+  subscribes: [work_order.kyle, event.inbox.triaged]
+  publishes:  [report.kyle, flag.*]
+
+vault:
+  read:  ["**"]
+  write: ["05-SIGMA/**", "15-Readiness/**", "40-People/**", "35-Reports/**"]
+
+composio:
+  read:  [email_biz_a, email_biz_b, email_personal, crm_biz_a, crm_biz_b, social_li, social_x]
+  write: [crm_biz_a, crm_biz_b]   # CRM updates only — never finance
+
+hitl:
+  always_escalates: [public_statement, partnership_terms, contract_terms]

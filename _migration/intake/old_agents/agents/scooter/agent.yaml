@@ -1,0 +1,125 @@
+name: scooter
+role: Chief Logistics Officer (CLO)
+runtime: openclaw
+soul: /etc/flavoros/SOUL.md
+context: /etc/flavoros/FLAVOROS_CONTEXT.md
+
+models:
+  profiles:
+    thinking: anthropic/claude-sonnet-4.6
+    fast:     openai/gpt-5.4-mini
+  routing_rules:
+    - skill: travel-planning
+      args: { stakes: high }
+      profile: thinking
+    - skill: travel-planning
+      args: { multi_constraint: true }
+      profile: thinking
+    - skill: travel-planning
+      profile: thinking
+    - skill: travel-booking
+      profile: thinking
+    - skill: travel-prep
+      args: { stakes: high }
+      profile: thinking
+    - skill: travel-prep
+      profile: fast
+    - skill: travel-receipts
+      args: { mode: followup }
+      profile: thinking
+    - skill: travel-receipts
+      profile: fast
+    - skill: travel-itinerary
+      args: { divergence_detected: true }
+      profile: thinking
+    - skill: travel-itinerary
+      profile: fast
+    - skill: ripple-observation
+      profile: fast
+    - skill: travel-return
+      profile: thinking
+    - skill: travel-debrief
+      args: { stakes: high }
+      profile: thinking
+    - skill: travel-debrief
+      profile: thinking
+    - skill: travel-universe-update
+      profile: thinking
+    - skill: travel-logistics
+      args: { stakes: high }
+      profile: thinking
+    - skill: travel-logistics
+      args: { multi_constraint: true }
+      profile: thinking
+    - skill: travel-logistics
+      profile: fast
+    - skill: tech-ops
+      args: { stakes: high }
+      profile: thinking
+    - skill: tech-ops
+      profile: fast
+    - skill: briefing-coordination
+      args: { stakes: high }
+      profile: thinking
+    - skill: briefing-coordination
+      args: { multi_constraint: true }
+      profile: thinking
+    - skill: briefing-coordination
+      profile: fast
+    - skill: web-research
+      args: { stakes: high }
+      profile: thinking
+    - skill: web-research
+      args: { multi_constraint: true }
+      profile: thinking
+    - skill: web-research
+      profile: fast
+    - skill: logistics-research
+      args: { stakes: high }
+      profile: thinking
+    - skill: logistics-research
+      args: { multi_constraint: true }
+      profile: thinking
+    - skill: logistics-research
+      profile: fast
+
+skills_mounted:
+  - travel-planning
+  - travel-booking
+  - travel-prep
+  - travel-receipts
+  - travel-itinerary
+  - travel-return
+  - travel-debrief
+  - travel-universe-update
+  - ripple-observation
+  - travel-logistics
+  - tech-ops
+  - briefing-coordination
+  - web-research
+  - logistics-research
+  - obsidian-logistics
+
+plugins:
+  obsidian:
+    enabled: true
+    bundles: [dataview, templater, tasks]
+  web:
+    enabled: true
+    bundles: [browser, research]
+
+obsidian:
+  primary_folders: ["05-SIGMA", "15-Readiness", "20-Meetings", "35-Reports", "50-Travel", "70-Ops", "90-Archive"]
+  templates: ["05-SIGMA/_templates/sigma.md", "05-SIGMA/_templates/sigma-trip-instance.md", "05-SIGMA/_templates/sigma-ripple.md", "05-SIGMA/_templates/sigma-travel-preferences.md", "05-SIGMA/_templates/sigma-destination-intelligence.md", "05-SIGMA/_templates/sigma-vendor-intelligence.md", "15-Readiness/_templates/readiness-artifact.md", "15-Readiness/_templates/plan-trip.md", "15-Readiness/_templates/booking-execution.md", "15-Readiness/_templates/trip-brief.md", "15-Readiness/_templates/receipt-prompt.md", "15-Readiness/_templates/itinerary-live.md", "15-Readiness/_templates/return-checklist.md", "15-Readiness/_templates/debrief-survey.md", "15-Readiness/_templates/trip-debrief.md", "20-Meetings/_templates/prep.md", "35-Reports/_templates/agent-report.md", "50-Travel/_templates/trip.md"]
+
+bus:
+  subscribes: [work_order.scooter]
+  publishes:  [report.scooter, flag.*]
+
+vault:
+  read:  ["**"]
+  write: ["05-SIGMA/**", "15-Readiness/**", "20-Meetings/**", "35-Reports/**", "50-Travel/**", "70-Ops/**"]
+
+composio:
+  read:  [travel, flights, hotels, cal_personal, cal_biz_a, cal_biz_b, email_personal]
+  write: [travel]   # itinerary file only; bookings escalate to Khadijah

@@ -1,0 +1,55 @@
+provider: gmail
+source_object: message
+target_object: normalized_item
+normalization_version: v1
+
+thread:
+  external_thread_id: threadId
+  title: payload.headers.Subject
+
+fields:
+  external_object_id:
+    source: id
+    required: true
+  received_at:
+    source: internalDate
+    transform: epoch_ms_to_iso8601
+    required: true
+  subject:
+    source: payload.headers.Subject
+  from_entities:
+    source: payload.headers.From
+    transform: parse_email_participants
+    required: true
+  to_entities:
+    source: payload.headers.To
+    transform: parse_email_participants
+  body_markdown:
+    source: payload.parts
+    fallback: snippet
+    transform: gmail_body_to_markdown
+    required: true
+  thread_status:
+    source: labelIds
+    transform: gmail_labels_to_thread_status
+
+derived:
+  requires_response:
+    transform: detect_reply_need
+  requires_approval:
+    transform: detect_sensitive_or_external_side_effect
+  suggested_route:
+    transform: route_communication_item
+    allowed_routes:
+      - sinclair.communications
+      - khadijah.projects
+      - khadijah.finance
+      - regine.relationships
+
+origin:
+  action_type: gmail_reply_or_draft
+  target:
+    provider_connection_lookup: client_context_account
+    thread_id: threadId
+    message_id: id
+

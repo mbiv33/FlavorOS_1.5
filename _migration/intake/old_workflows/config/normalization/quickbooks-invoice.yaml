@@ -1,0 +1,34 @@
+provider: quickbooks
+source_object: invoice
+target_object: invoice
+normalization_version: v1
+fields:
+  external_invoice_id:
+    source: Id
+    required: true
+  invoice_number:
+    source: DocNumber
+    required: true
+  customer_name:
+    source: CustomerRef.name
+    required: true
+  total_amount_minor:
+    source: TotalAmt
+    required: true
+    transform: decimal_to_minor_unsigned
+  currency:
+    source: CurrencyRef.value
+    default: USD
+    transform: uppercase
+  due_date:
+    source: DueDate
+    transform: date_to_iso
+  issued_at:
+    source: TxnDate
+    transform: date_to_iso
+derived:
+  invoice_status:
+    transform: quickbooks_balance_to_status
+    args:
+      balance_source: Balance
+      email_status_source: EmailStatus

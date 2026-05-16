@@ -1,29 +1,49 @@
-# Placeholder — maps to docs/mvp_build_notes.md MVP agents.
+# FlavorOS 1.5 MVP agent roster.
 
 agents:
   khadijah_conductor:
     runtime: cloud
-    personas: [khadijah_orchestration, maxine_project_management, kyle_finances]
+    personas:
+      - khadijah_orchestration
+      - maxine_project_management
+      - maxine_finance_oversight
+    owns:
+      - orchestration
+      - briefings
+      - approvals
+      - projects
+      - operations
+      - finance_oversight
   sinclair_communications:
     runtime: local
     personas:
-      [
-        sinclair_executive_assistant,
-        sinclair_preference_guardian,
-        sinclair_wellness_guru,
-        overton_secrets_butler,
-        overton_household_management,
-      ]
+      - sinclair_executive_assistant
+      - sinclair_preference_guardian
+      - sinclair_wellness_guru
+      - overton_secrets_butler
+      - overton_household_management
+    owns:
+      - communications
+      - calendar
+      - provider_private_boundary
+      - wellness_rhythm
+      - household_sensitive_context
   regine_research_logistics:
     runtime: cloud
     personas:
-      [
-        scooter_travel_logistics,
-        scooter_researcher,
-        regine_relationships,
-        regine_lifestyle,
-        regine_social_media,
-      ]
+      - scooter_travel_logistics
+      - scooter_researcher
+      - kyle_crm_relationships
+      - regine_relationships
+      - regine_lifestyle
+      - regine_social_media
+    owns:
+      - research
+      - travel
+      - logistics
+      - relationships
+      - crm
+      - brand_social_context
 
 enabled:
   - khadijah_conductor

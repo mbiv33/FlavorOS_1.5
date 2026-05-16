@@ -1,0 +1,51 @@
+provider: google_calendar
+source_object: event
+target_object: normalized_item
+normalization_version: v1
+
+thread:
+  external_thread_id: iCalUID
+  title: summary
+
+fields:
+  external_object_id:
+    source: id
+    required: true
+  received_at:
+    source: start
+    transform: calendar_start_to_iso8601
+    required: true
+  subject:
+    source: summary
+  from_entities:
+    source: organizer
+    transform: normalize_calendar_organizer
+    required: true
+  to_entities:
+    source: attendees
+    transform: normalize_calendar_attendees
+  body_markdown:
+    source: description
+    transform: sanitize_markdown
+  thread_status:
+    source: status
+    required: true
+
+derived:
+  requires_response:
+    transform: detect_calendar_action_need
+  requires_approval:
+    transform: detect_calendar_commitment_risk
+  suggested_route:
+    transform: route_calendar_item
+    allowed_routes:
+      - sinclair.calendar
+      - sinclair.meeting_prep
+      - khadijah.briefing
+
+origin:
+  action_type: calendar_event_update_or_proposal
+  target:
+    calendar_id: primary
+    event_id: id
+

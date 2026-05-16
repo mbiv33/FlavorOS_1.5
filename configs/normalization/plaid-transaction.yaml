@@ -1,0 +1,76 @@
+provider: plaid
+source_object: transaction
+target_object: financial_transaction
+normalization_version: v1
+
+account:
+  financial_account_lookup:
+    by:
+      - provider
+      - external_account_id
+
+fields:
+  external_transaction_id:
+    source: transaction_id
+    required: true
+  transaction_date:
+    source: date
+    required: true
+    transform: date_to_iso
+  posted_at:
+    source: authorized_datetime
+    fallback_source: datetime
+    transform: datetime_to_iso8601
+  amount_minor:
+    source: amount
+    required: true
+    transform: decimal_to_minor_signed
+  currency:
+    source: iso_currency_code
+    required: true
+    default: USD
+    transform: uppercase
+  raw_merchant:
+    source: merchant_name
+  clean_merchant:
+    transform: merchant_alias_lookup
+    args:
+      raw_source: merchant_name
+  description:
+    source: name
+  transaction_status:
+    source: pending
+    required: true
+    transform: plaid_pending_to_status
+
+derived:
+  source_kind: provider_api
+  transaction_direction:
+    transform: signed_amount_to_direction
+    args:
+      source: amount
+  suggested_route:
+    default: khadijah.finance
+  idempotency_key:
+    transform: first_present
+    args:
+      values:
+        - transaction_id
+        - composite:
+            - account_id
+            - date
+            - amount
+            - merchant_name
+  immutable_hash:
+    transform: stable_hash
+    args:
+      values:
+        - plaid
+        - account_id
+        - transaction_id
+        - pending_transaction_id
+        - date
+        - amount
+        - iso_currency_code
+        - merchant_name
+

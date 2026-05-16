@@ -1,0 +1,49 @@
+# Composio account aliases + per-agent toolkit grants.
+# Connect each account once via `docker compose run --rm composio-init`,
+# then reference the alias in `agents/<name>/agent.yaml`.
+
+accounts:
+  email_biz_a:        { toolkit: gmail,           label: "Business A" }
+  email_biz_b:        { toolkit: gmail,           label: "Business B" }
+  email_personal:     { toolkit: gmail,           label: "Personal" }
+
+  cal_biz_a:          { toolkit: googlecalendar,  label: "Business A" }
+  cal_biz_b:          { toolkit: googlecalendar,  label: "Business B" }
+  cal_personal:       { toolkit: googlecalendar,  label: "Personal" }
+
+  bank_biz_a:         { toolkit: mercury,         label: "Business A" }
+  bank_biz_b:         { toolkit: mercury,         label: "Business B" }
+  bank_personal:      { toolkit: plaid,           label: "Personal" }
+  cards:              { toolkit: ramp,            label: "Corporate cards" }
+  books:              { toolkit: quickbooks,      label: "Both books" }
+
+  crm_biz_a:          { toolkit: hubspot,         label: "Business A CRM" }
+  crm_biz_b:          { toolkit: attio,           label: "Business B CRM" }
+
+  pm_biz_a:           { toolkit: linear,          label: "Business A engineering" }
+  pm_biz_b:           { toolkit: notion,          label: "Business B" }
+
+  travel:             { toolkit: tripit,          label: "Travel itineraries" }
+  flights:            { toolkit: googleflights,   label: "Flight search" }
+  hotels:             { toolkit: hotels,          label: "Hotel search" }
+
+  social_li:          { toolkit: linkedin,        label: "Personal LinkedIn" }
+  social_x:           { toolkit: twitter,         label: "Personal X" }
+
+  comms:              { toolkit: telegram,        label: "Khadijah escalation channel" }
+
+# Agent → account access. Read = can fetch; Write = can send/create (HITL gated).
+grants:
+  khadijah:  { read: [comms], write: [comms] }
+  sinclair:
+    read:  [email_biz_a, email_biz_b, email_personal, cal_biz_a, cal_biz_b, cal_personal]
+    write: [email_biz_a, email_biz_b, email_personal, cal_biz_a, cal_biz_b, cal_personal]
+  maxine:
+    read:  [pm_biz_a, pm_biz_b, cal_biz_a, cal_biz_b, bank_biz_a, bank_biz_b, bank_personal, cards, books, email_personal]
+    write: [pm_biz_a, pm_biz_b]
+  kyle:
+    read:  [email_biz_a, email_biz_b, email_personal, crm_biz_a, crm_biz_b, social_li, social_x]
+    write: [crm_biz_a, crm_biz_b]
+  scooter:
+    read:  [travel, flights, hotels, cal_personal, cal_biz_a, cal_biz_b, email_personal]
+    write: [travel]                 # itinerary file only; bookings escalate

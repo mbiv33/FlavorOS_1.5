@@ -1,1 +1,98 @@
-workflows: {}
+workflows:
+  briefing.morning_standup:
+    owner: khadijah_conductor
+    surface: morning_standup
+    schedule_hint: daily_morning
+    produces:
+      - client_artifact
+      - completion_summary
+  briefing.cob_workday:
+    owner: khadijah_conductor
+    surface: cob_workday
+    schedule_hint: weekday_late_afternoon
+    produces:
+      - client_artifact
+      - completion_summary
+  briefing.goodnight:
+    owner: sinclair_communications
+    surface: goodnight
+    schedule_hint: evening
+    produces:
+      - client_artifact
+      - memory_candidate
+  provider.communication_sweep:
+    owner: sinclair_communications
+    surface: comms_calendar_meeting
+    schedule_hint: frequent_business_hours
+    produces:
+      - normalized_item
+      - pending_action_candidate
+      - approval_request
+      - client_artifact
+  provider.calendar_lookahead:
+    owner: sinclair_communications
+    surface: comms_calendar_meeting
+    schedule_hint: morning_and_midday
+    produces:
+      - normalized_item
+      - client_artifact
+  meeting.comms_calendar_prep:
+    owner: sinclair_communications
+    surface: comms_calendar_meeting
+    schedule_hint: evening_before_meetings
+    produces:
+      - client_artifact
+      - sigma_artifact
+  meeting.projects_pulse:
+    owner: khadijah_conductor
+    surface: projects_meeting
+    schedule_hint: weekday_or_monday
+    produces:
+      - client_artifact
+      - sigma_artifact
+  workflow.finance_pulse:
+    owner: khadijah_conductor
+    surface: projects_meeting
+    schedule_hint: weekly_plus_exception_sweeps
+    hitl_required: true
+    produces:
+      - client_artifact
+      - approval_request
+  workflow.pac_ptq_review:
+    owner: khadijah_conductor
+    surface: command_center
+    schedule_hint: nightly_plus_event_driven
+    produces:
+      - pending_action_candidate
+      - qualification_check
+      - approval_request
+  meeting.relationship_context:
+    owner: regine_research_logistics
+    surface: reports_artifacts_meeting
+    schedule_hint: weekly_or_twice_weekly
+    produces:
+      - client_artifact
+      - sigma_artifact
+  meeting.travel_horizon_scan:
+    owner: regine_research_logistics
+    surface: travel_meeting
+    schedule_hint: weekday_morning
+    produces:
+      - client_artifact
+      - sigma_artifact
+  workflow.travel_lifecycle:
+    owner: regine_research_logistics
+    surface: travel_meeting
+    schedule_hint: daily_conditional
+    hitl_required: true
+    produces:
+      - client_artifact
+      - sigma_artifact
+      - approval_request
+  meeting.reports_artifacts_refresh:
+    owner: khadijah_conductor
+    surface: reports_artifacts_meeting
+    schedule_hint: daily_or_on_workflow_completion
+    produces:
+      - completion_summary
+      - client_artifact

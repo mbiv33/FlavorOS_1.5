@@ -1,38 +1,74 @@
-# FlavorOS Framework
+# FlavorOS Docs
 
-FlavorOS is a multi-tenant, multi-agent client operating system that gives each client a calm, unified command center while allowing the developer/admin role to monitor, configure, test, and improve the underlying system.
+FlavorOS is a multi-tenant, multi-agent client operating system built around a visual-first Command Center, structured Briefings and Meetings, Client Artifacts, SIGMA/GBrain-backed internal state, and approval-led workflows.
 
-This framework memorializes the current architecture decisions for FlavorOS, including the multi-tenant model, Client Universe, agent/persona structure, GBrain memory layer, Composio integration layer, artifact model, services, configurations, and recommended repository structure.
+## Canonical Doc Folders
 
-## Core Thesis
+| Folder | Purpose |
+|---|---|
+| `architecture/` | Core system architecture, Client Universe, data flow, artifacts, GBrain, SIGMA, Composio, repo structure |
+| `agents/` | Three-agent MVP model, runtime contracts, persona pack rules |
+| `workflows/` | Onboarding, workflow runtime, PAC/PTQ qualification |
+| `runtime/` | Hostinger/VPS runtime direction and services/config model |
+| `governance/` | HITL, permissions, tenant isolation, audit, secrets protocol |
+| `ui/` | MVP UI architecture and future-state voice/chat layer |
+| `planning/` | Non-canonical planning notes and MVP build notes |
 
-FlavorOS is not organized around individual apps or disconnected accounts. It is organized around the client.
-
-Each client has a **Client Universe**: a scoped, isolated operating context containing their profile, preferences, accounts, dimensions, relationships, projects, communications, calendar data, memory, context, artifacts, approvals, and agent-generated internal state.
-
-The system uses:
-
-- **Composio** for authorized access to external context providers.
-- **GBrain** for ingestion, indexing, memory maintenance, retrieval, and context preparation.
-- **Agents** for role-based execution.
-- **Personas** for purpose, tone, and interaction mode.
-- **Skills** for reusable capabilities.
-- **Workflows** for repeatable procedures.
-- **Artifacts** for agent work product.
-- **Governance** for permissions, approvals, auditability, and tenant isolation.
-
-## Documents in This Package
+## Architecture
 
 | File | Purpose |
 |---|---|
-| `architecture_overview.md` | High-level system architecture and operating model |
-| `multi_tenant_model.md` | Tenant/client structure, roles, and isolation model |
-| `client_universe_model.md` | Definition of the Client Universe and client-scoped context |
-| `agent_persona_model.md` | MVP agents, personas, and responsibilities |
-| `artifact_model.md` | Client Arts and SIGMA Arts definitions |
-| `gbrain_integration.md` | How GBrain fits into ingestion, memory, retrieval, and state maintenance |
-| `composio_integration.md` | How Composio functions as the external provider access layer |
-| `repo_structure.md` | Recommended root folder structure |
-| `services_and_configs.md` | Meaning of services and configurations under this framework |
-| `governance_and_permissions.md` | Approval, permissions, tenant isolation, and audit rules |
-| `mvp_build_notes.md` | MVP build priorities and implementation notes |
+| `architecture/architecture_overview.md` | High-level system architecture and operating model |
+| `architecture/multi_tenant_model.md` | Tenant/client structure, roles, and isolation model |
+| `architecture/client_universe_model.md` | Definition of the Client Universe and client-scoped context |
+| `architecture/client_profile_and_envelope_model.md` | Client profile, envelope, contexts, account aliases, and role separation |
+| `architecture/artifact_model.md` | Client Artifact and SIGMA Artifact definitions |
+| `architecture/readiness_artifact_contract.md` | Readiness artifacts as Client Artifact subtype |
+| `architecture/gbrain_integration.md` | GBrain ingestion, memory, retrieval, and state maintenance |
+| `architecture/sigma_model.md` | SIGMA records as internal GBrain-backed memory/state artifacts |
+| `architecture/composio_integration.md` | Composio as the external provider access layer |
+| `architecture/storage_data_flow_model.md` | Storage layers and provider-to-artifact data flow |
+| `architecture/schema_model.md` | Schema plan extracted from old SQL intake |
+| `architecture/normalization_model.md` | Provider normalization mapping model and shared target objects |
+| `architecture/provider_ingest_api_model.md` | Provider ingest/API behavior model |
+| `architecture/repo_structure.md` | Recommended root folder structure |
+
+## Agents
+
+| File | Purpose |
+|---|---|
+| `agents/agent_persona_model.md` | MVP agents, personas, and consolidation rules |
+| `agents/agent_runtime_contracts.md` | Durable agent task/report envelopes and runtime status vocabulary |
+| `agents/persona_packs_model.md` | Persona packs as non-agent tone/specialty layers |
+
+## Workflows
+
+| File | Purpose |
+|---|---|
+| `workflows/client_onboarding_model.md` | Client onboarding sequence, readiness, provider setup, and HITL defaults |
+| `workflows/workflow_runtime_model.md` | Workflow, provider sweep, scheduler, runtime, and deployment model |
+| `workflows/pac_ptq_model.md` | Pending Action Candidate and qualification model |
+| `workflows/schedule_catalog.md` | Normalized schedule catalog mapped to three-agent ownership |
+
+## Runtime
+
+| File | Purpose |
+|---|---|
+| `runtime/hostinger_runtime_model.md` | Hostinger/VPS runtime direction with old voice/container assumptions marked future-state |
+| `runtime/services_and_configs.md` | Meaning of services and configurations under this framework |
+
+## Governance
+
+| File | Purpose |
+|---|---|
+| `governance/governance_and_permissions.md` | Approval, permissions, tenant isolation, and audit rules |
+| `governance/secrets_protocol.md` | Secrets and provider credential handling rules |
+
+## UI
+
+| File | Purpose |
+|---|---|
+| `ui/04-app-surfaces.md` | Command Center, Briefings, Meetings, and channel-specific surfaces |
+| `ui/05-structured-interaction-surface.md` | Structured Briefing/Meeting interaction model |
+| `ui/06-command-components.md` | Reusable command, approval, artifact, link, launch, summary, and status components |
+| `ui/10-future-voice-and-chat-layer.md` | Future-state voice/chat/right-rail layer, explicitly not MVP canon |

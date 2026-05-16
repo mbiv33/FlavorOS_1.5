@@ -1,0 +1,62 @@
+provider: csv_import
+source_object: row
+target_object: financial_transaction
+normalization_version: v1
+
+configurable_columns:
+  - transaction_date
+  - amount
+  - currency
+  - raw_merchant
+  - description
+
+fields:
+  transaction_date:
+    source: configured.transaction_date
+    required: true
+    transform: flexible_date_parse
+  amount_minor:
+    source: configured.amount
+    required: true
+    transform: decimal_to_minor_signed
+  currency:
+    source: configured.currency
+    default: USD
+    required: true
+    transform: uppercase
+  raw_merchant:
+    source: configured.raw_merchant
+  clean_merchant:
+    transform: merchant_alias_lookup
+    args:
+      raw_source: configured.raw_merchant
+  description:
+    source: configured.description
+
+derived:
+  source_kind: csv_import
+  transaction_status:
+    default: posted
+  transaction_direction:
+    transform: signed_amount_to_direction
+    args:
+      source: configured.amount
+  suggested_route:
+    default: khadijah.finance
+  idempotency_key:
+    transform: stable_hash
+    args:
+      values:
+        - file_sha256
+        - row_number
+  immutable_hash:
+    transform: stable_hash
+    args:
+      values:
+        - financial_account_id
+        - configured.transaction_date
+        - configured.amount
+        - configured.currency
+        - configured.raw_merchant
+        - configured.description
+

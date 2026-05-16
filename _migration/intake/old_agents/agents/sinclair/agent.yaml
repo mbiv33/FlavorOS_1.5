@@ -1,0 +1,85 @@
+name: sinclair
+role: Executive Assistant (EA)
+runtime: hermes-agent
+soul: /etc/flavoros/SOUL.md
+context: /etc/flavoros/FLAVOROS_CONTEXT.md
+
+models:
+  profiles:
+    thinking: anthropic/claude-sonnet-4.6
+    fast:     openai/gpt-5.4-mini
+  endpoint: ${OPENROUTER_BASE_URL}
+  routing_rules:
+    - skill: inbox-sweep        → fast
+    - skill: label-message      → fast
+    - skill: archive-decision   → fast
+    - skill: draft-email
+      args: { stakes: high }
+      profile: thinking
+    - skill: draft-email
+      args: { stakes: high_stakes }
+      profile: thinking
+    - skill: draft-email
+      profile: fast
+    - skill: schedule-decision  → thinking
+    - skill: meeting-prep       → thinking
+    - skill: morning-vitals     → fast
+    - skill: calendar-load-check → fast
+    - skill: perma-v-checkin    → fast
+    - skill: journal-sentiment-scan → fast
+
+skills_mounted:
+  - executive-assistant
+  - wellness
+  - sinclair-voice
+  - obsidian-executive-assistant
+  - inbound-communications-draft-response
+  - meeting-lifecycle-time-guarding
+  - information-diet-boundary-defense
+
+plugins:
+  obsidian:
+    enabled: true
+    bundles: [dataview, templater, tasks]
+  web:
+    enabled: true
+
+obsidian:
+  primary_folders: ["05-SIGMA", "15-Readiness", "20-Meetings", "35-Reports", "60-Wellness", "80-Journal", "90-Archive"]
+  templates: ["05-SIGMA/_templates/sigma.md", "15-Readiness/_templates/readiness-artifact.md", "15-Readiness/_templates/universal-inbox-triage.md", "20-Meetings/_templates/prep.md", "20-Meetings/_templates/pending-scheduling.md", "35-Reports/_templates/agent-report.md", "60-Wellness/_templates/perma-v-checkin.md"]
+
+bus:
+  subscribes: [work_order.sinclair, nots.incoming.comm.*, execute.sinclair.calendar, execute.sinclair.comms]
+  publishes:  [report.sinclair, event.inbox.triaged, request.approval.khadijah, flag.*]
+
+vault:
+  read:  ["**"]
+  write: ["05-SIGMA/**", "15-Readiness/**", "20-Meetings/**", "35-Reports/**", "60-Wellness/**"]
+
+composio:
+  read:  [email_biz_a, email_biz_b, email_personal, cal_biz_a, cal_biz_b, cal_personal, comms, social_li, social_x, sms_bridge]
+  write: [email_biz_a, email_biz_b, email_personal, cal_biz_a, cal_biz_b, cal_personal]
+
+hitl:
+  always_drafts_for_approval: [send_email, accept_meeting_external, reschedule_external]
+  acts_autonomously: [archive, label, mark_read, accept_recurring, decline_obvious_spam]
+
+human_interface:
+  channel: telegram
+  exclusive: false
+  user_id_secret: /run/flavor/secrets/sinclair/telegram.user
+  bot_token_secret: /run/flavor/secrets/sinclair/telegram.token
+  inbound:
+    text: enabled
+    voice:
+      enabled: true
+      transcription: openai_whisper
+      forward_transcript_as_text: true
+  outbound:
+    text: enabled
+    voice:
+      enabled: true
+      provider: elevenlabs
+      config: /etc/flavoros/sinclair-voice.yaml
+      api_key_secret: /run/flavor/secrets/sinclair/elevenlabs.key
+      voice_id_secret: /run/flavor/secrets/sinclair/elevenlabs.voice_id

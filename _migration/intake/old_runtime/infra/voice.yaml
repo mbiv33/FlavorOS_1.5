@@ -1,0 +1,48 @@
+# Khadijah's voice — ElevenLabs TTS for Telegram voice messages.
+
+provider: elevenlabs
+
+khadijah:
+  voice_id: REPLACE_WITH_ELEVENLABS_VOICE_ID    # cloned or library voice
+  model_id: eleven_turbo_v2_5                   # fast + good for brief delivery
+  output_format: ogg_44100_64                    # Telegram sendVoice expects OGG/Opus
+  voice_settings:
+    stability: 0.55
+    similarity_boost: 0.80
+    style: 0.30
+    use_speaker_boost: true
+
+  # When to deliver voice vs. text
+  delivery_rules:
+    - mode: voice_and_text
+      trigger: morning_brief
+      reason: User often listens during morning routine
+    - mode: voice_only
+      trigger: tier_3_escalation
+      condition: outside_work_hours
+      reason: Escalations after hours arrive as voice notes
+    - mode: text_only
+      trigger: midday_pulse
+      reason: Quick scan, no need to listen
+    - mode: text_only
+      trigger: eod_review
+      reason: Reviewable on-screen at EOD
+    - mode: on_request
+      trigger: user_says_play_it
+      reason: User requested the brief out loud
+
+  # Trim the brief before TTS (skip code blocks, tables, etc.)
+  preprocessing:
+    strip_markdown: true
+    strip_tables: true
+    strip_code_blocks: true
+    expand_abbreviations: true
+    max_chars: 3500            # Keep voice notes under ~2 minutes
+    overflow_strategy: summarize_with_cta_to_open_text
+
+# Inbound voice from the user — Telegram → Whisper transcription
+inbound_voice:
+  provider: openai_whisper     # or elevenlabs_stt
+  model: whisper-1
+  language: auto
+  forwarded_to: khadijah        # transcript becomes a normal Khadijah message

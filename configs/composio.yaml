@@ -1,3 +1,102 @@
-# Composio integration stub — see docs/composio_integration.md
+# Composio/provider access catalog.
+#
+# This is a normalized migration candidate. Account aliases are product
+# categories, not real credentials. Runtime provider connection records and
+# secret/provider vault references remain client-scoped.
 
-providers: []
+accounts:
+  email_business:
+    toolkit: gmail
+    label: Business email
+  email_personal:
+    toolkit: gmail
+    label: Personal email
+  calendar_business:
+    toolkit: googlecalendar
+    label: Business calendar
+  calendar_personal:
+    toolkit: googlecalendar
+    label: Personal calendar
+  bank_business:
+    toolkit: plaid
+    label: Business banking
+  bank_personal:
+    toolkit: plaid
+    label: Personal banking
+  cards:
+    toolkit: ramp
+    label: Cards
+  books:
+    toolkit: quickbooks
+    label: Books
+  crm:
+    toolkit: hubspot
+    label: CRM
+  project_management:
+    toolkit: linear
+    label: Project management
+  travel:
+    toolkit: tripit
+    label: Travel itineraries
+  flights:
+    toolkit: googleflights
+    label: Flight search
+  hotels:
+    toolkit: hotels
+    label: Hotel search
+  social_linkedin:
+    toolkit: linkedin
+    label: LinkedIn
+  social_x:
+    toolkit: twitter
+    label: X
+  comms:
+    toolkit: telegram
+    label: Escalation channel
+
+grants:
+  khadijah_conductor:
+    read:
+      - comms
+      - project_management
+      - bank_business
+      - bank_personal
+      - cards
+      - books
+    write:
+      - comms
+      - project_management
+  sinclair_communications:
+    read:
+      - email_business
+      - email_personal
+      - calendar_business
+      - calendar_personal
+      - comms
+    write:
+      - email_business
+      - email_personal
+      - calendar_business
+      - calendar_personal
+  regine_research_logistics:
+    read:
+      - crm
+      - social_linkedin
+      - social_x
+      - travel
+      - flights
+      - hotels
+      - calendar_business
+      - calendar_personal
+    write:
+      - crm
+      - travel
+
+hitl_required_for:
+  - outbound_email_send
+  - external_calendar_commitment
+  - travel_booking
+  - money_movement
+  - invoice_send
+  - public_social_post
+  - sensitive_relationship_action

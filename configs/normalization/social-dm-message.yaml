@@ -1,0 +1,50 @@
+provider: social_dm
+source_object: message
+target_object: normalized_item
+normalization_version: v1
+
+thread:
+  external_thread_id: thread.id
+  title: thread.title
+
+fields:
+  external_object_id:
+    source: id
+    required: true
+  received_at:
+    source: created_at
+    transform: iso8601_passthrough
+    required: true
+  from_entities:
+    source: sender
+    transform: normalize_social_profile
+    required: true
+  to_entities:
+    source: recipients
+    transform: normalize_social_profiles
+  body_markdown:
+    source: text
+    transform: sanitize_markdown
+    required: true
+  direction:
+    source: direction
+    required: true
+
+derived:
+  requires_response:
+    transform: detect_reply_need
+  requires_approval:
+    transform: detect_public_or_relationship_risk
+  suggested_route:
+    transform: route_social_dm
+    allowed_routes:
+      - regine.relationships
+      - sinclair.communications
+
+origin:
+  action_type: social_dm_reply
+  target:
+    provider: platform
+    thread_id: thread.id
+    message_id: id
+

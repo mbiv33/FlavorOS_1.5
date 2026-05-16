@@ -1,0 +1,68 @@
+name: maxine
+role: Chief Operating Officer (COO)
+runtime: openclaw
+soul: /etc/flavoros/SOUL.md
+context: /etc/flavoros/FLAVOROS_CONTEXT.md
+
+models:
+  profiles:
+    thinking: anthropic/claude-sonnet-4.6
+    report:   openai/gpt-5.4-mini
+  routing_rules:
+    - skill: daily-task-prep         → report
+    - skill: task-file-diff          → report
+    - skill: status-summary          → report
+    - skill: milestone-risk-scan     → thinking
+    - skill: prioritization          → thinking
+    - skill: goal-alignment          → thinking
+    - skill: project-status-roundup  → thinking
+    - skill: finance-pulse           → thinking
+    - skill: overhead-audit          → thinking
+    - skill: invoice-tracker         → report
+    - skill: expense-anomaly-scan    → report
+    - skill: bill-radar              → report
+    - skill: subscription-audit      → thinking
+    - skill: domain-renewal-scan     → report
+
+skills_mounted:
+  - daily-task-manager
+  - daily-task-prep
+  - financial-management
+  - financial-ingestion-normalization
+  - receipt-capture-matching
+  - budget-dashboard-generation
+  - ledger-reconciliation
+  - infrastructure-ops
+  - obsidian-operations
+  - clickup-obsidian-project-management
+  - accounts-receivable-invoicing-lifecycle
+  - accounts-payable-expense-routing
+  - monthly-financial-reporting-synthesis
+  - pac-triage-and-logging
+  - ptq-resolution-engine
+  - project-initiation-milestone-mapping
+  - task-execution-status-monitoring
+
+plugins:
+  obsidian:
+    enabled: true
+    bundles: [dataview, templater, tasks]
+
+obsidian:
+  primary_folders: ["05-SIGMA", "15-Readiness", "20-Meetings", "30-Projects", "35-Reports", "70-Ops", "90-Archive"]
+  templates: ["05-SIGMA/_templates/sigma.md", "15-Readiness/_templates/readiness-artifact.md", "30-Projects/_templates/project.md", "35-Reports/_templates/project-status.md", "70-Ops/_templates/audit.md"]
+
+bus:
+  subscribes: [work_order.maxine]
+  publishes:  [report.maxine, flag.*]
+
+vault:
+  read:  ["**"]
+  write: ["05-SIGMA/**", "15-Readiness/**", "30-Projects/**", "35-Reports/**", "20-Meetings/**", "70-Ops/**"]
+
+composio:
+  read:  [pm_biz_a, pm_biz_b, cal_biz_a, cal_biz_b, bank_biz_a, bank_biz_b, bank_personal, cards, books, email_personal]
+  write: [pm_biz_a, pm_biz_b]
+
+hitl:
+  always_escalates: [any_payment, any_invoice_dispute, contract_terms, new_subscription_commitment]
