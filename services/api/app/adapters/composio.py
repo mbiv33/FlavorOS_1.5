@@ -51,6 +51,13 @@ class SyncResult:
     errors: list[str] = field(default_factory=list)
 
 
+@dataclass(frozen=True)
+class ConnectLinkResult:
+    provider: str
+    url: str
+    connected_account_id: str | None = None
+
+
 @runtime_checkable
 class ComposioAdapter(Protocol):
     """Boundary contract for all Composio/provider-layer interactions."""
@@ -66,6 +73,18 @@ class ComposioAdapter(Protocol):
         redirect_uri: str,
     ) -> str:
         """Start an auth flow; return a URL the client should redirect to."""
+        ...
+
+    async def create_connect_link(
+        self,
+        client_id: uuid.UUID,
+        composio_user_id: str,
+        provider: str,
+        toolkit: str,
+        redirect_uri: str,
+        auth_config_id: str | None = None,
+    ) -> ConnectLinkResult:
+        """Create a hosted Composio Connect Link scoped to one FlavorOS user."""
         ...
 
     async def check_connection(
@@ -112,6 +131,23 @@ class StubComposioAdapter:
         redirect_uri: str,
     ) -> str:
         return f"{redirect_uri}?stub=true&provider={provider}"
+
+    async def create_connect_link(
+        self,
+        client_id: uuid.UUID,
+        composio_user_id: str,
+        provider: str,
+        toolkit: str,
+        redirect_uri: str,
+        auth_config_id: str | None = None,
+    ) -> ConnectLinkResult:
+        return ConnectLinkResult(
+            provider=provider,
+            url=(
+                f"{redirect_uri}?stub=true&provider={provider}"
+                f"&toolkit={toolkit}&user_id={composio_user_id}"
+            ),
+        )
 
     async def check_connection(
         self,

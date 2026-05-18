@@ -187,15 +187,39 @@ class WorkflowRunCreate(BaseModel):
 # Provider Connection
 # ---------------------------------------------------------------------------
 
+PROVIDER_CONNECTION_STATUSES = {
+    "not_started",
+    "pending_consent",
+    "initiated",
+    "connected",
+    "syncing",
+    "ready",
+    "degraded",
+    "blocked",
+    "revoked",
+    "failed",
+}
+
 
 class ProviderConnectionRead(BaseModel):
     id: uuid.UUID
     client_id: uuid.UUID
     provider: str
+    context_id: Optional[str]
+    context_account_id: Optional[str]
+    account_alias: Optional[str]
+    purpose: Optional[str]
+    toolkit: Optional[str]
+    auth_config_id: Optional[str]
+    connected_account_id: Optional[str]
+    composio_user_id: Optional[str]
     status: str
+    status_reason: Optional[str]
+    scopes: Optional[list]
     config: Optional[dict]
     enabled: bool
     last_sync_at: Optional[datetime]
+    last_checked_at: Optional[datetime]
     created_at: datetime
     updated_at: datetime
 
@@ -204,9 +228,119 @@ class ProviderConnectionRead(BaseModel):
 
 class ProviderConnectionWrite(BaseModel):
     provider: str = Field(..., min_length=1, max_length=64)
-    status: str = Field("disconnected", pattern=r"^(connected|disconnected|error)$")
+    context_id: Optional[str] = Field(None, max_length=128)
+    context_account_id: Optional[str] = Field(None, max_length=128)
+    account_alias: Optional[str] = Field(None, max_length=128)
+    purpose: Optional[str] = Field(None, max_length=64)
+    toolkit: Optional[str] = Field(None, max_length=64)
+    auth_config_id: Optional[str] = Field(None, max_length=255)
+    connected_account_id: Optional[str] = Field(None, max_length=255)
+    composio_user_id: Optional[str] = Field(None, max_length=255)
+    status: str = Field(
+        "not_started",
+        pattern=(
+            r"^(not_started|pending_consent|initiated|connected|syncing|ready|"
+            r"degraded|blocked|revoked|failed)$"
+        ),
+    )
+    status_reason: Optional[str] = None
+    scopes: Optional[list] = None
     config: Optional[dict] = None
     enabled: bool = True
+
+
+class ProviderCatalogItem(BaseModel):
+    provider: str
+    toolkit: str
+    label: str
+    category: str
+    enabled: bool = True
+
+
+class ProviderConnectLinkRequest(BaseModel):
+    provider_connection_id: uuid.UUID
+    redirect_uri: str = Field(..., min_length=1)
+
+
+class ProviderSyncRequest(BaseModel):
+    provider_connection_id: uuid.UUID
+
+
+class ProviderConnectLinkRead(BaseModel):
+    provider_connection_id: uuid.UUID
+    provider: str
+    url: str
+    composio_user_id: str
+    status: str
+
+
+class ProviderCallbackRead(BaseModel):
+    provider_connection_id: uuid.UUID
+    status: str
+    connected_account_id: Optional[str] = None
+
+
+class ProviderSyncRead(BaseModel):
+    provider_connection_id: uuid.UUID
+    provider: str
+    status: str
+    records_synced: int = 0
+    errors: list[str] = Field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------
+# Onboarding
+# ---------------------------------------------------------------------------
+
+
+class OnboardingIdentity(BaseModel):
+    display_name: str = Field(..., min_length=1, max_length=255)
+    legal_name: Optional[str] = None
+    preferred_name: Optional[str] = None
+    title: Optional[str] = None
+    birth_date: Optional[str] = None
+    gender: Optional[str] = None
+    timezone: str = Field("America/New_York", min_length=1, max_length=64)
+    locale: str = Field("en-US", min_length=1, max_length=32)
+
+
+class OnboardingContextAccount(BaseModel):
+    context_account_id: str = Field(..., min_length=1, max_length=128)
+    provider: str = Field(..., min_length=1, max_length=64)
+    context_account_purpose: str = Field(..., min_length=1, max_length=64)
+    account_alias: str = Field(..., min_length=1, max_length=128)
+    auth_scheme: str = Field(..., pattern=r"^(oauth|api_key|manual|local_path|none)$")
+    external_identifier: Optional[str] = None
+
+
+class OnboardingContext(BaseModel):
+    context_id: str = Field(..., min_length=1, max_length=128)
+    context_type: str = Field(..., min_length=1, max_length=64)
+    display_name: str = Field(..., min_length=1, max_length=255)
+    status: str = Field("active", pattern=r"^(active|pending|paused|archived)$")
+    description: Optional[str] = None
+    context_accounts: list[OnboardingContextAccount] = Field(default_factory=list)
+
+
+class OnboardingState(BaseModel):
+    status: str = Field(
+        "pending",
+        pattern=r"^(pending|partial|ready_for_auth|ready_for_sync|active|blocked|archived)$",
+    )
+
+
+class OnboardingSaveRequest(BaseModel):
+    identity: OnboardingIdentity
+    authority_defaults: dict = Field(default_factory=dict)
+    onboarding: OnboardingState = Field(default_factory=OnboardingState)
+    contexts: list[OnboardingContext] = Field(..., min_length=1)
+
+
+class OnboardingSaveRead(BaseModel):
+    trigger: str
+    onboarding_status: str
+    profile: ProfileRead
+    provider_connections: list[ProviderConnectionRead]
 
 
 # ---------------------------------------------------------------------------

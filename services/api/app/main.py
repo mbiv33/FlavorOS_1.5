@@ -15,6 +15,7 @@ from app.routers import (
     audit,
     auth,
     health,
+    onboarding,
     profiles,
     providers,
     universe,
@@ -59,6 +60,7 @@ def create_app() -> FastAPI:
     )
     app.include_router(health.router)
     app.include_router(auth.router)
+    app.include_router(onboarding.router)
     app.include_router(profiles.router)
     app.include_router(universe.router)
     app.include_router(artifacts.router)

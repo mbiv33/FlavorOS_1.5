@@ -8,7 +8,7 @@
     "dev:flavoros": "pnpm --filter flavoros dev",
     "lint": "pnpm --filter client --filter admin lint",
     "typecheck": "pnpm --filter client --filter admin typecheck",
-    "build": "pnpm --filter client --filter admin build",
+    "build": "pnpm --filter client --filter admin --filter flavoros build",
     "api:lint": "cd services/api && .venv/bin/ruff check app/",
     "api:test": "cd services/api && .venv/bin/python3 -m pytest tests/ -v",
     "check": "pnpm lint && pnpm typecheck && pnpm build && pnpm api:lint && pnpm api:test"

@@ -264,12 +264,18 @@ class WorkflowRun(Base):
 
 class ProviderConnection(Base):
     """
-    status: connected | disconnected | error.
+    status: not_started | pending_consent | initiated | connected | syncing |
+    ready | degraded | blocked | revoked | failed.
     """
 
     __tablename__ = "provider_connections"
     __table_args__ = (
-        UniqueConstraint("client_id", "provider", name="uq_provconn_client_provider"),
+        UniqueConstraint(
+            "client_id",
+            "provider",
+            "context_account_id",
+            name="uq_provconn_client_provider_context_account",
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -279,10 +285,23 @@ class ProviderConnection(Base):
         UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False
     )
     provider: Mapped[str] = mapped_column(String(64), nullable=False)
-    status: Mapped[str] = mapped_column(String(16), nullable=False, default="disconnected")
+    context_id: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    context_account_id: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    account_alias: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    purpose: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    toolkit: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    auth_config_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    connected_account_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    composio_user_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="not_started")
+    status_reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    scopes: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
     config: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     last_sync_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    last_checked_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
     created_at: Mapped[datetime] = mapped_column(
