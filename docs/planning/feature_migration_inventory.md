@@ -23,7 +23,7 @@ Canonical repo homes:
 - `docs/runtime/`
 - `docs/governance/`
 - `docs/ui/`
-- `agents/*/skills/`
+- `skills/`
 - `agents/*/protocols/`
 - `services/api/`
 - `apps/`
@@ -94,7 +94,8 @@ The feature intent for all rows above is now represented in this repo through:
 - `docs/planning/current_build_plan.md`,
 - `docs/workflows/planned_feature_catalog.md`,
 - workflow docs in `docs/workflows/`,
-- agent skill/protocol files under `agents/`,
+- canonical skill files under `skills/`,
+- agent protocol files under `agents/*/protocols/`,
 - API/UI scaffolding under `services/api/` and `apps/`.
 
 The repo is now the canonical place these features are described.

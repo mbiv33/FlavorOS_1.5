@@ -11,6 +11,11 @@ license: MIT
 
 # FlavorOS Project Management Control
 
+## FlavorOS 1.5 Storage Contract
+
+Follow [`../_shared/storage-contract.md`](../_shared/storage-contract.md). In short: scope state to `client_id`, treat Client Universe records and artifacts as durable truth, use provider data only as source material through approved adapters, and stage external side effects through approval-gated outbound actions.
+
+
 ## Before Starting
 
 1. Read `planning/00-flavoros-mvp-delivery-system/FLAVOROS_MVP_PROJECT_PLAN.md`.

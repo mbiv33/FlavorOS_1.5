@@ -1,0 +1,5 @@
+# inbound-communications-draft-response
+
+Canonical skill definition: [`skills/inbound-communications-draft-response/SKILL.md`](../../../../skills/inbound-communications-draft-response/SKILL.md).
+
+This directory is retained only as an agent-local compatibility pointer. Do not add canonical skill instructions here.

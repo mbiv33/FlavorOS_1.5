@@ -20,7 +20,7 @@ Khadijah herself — same Editor-in-Chief voice. The audio is just another chann
 
 Read `/etc/flavoros/voice.yaml` for the active delivery rules. By default:
 
-- **Morning Brief** → voice + text (text first, voice attached)
+- **Morning Standup** → voice + text (text first, voice attached)
 - **Tier 3 escalation outside work hours** → voice only
 - **Midday pulse, EOD review** → text only
 - **On user request** ("play it," "voice me," "read me X") → voice only
@@ -45,11 +45,11 @@ Read `/etc/flavoros/voice.yaml` for the active delivery rules. By default:
 
 ## What This Skill Does Not Do
 
-- Generate text content. The voice skill receives a finalized brief from another Khadijah skill (`morning-brief`, `escalation-router`, etc.) and only handles rendering + delivery.
+- Generate text content. The voice skill receives a finalized brief from another Khadijah skill (`morning-standup-briefing`, `workflow-approval-control`, etc.) and only handles rendering + delivery.
 - Speak as any other agent. Specialists never get a voice surface.
 
 ## Related
 
 - `infra/voice.yaml` — voice profile, delivery rules, preprocessing
 - `chief-of-staff` — the briefs that get rendered to voice
-- `escalation-router` — Tier 3 path that may trigger voice
+- `workflow-approval-control` — Tier 3 path that may trigger voice
