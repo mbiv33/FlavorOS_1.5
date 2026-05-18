@@ -41,14 +41,15 @@ Client-facing surfaces:
 |---|---|
 | Command Center | Default landing surface for ready work, approvals, briefings, meetings, artifacts, and quiet status |
 | Briefings | Morning Standup, COB Work Day, Goodnight |
-| Meetings | Launcher for topic-scoped client-to-agent sessions (Comms & Calendar, Travel / Logistics, Projects, Reports & Artifacts, General) |
-| Comms & Calendar | Standing channel surface for communication and schedule workflow |
+| Meetings | Launcher for topic-scoped client-to-agent sessions (Communications, Calendar, Travel / Logistics, Projects, Reports & Artifacts, General) |
+| Communications | Standing channel surface for inbound messages, drafts, contacts, and approved outbound write-back |
+| Calendar | Standing channel surface for events, conflicts, scheduling, and upcoming commitments |
 | Projects | Standing channel surface for project/work status, decisions, artifacts, and follow-up |
 | Reports & Artifacts | Standing channel surface for generated work product, reports, packets, drafts, and artifact review |
 | Travel / Logistics | Standing channel surface and future-capable workflow lane |
 | Settings / Profile | Client profile, preferences, contexts, and provider/account posture |
 
-Channel surfaces (Comms & Calendar, Projects, Reports & Artifacts, Travel / Logistics) and Meetings are distinct:
+Channel surfaces (Communications, Calendar, Projects, Reports & Artifacts, Travel / Logistics) and Meetings are distinct:
 
 - Channel surfaces are **standing** browse/manage views over a lane of work, reachable directly from the left nav at any time.
 - Meetings are **transient, topic-scoped client-to-agent sessions** opened from the Meetings launcher. A Meeting reuses the same workflow, artifact, approval, and source-link data as the underlying channel surface but presents it as a focused workspace for decisions and next actions.
@@ -133,7 +134,8 @@ Meetings are user-initiated, topic-scoped client-to-agent workspaces. They are n
 
 The client picks a topic from the Meeting launcher:
 
-- Comms & Calendar
+- Communications
+- Calendar
 - Travel / Logistics
 - Projects
 - Reports & Artifacts
@@ -152,7 +154,7 @@ Each Meeting screen should show:
 - notes, questions, follow-up tasks,
 - completion summary.
 
-The MVP should prioritize Comms & Calendar as the first proof lane for the underlying provider/normalization/write-back loop, while retaining Travel / Logistics, Projects, and Reports & Artifacts as visible standing surfaces and as Meeting topics.
+The MVP should prioritize Communications as the first proof lane for the underlying provider/normalization/write-back loop (Calendar follows immediately, since the two share normalized item plumbing), while retaining Travel / Logistics, Projects, and Reports & Artifacts as visible standing surfaces and as Meeting topics.
 
 ## App Launch And Role Routing
 

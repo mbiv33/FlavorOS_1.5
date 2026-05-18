@@ -7,7 +7,7 @@ Channel surfaces are standing left-nav views over a lane of work. Each is:
 - the authoritative view of the lane's prepared state,
 - the data source that a Meeting (or Briefing section) reads from.
 
-This document specifies the four MVP channel surfaces plus Settings/Profile.
+This document specifies the five MVP channel surfaces plus Settings/Profile.
 
 Controlling docs: `02-information-architecture.md`, `04-app-surfaces.md`, `06-command-components.md`, `11-command-center-wireframe.md`, `13-meetings.md`.
 
@@ -33,78 +33,124 @@ Rules:
 - "Open meeting" routes to a Meeting opened on this topic.
 - Cards on a channel surface match the canonical component definitions in `06-command-components.md` (Approval Card, Artifact Card, Link Card, Status Chip, etc.).
 
-## 1. Comms & Calendar
+## 1. Communications
 
-The first proof lane for provider ingestion → normalization → artifact → approval → outbound write-back.
+A standing light inbox over normalized communication items. First proof lane for provider ingestion → normalization → artifact → approval → outbound write-back.
 
-Not a full inbox replacement and not a full calendar replacement.
+Not a full inbox replacement.
 
-### Sections / lists
+### Surface frame
 
-| Section | Contents |
+| Tier | Contents |
 |---|---|
-| Priority messages | Normalized communication items flagged priority by Sinclair |
-| Drafts to approve | Artifact Cards of type `communication_draft` in `ready_for_approval` |
-| Calendar conflicts | Conflict cards with referenced calendar items |
-| Upcoming events | Calendar Cards for next 24–72h with source links |
-| Outbox status | `outbound_actions` (queued / executed / failed / pulled back) |
+| Banner | "Communications" |
+| Stat strip | Drafts pending · Sent today · Awaiting reply · Unread urgent |
+| Pile row (by channel) | Emails · SMS & Voice · Social |
+| Detail section | Contacts rail (grouped by context) + composer + outbox status |
+
+### Pile mapping (data-grounded)
+
+| Pile | Reads |
+|---|---|
+| Emails | `normalized_items` where `item_type = email` (provider = gmail at MVP) |
+| SMS & Voice | `normalized_items` where `item_type in (sms, voice)` (future provider tier) |
+| Social | `normalized_items` where `item_type = social_dm` |
+
+Each pile opens an Overlay with full scrollable list. Item kind drives the available actions (approval items get Approve/Modify/I'll do myself; outbound completions get Open / Pull back during the retraction window).
 
 ### Filters
 
 - context chips (when client has more than one context)
-- type (message / event / draft / conflict)
-- status (needs approval / sent / queued / failed)
-- provider (Gmail, Calendar)
-
-### Data expected
-
-- normalized communication items (read-only here; writes go through approval)
-- `calendar_items`
-- `artifacts` of type `communication_draft`, `meeting_brief`
-- `approvals` linked to those artifacts
-- `outbound_actions`
-- `provider_connections` (for inline degraded-state notice)
+- direction (inbound · outbound · all)
+- status (needs approval · sent · queued · failed · awaiting reply)
 
 ### Commands
 
-Approve · Send for revision · I'll handle it · Defer · Pull back · Open source link · Open meeting
+Approve · Modify · I'll do myself · Defer (workflow-allowed) · Open source · Pull back (within retraction window) · Open meeting
+
+### Composer
+
+A light rich-text composer beside the contacts rail. Submitting creates a `client_artifacts` row with `artifact_type = draft_email`, links the recipient(s) by context, and opens an Approval Request. No direct outbound bypass.
 
 ### Empty / degraded
 
-- If the Gmail/Calendar provider is degraded, show an inline notice at the top of the surface (no fake content below it).
-- If no priority messages and no drafts, the section header collapses; the surface still renders Upcoming events.
+- If Gmail/SMS provider is degraded, show an inline header notice; piles continue to render with the items they have.
+- If no items in a pile, the stack card still renders with count 0 ("Quiet here right now").
 
-## 2. Projects
+## 2. Calendar
+
+A standing channel surface for events, conflicts, scheduling, and upcoming commitments.
+
+### Surface frame
+
+| Tier | Contents |
+|---|---|
+| Banner | "Calendar" |
+| Stat strip | Today's events · Conflicts · This week · Travel days |
+| Pile row (by time window) | Today · Conflicts · Upcoming |
+| Detail section | Mini month calendar + linked travel / meetings / milestones |
+
+### Pile mapping (data-grounded)
+
+| Pile | Reads |
+|---|---|
+| Today | `calendar_items` where `start_at` within local today window |
+| Conflicts | `calendar_items` flagged by the conflict detector |
+| Upcoming | `calendar_items` next 7 days, excluding today |
+
+### Filters
+
+- context chips
+- provider (Google Calendar at MVP)
+- type (event · hold · proposed)
+
+### Commands
+
+Approve hold · Modify · I'll do myself · Defer · Open source · Open meeting
+
+### Empty / degraded
+
+- If the provider is degraded, the Today and Upcoming piles render the last known state with a stale notice.
+- The Conflicts pile hides entirely when zero.
+
+## 3. Projects
 
 A light project-management command center for client + agent work.
 
-### Sections / lists
+### Surface frame
 
-| Section | Contents |
+| Tier | Contents |
 |---|---|
-| Active projects | Project cards with status, owner, next step, blocker, due date |
-| Milestones | Milestone strip per project (in detail pane) |
-| Open decisions | Approval Cards scoped to projects |
-| Project artifacts | Artifact Cards filtered by project |
-| Completion history | Completion Summaries per project (read-only) |
+| Banner | "Projects" |
+| Stat strip | Active · Blocked · Completed this quarter · Due this week |
+| Pile row (by status) | Active · Blocked · Completed |
+| Detail section | Tasks list (per-project rows) + project artifacts strip |
+
+### Pile mapping (data-grounded)
+
+| Pile | Reads |
+|---|---|
+| Active | `projects` where `status in (in_progress, waiting_on_client, ready_for_review)` |
+| Blocked | `projects` where `status = blocked` |
+| Completed | `projects` where `status = completed` and `completed_at` in current quarter |
 
 ### Filters
 
 - context chips
 - agent owner (Khadijah, Sinclair, Regine)
-- status (in progress, blocked, needs review, completed)
+- due window (this week · this month · all)
 
 ### Data expected
 
 - `projects`, `project_tasks`, `milestones`
 - `approvals` linked by `project_id`
-- `artifacts` linked by `project_id`
+- `client_artifacts` linked by `project_id`
 - `completion_summaries` linked by `project_id`
 - `agent_tasks` for status/blocker derivation
 
 ### Commands
 
-Approve · Defer · Revise · Escalate · Open source · Open meeting
+Approve · Modify · I'll do myself · Defer · Open source · Open meeting
 
 ### Excluded
 
@@ -112,19 +158,28 @@ Approve · Defer · Revise · Escalate · Open source · Open meeting
 - raw agent task logs
 - agent status dashboard
 
-## 3. Reports & Artifacts
+## 4. Reports & Artifacts
 
 Review surface for generated work product.
 
-### Sections / lists
+### Surface frame
 
-| Section | Contents |
+| Tier | Contents |
 |---|---|
-| Pending review | Artifact Cards in `ready_for_review` / `needs_revision` |
-| Ready to file | Approved artifacts not yet filed |
-| Recent | Newest client-facing artifacts |
-| Reports | Subset filter for `report_*` artifact types |
-| Drafts | Subset for `*_draft` artifact types |
+| Banner | "Reports & Artifacts" |
+| Stat strip | Pending review · Filed this month · Drafts in flight · Avg approval time |
+| Pile row (by `artifact_type`) | Reports · Briefs · Drafts |
+| Detail section | Document Product Library (data table over all client-visible artifacts) |
+
+### Pile mapping (data-grounded)
+
+| Pile | Reads |
+|---|---|
+| Reports | `client_artifacts` where `artifact_type = report` |
+| Briefs | `client_artifacts` where `artifact_type = brief` |
+| Drafts | `client_artifacts` where `artifact_type in (draft_email, *_draft)` |
+
+Completion summaries (`artifact_type = completion_summary`) appear in the Document Product Library table but not as a top-tier pile (they're operational, not primary work product).
 
 ### Filters
 
@@ -136,21 +191,21 @@ Review surface for generated work product.
 
 ### Data expected
 
-- `artifacts` where `visibility = client`
-- `artifacts.versions` (for show-decisions-and-versions behavior)
-- `approvals` linked to artifacts
+- `client_artifacts` where `visibility = client`
+- `client_artifacts.related_artifact_ids` for version chains
+- `approval_requests` linked to artifacts
 - `link_cards` for provider/source
 
 ### Focused artifact viewer
 
 The detail pane is a focused artifact viewer:
 
-- title, type, context, status
+- title, type, context, status (per `03-approval-card.md` Status Mapping)
 - preview body
 - version selector
 - approval status
 - source/provider Link Cards
-- commands: Approve · Revise · Open source · File
+- commands: Approve · Modify · I'll do myself · Open source · File
 
 ### Excluded
 
@@ -158,38 +213,44 @@ The detail pane is a focused artifact viewer:
 - raw file browser
 - agent memory browser
 
-## 4. Travel / Logistics
+## 5. Travel / Logistics
 
 Retained as an MVP surface and a future-capable workflow lane. Not the first proof loop unless explicitly promoted.
 
-### Sections / lists
+### Surface frame
 
-| Section | Contents |
+| Tier | Contents |
 |---|---|
-| Upcoming trips | Trip cards (next 90 days) with phase chip |
-| Options to compare | Travel option Artifact Cards per trip |
-| Approvals | Travel-related Approval Cards (holds, bookings) |
-| Itinerary status | Status per trip with milestone chips |
-| Client travel library | Filed travel documents and packing/prep references |
-| Research items | Research artifacts in progress |
+| Banner | "Travel & Logistics" |
+| Stat strip | Upcoming trips · Decisions to make · Research items · Itineraries built |
+| Pile row (by artifact subtype) | Decisions · Research · Itineraries |
+| Detail section | Trip tabs (Trip details card) + Logistics grid (Hospitality / Transportation / Dining / Locations) |
+
+### Pile mapping (data-grounded)
+
+| Pile | Reads |
+|---|---|
+| Decisions | `client_artifacts` where `artifact_type = travel_option` and `status in (prepared, pending_review)` |
+| Research | `client_artifacts` where `artifact_type` matches travel research subtype |
+| Itineraries | `client_artifacts` where `artifact_type` matches itinerary subtype |
 
 ### Filters
 
 - trip
 - context chips
-- phase (planning / booked / in trip / wrap-up)
+- phase (planning · booked · in trip · wrap-up)
 
 ### Data expected
 
 - `trips`, `trip_phases`
-- `artifacts` of type `travel_*`
-- `approvals` scoped to travel
+- `client_artifacts` where related to a trip
+- `approval_requests` scoped to travel
 - `link_cards` for airline/hotel/booking providers
 - `documents` filed in the travel library
 
 ### Commands
 
-Approve · Defer · Revise · Compare · Open source · Open meeting
+Approve · Modify · I'll do myself · Defer · Open source · Open meeting
 
 ### Excluded from MVP
 
@@ -197,7 +258,7 @@ Approve · Defer · Revise · Compare · Open source · Open meeting
 - always-on voice reminders
 - full travel operations replacement
 
-## 5. Settings / Profile
+## 6. Settings / Profile
 
 Operational surface, not a core work surface.
 

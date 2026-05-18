@@ -1,61 +1,107 @@
 import Link from "next/link";
-import { Header } from "@/components/Header";
-import { Zone } from "@/components/Zone";
-import { Card, CardMeta, CardRow, CardTitle } from "@/components/Card";
+import { SurfaceFrame, SurfaceSection } from "@/components/SurfaceFrame";
+import { StatStrip } from "@/components/StatStrip";
+import { PileRow, type PileDef } from "@/components/PileRow";
 import { StatusChip } from "@/components/StatusChip";
-import { artifacts } from "@/lib/fixtures";
+import { DataTable, type Column } from "@/components/DataTable";
+import {
+  reportsItems,
+  reportsStats,
+  type ArtifactPileItem,
+  type ReportsPile,
+} from "@/lib/fixtures";
+
+const PILE_DEF: Record<
+  ReportsPile,
+  { label: string; tone: "violet" | "blue" | "emerald"; subtitle: string }
+> = {
+  reports: {
+    label: "Reports",
+    tone: "violet",
+    subtitle: "Formal reports across contexts",
+  },
+  briefs: {
+    label: "Briefs",
+    tone: "blue",
+    subtitle: "Project & travel briefs",
+  },
+  drafts: {
+    label: "Drafts",
+    tone: "emerald",
+    subtitle: "Outbound drafts in flight",
+  },
+};
+
+const PILE_ORDER: ReportsPile[] = ["reports", "briefs", "drafts"];
+
+const COLUMNS: Column<ArtifactPileItem>[] = [
+  {
+    key: "title",
+    header: "Title",
+    render: (r) => <span className="font-medium">{r.title}</span>,
+  },
+  { key: "type", header: "Type", render: (r) => r.artifactType },
+  { key: "context", header: "Context", render: (r) => r.context },
+  { key: "agent", header: "Prepared by", render: (r) => r.agent },
+  {
+    key: "status",
+    header: "Status",
+    render: (r) => <StatusChip status={r.status} />,
+  },
+  {
+    key: "updated",
+    header: "Updated",
+    render: (r) => <span className="text-muted">{r.updated}</span>,
+  },
+];
 
 export default function ReportsArtifactsPage() {
+  const piles: PileDef[] = PILE_ORDER.map((key) => {
+    const def = PILE_DEF[key];
+    return {
+      key,
+      label: def.label,
+      tone: def.tone,
+      subtitle: def.subtitle,
+      items: reportsItems
+        .filter((i) => i.pile === key)
+        .map((r) => ({
+          id: r.id,
+          kind: r.kind,
+          title: r.title,
+          status: r.status,
+          agent: r.agent,
+          detail: `${r.artifactType} · ${r.context}`,
+          when: r.updated,
+          sourceLinkLabel: r.sourceLinkLabel,
+        })),
+    };
+  });
+
   return (
-    <>
-      <Header
-        title="Reports & Artifacts"
-        nextFocus="Generated work product, drafts, and reports"
-        action={
-          <Link
-            href="/meetings/reports-artifacts"
-            className="rounded-md bg-accent px-3 py-1.5 text-xs font-medium text-accent-foreground hover:opacity-90"
-          >
-            Open meeting
-          </Link>
-        }
-      />
-      <div className="flex-1 overflow-y-auto px-6 py-6">
-        <div className="mx-auto max-w-5xl space-y-8">
-          <Zone title="Pending review">
-            {artifacts
-              .filter((a) => a.status !== "Completed")
-              .map((a) => (
-                <Card key={a.id}>
-                  <CardRow>
-                    <div className="space-y-1">
-                      <CardTitle>{a.title}</CardTitle>
-                      <CardMeta>
-                        {a.type} · {a.agent} · {a.updated}
-                      </CardMeta>
-                    </div>
-                    <StatusChip status={a.status} />
-                  </CardRow>
-                </Card>
-              ))}
-          </Zone>
-          <Zone title="Recent">
-            {artifacts.map((a) => (
-              <Card key={a.id}>
-                <CardRow>
-                  <div className="space-y-1">
-                    <CardTitle>{a.title}</CardTitle>
-                    <CardMeta>
-                      {a.type} · {a.updated}
-                    </CardMeta>
-                  </div>
-                  <StatusChip status={a.status} />
-                </CardRow>
-              </Card>
-            ))}
-          </Zone>
-        </div>
-      </div>
-    </>
+    <SurfaceFrame
+      title="Reports & Artifacts"
+      description="Generated work product, drafts, and reports — across every context."
+      action={
+        <Link
+          href="/meetings/reports-artifacts"
+          className="rounded-md border border-border-strong px-3 py-1.5 text-xs font-medium hover:bg-surface-muted"
+        >
+          Open meeting
+        </Link>
+      }
+    >
+      <SurfaceSection title="Stats">
+        <StatStrip stats={reportsStats} />
+      </SurfaceSection>
+
+      <SurfaceSection title="Piles">
+        <PileRow piles={piles} />
+      </SurfaceSection>
+
+      <SurfaceSection title="Document Product Library">
+        <DataTable columns={COLUMNS} rows={reportsItems} />
+      </SurfaceSection>
+    </SurfaceFrame>
   );
 }

@@ -7,8 +7,8 @@ import { clientProfile } from "@/lib/fixtures";
 const CLIENT_NAV: Array<{ href: string; label: string }> = [
   { href: "/command-center", label: "Command Center" },
   { href: "/briefings", label: "Briefings" },
-  { href: "/meetings", label: "Meetings" },
-  { href: "/comms-calendar", label: "Comms & Calendar" },
+  { href: "/communications", label: "Communications" },
+  { href: "/calendar", label: "Calendar" },
   { href: "/projects", label: "Projects" },
   { href: "/reports", label: "Reports & Artifacts" },
   { href: "/travel", label: "Travel / Logistics" },
@@ -41,20 +41,30 @@ export function LeftNav({ variant }: { variant: "client" | "admin" }) {
         </Link>
       </div>
       {variant === "client" ? (
-        <div className="mx-5 mb-4 flex items-center gap-3 rounded-xl border border-border bg-surface-muted px-3 py-3">
-          <div
-            className="flex h-10 w-10 items-center justify-center rounded-full bg-stone-200 text-sm font-semibold text-stone-700"
-            aria-hidden
-          >
-            {clientProfile.initials}
+        <>
+          <div className="mx-5 mb-3 flex items-center gap-3 rounded-xl border border-border bg-surface-muted px-3 py-3">
+            <div
+              className="flex h-10 w-10 items-center justify-center rounded-full bg-stone-200 text-sm font-semibold text-stone-700"
+              aria-hidden
+            >
+              {clientProfile.initials}
+            </div>
+            <div className="min-w-0">
+              <p className="truncate text-sm font-medium">
+                {clientProfile.displayName}
+              </p>
+              <p className="text-xs text-muted">{clientProfile.role}</p>
+            </div>
           </div>
-          <div className="min-w-0">
-            <p className="truncate text-sm font-medium">
-              {clientProfile.displayName}
-            </p>
-            <p className="text-xs text-muted">{clientProfile.role}</p>
+          <div className="mx-5 mb-4">
+            <Link
+              href="/meetings"
+              className="block rounded-full bg-accent px-4 py-2 text-center text-sm font-medium text-accent-foreground shadow-sm hover:opacity-90"
+            >
+              Start a Meeting
+            </Link>
           </div>
-        </div>
+        </>
       ) : (
         <p className="px-5 pb-3 text-xs text-muted">Operator</p>
       )}

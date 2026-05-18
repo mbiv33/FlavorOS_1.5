@@ -22,8 +22,8 @@ export function MiniCalendar() {
         </button>
       </div>
       <div className="grid grid-cols-7 gap-y-1 text-center text-xs">
-        {weekdays.map((d) => (
-          <div key={d} className="text-muted">
+        {weekdays.map((d, i) => (
+          <div key={`wd-${i}`} className="text-muted">
             {d}
           </div>
         ))}

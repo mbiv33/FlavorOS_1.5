@@ -5,11 +5,17 @@ import { ApprovalCard } from "@/components/ApprovalCard";
 import { meetings, inboxItems } from "@/lib/fixtures";
 
 const SECTIONS: Record<string, string[]> = {
-  "comms-calendar": [
-    "Triage summary",
+  communications: [
+    "Inbox triage",
     "Drafts to approve",
-    "Calendar conflicts",
     "Outbox status",
+    "Awaiting reply",
+  ],
+  calendar: [
+    "Today's schedule",
+    "Conflicts to resolve",
+    "Upcoming holds",
+    "Travel windows",
   ],
   travel: [
     "Trip status",

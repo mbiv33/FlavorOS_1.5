@@ -45,7 +45,8 @@ This table is a migration reference only. The MVP surfaces below are the canonic
 | Today | Command Center Dashboard | Rewrite |
 | Work | Projects channel surface + Projects Meeting topic | Rewrite |
 | Travel | Travel / Logistics channel surface + Travel Meeting topic | Rewrite |
-| Messages + Calendar | Comms & Calendar channel surface + Meeting topic | Combine and narrow |
+| Messages | Communications channel surface + Communications Meeting topic | Rewrite (split from Calendar) |
+| Calendar | Calendar channel surface + Calendar Meeting topic | Rewrite (split from Communications) |
 | Library | Reports & Artifacts channel surface + Meeting topic | Rewrite |
 | Preferences | Settings/Admin/Profile | Move out of core MVP |
 | Command Palette | Future-state power-user layer | Archive |
@@ -150,7 +151,8 @@ The Meetings surface is a **launcher** that lets the client open a focused sessi
 
 MVP Meeting topics:
 
-- Comms & Calendar
+- Communications
+- Calendar
 - Travel / Logistics
 - Projects
 - Reports & Artifacts
@@ -167,34 +169,62 @@ Meeting launch cards should show:
 
 Each Meeting screen reuses the Structured Interaction Surface (see `05-structured-interaction-surface.md`) and pulls its data from the corresponding channel surface.
 
-## 6. Comms & Calendar (Channel Surface)
+## 6. Communications (Channel Surface)
 
-Comms & Calendar is a standing channel surface in the left nav for communication and schedule workflow. A Comms & Calendar Meeting can be launched over the same data for a focused decision session.
+Communications is a standing channel surface for inbound messages, drafted replies, contacts, and approved outbound write-back. A Communications Meeting can be launched over the same data for a focused decision session.
 
-This is not a full inbox or full calendar replacement.
+This is not a full inbox replacement. It is a light, calm inbox over normalized communication items.
 
-Comms & Calendar is the first proof lane for provider ingestion, normalization, artifacts, approvals, and approval-gated outbound write-back.
+Communications is the first proof lane for provider ingestion → normalization → artifact → approval → outbound write-back.
 
 Purpose:
 
-- review communication and schedule-related prepared work
-- approve, defer, revise, or open source/provider links
-- show selected calendar context needed for the workflow
+- review priority messages, drafts, and outbox state
+- approve, modify, defer, or open source/provider links
+- compose new outbound communications (drafts flow into the same approval pipeline)
+- access contacts grouped by client context
 
 Included:
 
-- triage summary
-- approval cards for drafted responses or calendar holds
-- outbox/status cards
+- channel piles (Emails · SMS & Voice · Social) over `normalized_items`
+- approval cards for drafted responses
+- outbox/status cards for approved outbound actions
+- contacts rail grouped by client context (Personal / Work / Social, configurable)
+- light composer that produces a `draft_email` Client Artifact → Approval Request
 - link cards to provider sources
-- schedule conflict cards
-- completion summary
 
 Excluded:
 
 - raw inbox replacement
-- full calendar management UI
 - persistent agent DM thread
+- voice/chat-first composition
+
+## 6b. Calendar (Channel Surface)
+
+Calendar is a standing channel surface for events, conflicts, scheduling, and upcoming commitments. A Calendar Meeting can be launched for focused scheduling decisions.
+
+This is not a full calendar management UI.
+
+Purpose:
+
+- show today's events and upcoming commitments
+- surface schedule conflicts
+- approve calendar holds and proposed events
+- open source provider event links (Google Calendar)
+
+Included:
+
+- piles by time window (Today · Conflicts · Upcoming)
+- approval cards for calendar holds and event proposals
+- mini month calendar with marked days
+- linked travel / meetings / milestones context
+- link cards to provider sources
+
+Excluded:
+
+- full calendar replacement / day-week-month views as core MVP
+- in-place event editing
+- recurring-event editor
 
 ## 7. Travel / Logistics (Channel Surface)
 
