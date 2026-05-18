@@ -2,6 +2,8 @@
 
 This document defines the FlavorOS 1.5 MVP structured interaction model. It intentionally removes live-call-first, voice-first, transcript-first, and right-rail-takeover assumptions from MVP canon.
 
+Structured Interaction Surfaces must follow `docs/planning/current_build_plan.md`: they display durable workflow state, artifacts, approvals, commands, source links, and completion summaries.
+
 ## Definition
 
 A Structured Interaction Surface is the screen used after a client launches a configured Briefing or Meeting.
@@ -107,7 +109,7 @@ It should not contain:
 
 ## Agenda Handling
 
-The old call agenda becomes a visible step list or progress rail.
+The structured agenda is rendered as a visible step list or progress rail.
 
 Allowed states:
 
@@ -159,6 +161,8 @@ The Structured Interaction Surface requires:
 - meeting definitions
 - dialog step definitions
 - workflow run state
+- Client Universe / GBrain context packets
+- provider/source references
 - approval requests
 - artifacts
 - command/action definitions
@@ -167,7 +171,7 @@ The Structured Interaction Surface requires:
 
 ## What Moved To Future-State
 
-The following old call-surface concepts are not MVP:
+The following live-call concepts are not MVP:
 
 - live voice call surface
 - speaker orb

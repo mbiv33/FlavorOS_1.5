@@ -99,6 +99,16 @@ The client **Command Center** home polls **`GET /health`** using `NEXT_PUBLIC_AP
 
 **Explicitly deferred:** Composio OAuth, in-repo GBrain subsystem, orchestrator, briefing/meeting engines, voice, mobile shell — see [`docs/planning/mvp_build_notes.md`](docs/planning/mvp_build_notes.md).
 
+## Canonical Planning Policy
+
+This repository is the canonical home for FlavorOS functionality, architecture, workflows, and planned feature coverage.
+
+- Features should be represented in this repo even when they are future-state or deferred beyond MVP.
+- Deferred features may remain documented-only, but they should not survive only in an external planning workspace.
+- The external Dropbox `.planning` workspace is reference material, not canonical product truth.
+- Current implementation priorities should follow the MVP plan at [FLAVOROS_MVP_PROJECT_PLAN.md](</Users/marcusbivines/Library/CloudStorage/Dropbox/My Mac (Marcuss-MacBook-Pro.local)/Documents/FlavorOS/planning/00-flavoros-mvp-delivery-system/FLAVOROS_MVP_PROJECT_PLAN.md>).
+- For migration status of planned features, see [`docs/planning/feature_migration_inventory.md`](docs/planning/feature_migration_inventory.md).
+
 ## Smoke checks
 
 1. `curl -s http://localhost:8000/health` returns JSON with an `ok` or status field (see implementation).

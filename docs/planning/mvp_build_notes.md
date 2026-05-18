@@ -1,5 +1,11 @@
 # MVP Build Notes
 
+## Status
+
+This file is supporting context. The canonical development plan and build priority order live in `current_build_plan.md`.
+
+Use this file for background on MVP purpose, agents, surfaces, and non-negotiables. If this file conflicts with `current_build_plan.md`, the current build plan wins.
+
 ## MVP Positioning
 
 The MVP should prove that FlavorOS can operate as a calm, unified client command center powered by a small but useful multi-agent system.
@@ -13,38 +19,45 @@ It should not attempt to build every possible future capability.
 
 ## MVP Agents
 
+The MVP agent model has exactly three canonical agent owners: Khadijah, Sinclair, and Regine.
+
+Retired names may appear as persona, skill, or design lineage only. They are not standalone MVP agent owners.
+
 ### Khadijah — Conductor Agent
 
 Runtime: Cloud-based
 
-Personas/purposes:
+Responsibilities:
 
-- Khadijah — orchestration
-- Maxine — project management, operations, and finance oversight
+- orchestration
+- project/workflow qualification
+- approval routing
+- artifact coordination
+- finance boundary/model oversight
 
 ### Sinclair — Communications Agent
 
 Runtime: Local
 
-Personas/purposes:
+Responsibilities:
 
-- Sinclair — executive assistant
-- Sinclair — preference guardian
-- Sinclair — wellness guru
-- Overton — secrets butler
-- Overton — household management
+- communications triage
+- calendar/schedule posture
+- preference guarding
+- wellness-sensitive communication handling
+- client-facing draft preparation
 
 ### Regine — Research & Logistics Agent
 
 Runtime: Cloud-based
 
-Personas/purposes:
+Responsibilities:
 
-- Scooter — travel + logistics
-- Scooter — researcher
-- Regine — relationships/contacts management
-- Regine — lifestyle coordinator
-- Regine — social media coordinator
+- research
+- travel/logistics
+- relationship and contact context
+- lifestyle coordination
+- selected social DM context where connected
 
 ## MVP App Surfaces
 
@@ -146,13 +159,13 @@ Examples:
 
 Use Composio for provider access.
 
-Initial provider categories:
+Provider priority tiers:
 
-- email,
-- calendar,
-- contacts,
-- files,
-- project management.
+| Tier | Provider target | MVP posture |
+|---|---|---|
+| 1 | Google Workspace: Gmail, Google Calendar, Docs, Sheets, Slides | First-class MVP provider target |
+| 2 | Project management, contacts, files, selected social DMs | Supporting MVP providers where needed |
+| 3 | Finance and Twilio | Future/adjacent unless explicitly promoted |
 
 Use GBrain for:
 
@@ -165,17 +178,28 @@ Use GBrain for:
 
 ## MVP Technical Priorities
 
-1. Multi-tenant foundation
-2. Auth and role model
-3. Client Universe schema
-4. Composio provider connection
-5. GBrain ingestion/retrieval integration
-6. Basic orchestrator
-7. Three MVP agents
-8. Briefing engine
-9. Artifact engine
-10. Approval queue
-11. Admin monitoring widgets
+These notes support the canonical priority order in `current_build_plan.md`:
+
+1. Visualization and surfaces
+2. DB and storage
+3. Integrations
+4. Onboarding
+5. Provider ingestion
+6. Agent workflows
+
+Technical foundations required under that order:
+
+- multi-tenant foundation
+- auth and role model
+- Client Universe schema
+- provider connection framework
+- GBrain ingestion/retrieval integration
+- basic orchestrator
+- three MVP agents
+- briefing workflow/storage framework
+- artifact engine
+- approval queue
+- admin monitoring widgets
 
 ## MVP Non-Negotiables
 

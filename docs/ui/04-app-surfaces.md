@@ -2,6 +2,8 @@
 
 This document defines the approved FlavorOS 1.5 MVP app surfaces.
 
+It follows `docs/planning/current_build_plan.md`: visualization and surfaces are the first build priority, and these surfaces must be able to show durable workflow, artifact, approval, provider, and Client Universe state.
+
 ## Controlling Rule
 
 The MVP app is a visual, structured command-and-control WebApp.
@@ -34,9 +36,11 @@ App Launch
 -> Completion Summary
 ```
 
-## Surface Map
+## Migration Map
 
-| Old Surface | FlavorOS 1.5 MVP Surface | Treatment |
+This table is a migration reference only. The MVP surfaces below are the canonical app model.
+
+| Prior concept | FlavorOS 1.5 MVP Surface | Treatment |
 |---|---|---|
 | Today | Command Center Dashboard | Rewrite |
 | Work | Projects Meeting | Rewrite |
@@ -58,7 +62,7 @@ MVP screens:
 - Sign Up
 - Client Onboarding
 
-Launch surfaces must not expose agent internals, workflow traces, SIGMA state, provider implementation details, or old voice-first concepts.
+Launch surfaces must not expose agent internals, workflow traces, SIGMA state, provider implementation details, or voice-first concepts.
 
 ## 2. Client Onboarding
 
@@ -78,7 +82,7 @@ Onboarding should be guided and button-led. Avoid chat-style onboarding.
 
 ## 3. Command Center Dashboard
 
-Replaces old `Today`.
+Command Center is the default client landing surface.
 
 Purpose:
 
@@ -117,6 +121,8 @@ The Command Center should not include:
 
 Briefings are preconfigured guided flows, usually scheduled or recurring. They are not necessarily live calls.
 
+For build purposes, Briefings are also workflow/storage frameworks. They must be backed by workflow run state, prepared agenda items, Client Universe/GBrain context, artifacts, approvals, provider/source links where relevant, and completion summaries.
+
 MVP Briefing Types:
 
 - Morning Standup
@@ -133,6 +139,8 @@ Briefing launch cards should show:
 - secondary command: defer/reschedule where applicable
 
 Briefing screens should contain structured dialog steps, prepared context, approval cards, artifact cards, and a completion summary.
+
+Briefing screens should not be static scripts or decorative launchers. Their job is to display prepared system state correctly.
 
 ## 5. Meetings
 
@@ -156,7 +164,9 @@ Meeting launch cards should show:
 
 ## 6. Comms & Calendar Meeting
 
-Combines old Messages and Calendar. This is not a full inbox or full calendar replacement.
+Combines communication and schedule review. This is not a full inbox or full calendar replacement.
+
+Comms & Calendar is the first proof lane for provider ingestion, normalization, artifacts, approvals, and approval-gated outbound write-back.
 
 Purpose:
 
@@ -181,7 +191,9 @@ Excluded:
 
 ## 7. Travel Meeting
 
-Rewrites old Travel into a structured review and command surface.
+Travel is a structured review and command surface.
+
+Travel / Logistics is retained as an MVP surface and future-capable workflow lane, but it is not the first proof loop unless explicitly promoted for demo needs.
 
 Purpose:
 
@@ -210,7 +222,7 @@ Excluded from MVP:
 
 ## 8. Projects Meeting
 
-Rewrites old Work.
+Projects is a structured status, artifact, and approval surface.
 
 Purpose:
 
@@ -237,7 +249,7 @@ Excluded:
 
 ## 9. Reports & Artifacts Meeting
 
-Rewrites old Library.
+Reports & Artifacts is the review surface for generated work product.
 
 Purpose:
 
@@ -262,7 +274,7 @@ Excluded:
 
 ## 10. Settings/Admin/Profile
 
-Reframes old Preferences.
+Settings, Admin, and Profile are operational surfaces, not the center of client work.
 
 Settings are useful, but not a core client work surface.
 
@@ -304,6 +316,6 @@ Priority components:
 
 ## Migration Notes
 
-- Preserve the old calm dashboard, approval, artifact, status, and source-link thinking.
-- Remove the old assumption that a right rail or live call is the center of interaction.
-- Treat old voice/chat/call UI as future-state, documented separately in `10-future-voice-and-chat-layer.md`.
+- Preserve calm dashboard, approval, artifact, status, and source-link behavior.
+- Do not treat right rail, live call, or persistent chat as the center of interaction.
+- Treat voice/chat/call UI as future-state, documented separately in `10-future-voice-and-chat-layer.md`.

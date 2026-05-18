@@ -2,6 +2,8 @@
 
 This document preserves voice, chat, right-rail, and call-surface concepts as future-state architecture. It is explicitly not MVP canon.
 
+The visual MVP must work without this layer. Future voice and chat should wrap the same workflow, artifact, approval, provider, and Client Universe data used by the visual surfaces.
+
 ## Future-State Only
 
 The following are excluded from MVP:

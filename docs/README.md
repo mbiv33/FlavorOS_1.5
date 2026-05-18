@@ -12,7 +12,29 @@ FlavorOS is a multi-tenant, multi-agent client operating system built around a v
 | `runtime/` | Hostinger/VPS runtime direction and services/config model |
 | `governance/` | HITL, permissions, tenant isolation, audit, secrets protocol |
 | `ui/` | MVP UI architecture and future-state voice/chat layer |
-| `planning/` | Non-canonical planning notes and MVP build notes |
+| `planning/` | Canonical build plan, migration inventory, and supporting planning notes |
+
+## Canonical Source Policy
+
+FlavorOS should capture all meaningful functionality and planned feature coverage in this repository, including future-state work that is not part of the MVP implementation slice yet.
+
+Rules:
+
+- This repo is the canonical home for architecture, workflows, skills, runtime contracts, UI specs, and planned feature inventory.
+- Deferred or future features should still be represented here as canonical docs, schemas, workflow definitions, skill/protocol placeholders, or migration inventory rows.
+- External planning workspaces are allowed as historical inputs, but they are not the source of truth once a concept is promoted into the FlavorOS 1.5 repo.
+- The current priority guide for build sequencing is [`planning/current_build_plan.md`](planning/current_build_plan.md).
+- The broader migration status across MVP and future features is tracked in [`planning/feature_migration_inventory.md`](planning/feature_migration_inventory.md).
+
+## Canon Order
+
+| Rank | Document set | Role |
+|---|---|---|
+| 1 | `planning/current_build_plan.md` | Single canonical development plan and priority order |
+| 2 | Domain docs under `architecture/`, `workflows/`, `agents/`, `ui/`, `governance/`, `runtime/` | Canonical system specs |
+| 3 | `workflows/planned_feature_catalog.md` | Retained MVP and future feature catalog |
+| 4 | `planning/feature_migration_inventory.md` | Migration/status tracker |
+| 5 | `planning/mvp_build_notes.md` | Supporting context only |
 
 ## Architecture
 
@@ -49,6 +71,7 @@ FlavorOS is a multi-tenant, multi-agent client operating system built around a v
 | `workflows/workflow_runtime_model.md` | Workflow, provider sweep, scheduler, runtime, and deployment model |
 | `workflows/pac_ptq_model.md` | Pending Action Candidate and qualification model |
 | `workflows/schedule_catalog.md` | Normalized schedule catalog mapped to three-agent ownership |
+| `workflows/planned_feature_catalog.md` | Canonical catalog of retained MVP and future workflow/feature functionality |
 
 ## Runtime
 

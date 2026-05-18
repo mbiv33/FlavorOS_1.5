@@ -1,88 +1,128 @@
 # 00 · Principles & Vocabulary
 
-These govern every UI decision. When two principles conflict, the earlier one wins.
+This document defines UI principles for the current FlavorOS 1.5 build direction.
 
----
+`docs/planning/current_build_plan.md` is the controlling source. If this file conflicts with the current build plan, update this file.
 
 ## Principles
 
-### 1. Sausage over sausage-making
+### 1. Surfaces come first
 
-client sees **tasks, artifacts, and decisions** in plain English. She never sees agent IDs, skill names, event traces, PAC/PTQ vocabulary, SIGMA types, routing metadata, or backend protocol names. That layer exists for Khadijah and admin surfaces — not for her.
+The MVP starts by making FlavorOS visible as software: a client Command Center, workflow-backed Briefings and Meetings, channel surfaces, artifact review, approval handling, and operator/admin diagnostics.
 
-**Operational test:** if a UI element exposes how the system gets work done (rather than what got done), it's wrong.
+The UI should expose useful prepared state before deeper automation is complete.
 
-### 2. Silence equals working
+Operational test: can a client or operator understand what FlavorOS knows, what is ready, what is blocked, and what can be done next?
 
-Empty states are the proof of value. When nothing needs client, the surface is short, calm, and mostly whitespace — no placeholder cards, no "no items yet," no suggestion tiles to fill space, no analytics widgets for their own sake.
+### 2. Durable state drives the UI
 
-**Operational test:** if a zone has no content, it doesn't render. The page gets shorter, not noisier.
+Screens must represent stored FlavorOS state, not one-off mock state. Client, provider, workflow, artifact, approval, outbound action, audit, and onboarding status should all have clear homes in the data model.
 
-### ~~3. Voice-first, not voice-optional~~
+Operational test: if a card, status, or action appears on screen, there should be a durable record behind it or an explicit placeholder/gap note while it is being built.
 
-~~The composer, transcription, and listening orb are first-class surfaces. Text and click are supporting modes. Calls (briefings, scheduled meetings) are the primary interaction shape — not chat.~~
+### 3. Client UI is plain-English, admin UI can be diagnostic
 
-~~**Operational test:** every card action and major affordance has a voice phrase client can say.~~
+Client-facing surfaces show tasks, artifacts, approvals, completion summaries, provider/source links, and next actions in plain English.
 
-### 4. Context-agnostic, context-fatigue-guarded
+Client-facing UI must not expose agent IDs, skill names, PAC/PTQ vocabulary, raw SIGMA vocabulary, routing traces, provider payloads, or backend protocol names.
 
-client configures her contexts during onboarding. The UI adapts to whatever she has — 1 context or 6. No hardcoded contexts, no chrome bloat for single-context users, no forced "context picker" if there's only one.
+Admin/operator surfaces may show diagnostics, logs, provider sync state, workflow failures, queues, and configuration details where governance allows it.
 
-**Operational test:** a single-context user sees zero context-switching UI.
+Operational test: client UI explains what happened and what is needed; admin UI can explain why the system behaved that way.
 
-### 5. Human-in-the-loop on commitments only
+### 4. Client Universe is the context boundary
 
-Money, time commitments, public-facing comms, and sensitive relationships require explicit approval. Everything else runs silently in the background.
+Onboarding, profile, preferences, context accounts, account aliases, OAuth connection references, HITL defaults, provider expectations, and sync readiness should feed the Client Universe.
 
-**Operational test:** if the system is asking client something that doesn't move money/time/comms/relationships, redesign — it shouldn't be asking.
+The UI should not hardcode personal contexts, provider assumptions, authority rules, or account mappings.
 
-### 6. One canonical component per decision
+Operational test: a new client can have different contexts, providers, approval defaults, and account aliases without redesigning the UI.
 
-A single Approval Card shape handles every decision client makes. Different artifacts, different agents, different contexts — all rendered through the same component. She learns the affordances once.
+### 5. Provider access is not canonical truth
 
-**Operational test:** if a designer is reaching for a new card variant, ask whether the canonical one with adjusted content can do the job. Almost always yes.
+Google Workspace and other providers are connected sources and write-back destinations. The durable FlavorOS model is the normalized record, workflow run, artifact, approval, outbound action, audit event, and Client Universe state.
 
-### 7. Boring, reliable, unsung is the goal
+Operational test: provider/source links are visible where useful, but the UI does not treat Gmail, Calendar, Docs, Sheets, Slides, PM tools, social DMs, finance tools, or Twilio as the product's source of truth.
 
-The agent should feel like an industrious capable virtual employee. 95% of work is pre-done, anticipated, or behind the scenes. The interface is primarily a place to **show artifacts** so client can be great. It is not a command surface for prompting work.
+### 6. Approval-gated write-back is part of MVP
 
-**Operational test:** if client is being asked to direct work, ask whether the system could have anticipated. Default position: don't ask unless absolutely necessary.
+Outbound sync/write-back is part of the MVP proof loop. Governed actions must be approval-gated, channel-correct, source-linked, and auditable.
 
-### 8. No instant work
+Approval is required for public-facing communication, calendar commitments, money movement, sensitive relationship actions, irreversible provider actions, and any other governed external side effect.
 
-Modifications, redrafts, and research take real time — agents use that time to consult preferences, prior artifacts, peer agent context. Nothing is rushed. The UI sets this expectation honestly: no countdown timers, no "in 1 hour" promises. Just "ready when ready" or, when the system genuinely knows: "back same-day or next morning."
+Operational test: after approval, the UI shows queued, executed, failed, or pulled-back state instead of making provider actions feel invisible.
 
-**Operational test:** no UI element implies a time SLA on agent work shorter than human-EA-equivalent.
+### 7. Three-agent canon, not agent sprawl
 
----
+The MVP agent model is Khadijah, Sinclair, and Regine.
 
-## Vocabulary lock
+User-facing attribution can use those agent names or approved persona signatures, but the UI should not revive retired agent ownership as a parallel product structure.
 
-The shared verb vocabulary between agents and the user is small and precise. UI copy must respect it.
+Operational test: every user-facing prepared item can be understood as orchestration, communications/calendar, or research/logistics/relationship work.
+
+### 8. Briefings are workflows, not decorative cards
+
+Morning Standup, COB Work Day, and Goodnight are UI surfaces and workflow/storage frameworks. They should display prepared agenda state, context, artifacts, approvals, source links, follow-ups, and completion summaries.
+
+Operational test: a Briefing can be resumed, audited, completed, and connected to artifacts or workflow runs.
+
+### 9. Calm means relevant, not empty
+
+FlavorOS should avoid noisy dashboards, raw feeds, placeholder clutter, and constant prompting. Calm UI still needs to show useful status, readiness, blockers, approvals, and next actions.
+
+Operational test: if a zone has no meaningful content, it can disappear; if something affects current work, it should be visible in the right place.
+
+### 10. Voice, chat, and right rail are future wrappers
+
+The MVP must work through visual surfaces, structured flows, command components, artifacts, approvals, and provider/source links.
+
+Voice, chat, persistent right rail, live transcript, call surface, and command palette are future or supporting layers. If they are added, they must wrap the same workflow, artifact, approval, provider, and Client Universe state.
+
+Operational test: every MVP workflow can be completed by reading, clicking, keyboard navigation, and assistive technology.
+
+## Vocabulary Lock
+
+Use a small, consistent vocabulary across UI docs and product copy.
+
+| Concept | Use | Avoid |
+|---|---|---|
+| Client-facing work | prepared work, artifact, approval, briefing, meeting, completion summary | PAC, PTQ, SIGMA, raw event trace |
+| Provider state | connected, syncing, ready, degraded, failed, source link | Gmail is the database, Calendar is the system of record |
+| Approval | approve, send for revision, pull back, I'll handle it | reject, agent approved, auto-sent without approval |
+| Outbound action | queued, executed, failed, pulled back | magically sent, invisible sync |
+| Agent attribution | Khadijah, Sinclair, Regine | retired agent names as standalone MVP owners |
+| Client context | context, account alias, preference, authority default | hardcoded life labels |
+| Admin diagnostics | provider sync, workflow run, queue, audit, config | client-facing backend jargon |
+
+## Role Vocabulary
 
 | Role | Verbs |
 |---|---|
-| **Agent** | *modifies* artifacts |
-| **User (client)** | *approves · edits · sends/uses* artifacts |
+| Client/user | approves, edits, sends, handles, pulls back, defers |
+| Agent | prepares, drafts, researches, routes, summarizes, revises |
+| System | syncs, stores, normalizes, queues, executes, audits |
+| Admin/operator | configures, monitors, diagnoses, retries, resolves |
 
-### What this means in practice
+Rules:
 
-- An agent never "approves" anything. Only client approves.
-- An agent never "sends" outbound comms on its own (except via approved auto-responder protocol — and client is the one who approved each item).
-- The user never "modifies" — when she changes something herself, the verb is **edit**.
-- "Reject" is replaced by **"I'll do it myself"** — the artifact returns to her control, with the agent's prior work attached as context.
+- Only the client/user approves governed actions.
+- Agents prepare and revise; they do not independently approve client commitments.
+- The system can execute approved actions and record the outcome.
+- Admin/operator copy may be technical; client copy should remain plain English.
 
-### Banned UI copy
+## Banned Or Replaced UI Copy
 
-The following phrasings are forbidden because they leak backend mechanics or reverse the role vocabulary:
+| Do not say | Say instead |
+|---|---|
+| `PTQ pending` | `Needs confirmation in briefing` |
+| `Open PAC` | `Potential work item` or hide from client |
+| `SIGMA created` | Hide from client; show admin diagnostics only |
+| `Agent approved your invoice` | `Approved invoice queued` or `Invoice sent` |
+| `Sinclair auto-sent this email` | `Your approved email was sent` |
+| `Provider truth` | `Provider source` or `source link` |
+| `Reject` | `I'll handle it` or `Pull back` depending on state |
+| `Ask the agent` | `Add to briefing`, `Open meeting`, or future request-capture language |
 
-- ❌ "Agent approved your invoice" → ✅ *(never happens)*
-- ❌ "Sinclair sent the email" → ✅ "Your approved emails went out at 4pm"
-- ❌ "Modify the artifact" *(user-facing)* → ✅ "Edit it" *(when user is acting)*; "Send for revision" *(when handing back to agent)*
-- ❌ "PTQ pending" → ✅ "Khadijah will walk this at the briefing"
-- ❌ "Open PAC" → ✅ "Pending decision"
-- ❌ "SIGMA created" → ✅ *(never surfaced)*
+## Persona Attribution
 
-### Persona attribution
-
-See agent_agent_persona_model -Biv_5/15/26
+See `docs/agents/agent_persona_model.md`.

@@ -2,7 +2,7 @@
 
 The single canonical decision component. Used everywhere client makes a decision about an artifact.
 
-> **Important:** Approval Card is the *only* user-facing decision component in FlavorOS. Question Cards, Suggestion Cards, and PTQ confirmation cards are **not** part of the framework. Decisions that aren't artifact-driven (e.g., "should we open a project for this podcast invite?") live on briefing agendas — not as cards on Today. See [01-interaction-taxonomy.md](./01-interaction-taxonomy.md).
+> **Important:** Approval Card is the *only* user-facing decision component in FlavorOS. Question Cards, Suggestion Cards, and PTQ confirmation cards are **not** part of the framework. Decisions that are not artifact-driven (for example, "should we open a project for this podcast invite?") live on briefing or meeting agendas, not as standalone prompt cards on Command Center. See [01-interaction-taxonomy.md](./01-interaction-taxonomy.md).
 
 ---
 
@@ -10,7 +10,7 @@ The single canonical decision component. Used everywhere client makes a decision
 
 ```
 ┌────────────────────────────────────────────────────┐
-│ [Avatar] Maxine · drafted invoice · #247           │  ← Headline
+│ [Avatar] Khadijah · drafted invoice · #247         │  ← Headline
 │ [💰 $4,200] [FlourishED] [⏱ today]                  │  ← Stakes + context chips
 ├────────────────────────────────────────────────────┤
 │ [Artifact preview — collapsible]                   │  ← The thing being decided about
@@ -28,15 +28,14 @@ The single canonical decision component. Used everywhere client makes a decision
 
 ## Headline
 
-Format: `[Persona avatar] [Persona name] · [verb] · [object]`
+Format: `[Agent/persona signature] · [verb] · [object]`
 
-| Persona | Verb | Object |
+| Signature | Verb | Object |
 |---|---|---|
-| Maxine | drafted invoice | #247 to Acme |
+| Khadijah | drafted invoice | #247 to Acme |
 | Sinclair | drafted reply | to John Smith |
-| Scooter | curated booking bundle | Paris hotel + flight |
-| Kyle | drafted follow-up | to Acme intro request |
-| Regine *(Kyle's social/dev)* | drafted intro request | to Dr. Williams |
+| Regine | curated booking bundle | Paris hotel + flight |
+| Regine | drafted follow-up | to Acme intro request |
 
 **Verb is always past-tense for completed work** ("drafted", "curated", "prepared"). Never present-progressive ("is drafting") on an actionable card — if the work isn't done, there's no card yet.
 
@@ -53,9 +52,9 @@ Show only when applicable. Most cards have 1–2.
 | 🔗 **public-facing** | Outbound to a person or channel |
 | 🔒 **irreversible** | Booking, send, transfer, post |
 | ⚠️ **high-stakes relationship** | Flagged contact (board, family, top clients) |
-| **[Context]** | Always shown. Color-coded. (`W2 Work`, `FlourishED`, `Career`, `Personal`) |
+| **[Context]** | Always shown. Color-coded. Uses client-configured context labels from onboarding/profile state. |
 
-The context chip is mandatory — every artifact belongs to a context. The stakes chips are conditional.
+The context chip is mandatory because every artifact belongs to a context. Labels come from Client Universe/client profile state; the UI should not hardcode default labels.
 
 ---
 
@@ -122,9 +121,9 @@ Not split into multiple sub-blocks. One pass, fully synthesized.
 |---|---|
 | **Approve** | Sets artifact for use/send. Card transitions to post-approve state showing scheduling info (see below). Eventually collapses into handled-tray. |
 | **Modify** | Opens 3-axis structured subform (see below). Submitting hands the artifact back to the agent for thorough rework. **Minimum 1 hour return time** — this is a floor, not a deadline. |
-| **I'll do myself** | Draft disappears from the agent's queue. Task created in client's user-only PM list, with the agent's prior research/draft attached as context. The agent never re-touches this work. |
+| **I'll do myself** | Draft disappears from the agent's queue. Task or ownership marker is created in the relevant client-owned work surface, with the agent's prior research/draft attached as context. The agent never re-touches this work. |
 
-**No "Ask" button.** If client needs clarification, she opens the chat thread (User-Initiated interaction) — not an affordance on the card. This keeps the card vocabulary tight and pushes ambiguity to the right surface.
+**No "Ask" button.** Clarification belongs in the relevant Briefing, Meeting, or future request-capture layer, not as an affordance on the card. This keeps the card vocabulary tight and pushes ambiguity to the right surface.
 
 ### Modify subform — three structured axes
 
@@ -136,9 +135,8 @@ Not split into multiple sub-blocks. One pass, fully synthesized.
 │  Format         ☐ narrative     ☐ outline         │
 │  Sender request ☐ clarity       ☐ additional details│
 │                                                    │
-│ Maxine will rework using your preferences and      │
-│ bring it back when ready (usually same-day or      │
-│ next morning).                                     │
+│ We'll rework using your preferences and bring it   │
+│ back when ready.                                   │
 │                                                    │
 │              [Cancel]  [Send for revision]         │
 └────────────────────────────────────────────────────┘
@@ -160,7 +158,7 @@ Single underlying behavior. Label adapts so the verb is honest:
 | Action (booking, transfer, post) | **I'll do it myself** |
 | Generic / multi-type | **I'll do myself** |
 
-In all cases: task is created, agent's prior work is attached, agent stops touching it.
+In all cases: the relevant client-owned work item is created or marked, agent's prior work is attached, and the agent stops touching it.
 
 ---
 
@@ -173,13 +171,13 @@ Approval doesn't always mean "send right now." Many artifacts route into protoco
 | Outbound email | "Approved — sending in next batch (4:00 PM)" |
 | Outbound SMS / DM | "Approved — sending in next batch (4:00 PM)" |
 | Invoice | "Approved — sending tomorrow 9 AM" |
-| Internal brief | "Approved — filed to Library" |
-| Booking action | "Approved — Scooter executing now" |
+| Internal brief | "Approved — filed to Reports & Artifacts" |
+| Booking action | "Approved — Regine executing now" |
 | Calendar hold | "Approved — added to your calendar" |
 
 The card stays visible in the post-approve state for ~5 minutes (so client can pull back), then collapses to handled-tray.
 
-See [07-protocols-affecting-ui.md](./07-protocols-affecting-ui.md) for the full email auto-responder protocol the UI honors.
+See [07-protocols-affecting-ui.md](./07-protocols-affecting-ui.md) for the outbound write-back protocol the UI honors.
 
 ---
 
@@ -188,7 +186,7 @@ See [07-protocols-affecting-ui.md](./07-protocols-affecting-ui.md) for the full 
 ```
 pending ──Approve──> approved ──[scheduled time]──> sent ──> handled-tray
         ──Modify──> revising  ──[1hr+]──> pending (v2)
-        ──I'll do myself──> rejected (logged)  +  task → user PM list
+        ──I'll do myself──> transferred (logged)  +  client-owned work item
         ──[time elapsed]──> stale  (header pulses; preference-driven escalation)
         ──[agent retracts]──> withdrawn (notice shown briefly)
 ```
@@ -197,17 +195,9 @@ pending ──Approve──> approved ──[scheduled time]──> sent ──>
 
 ---
 
-## Voice
+## Future Voice
 
-Every card has a short voice handle the agent uses. Disambiguation is `persona + object` — no IDs, no numbers.
-
-| Voice phrase | Effect |
-|---|---|
-| "Approve the Acme invoice" | Approve |
-| "Modify John's reply" | Opens Modify subform; client speaks dimensions ("warmer, more clarity") |
-| "I'll do the gala one myself" | I'll do myself |
-
-Voice for Modify subform: spoken dimensions match checkboxes ("warmer", "outline", "more clarity") — system maps voice phrases to checkbox state, then submits.
+Voice may later wrap Approval Card actions, but it is not required for MVP. The visual card must be fully usable through reading, clicking, keyboard, and assistive technology.
 
 ---
 
@@ -217,10 +207,10 @@ When one skill produces N similar cards (3 follow-up emails, 5 expense categoriz
 
 ```
 [Regine] · drafted 3 follow-ups · gala attendees
-[Review each ▾]  [Approve all]  [Reject all]
+[Review each]  [Approve all]  [I'll handle all]
 ```
 
-`Approve all` fires the post-approve protocol on each (likely scheduling all to the same batch send). `Reject all` creates 3 separate user-PM tasks. `Review each` expands inline to per-card.
+`Approve all` fires the post-approve protocol on each where batch approval is allowed. `I'll handle all` transfers ownership of each item to the client-owned work surface. `Review each` expands inline to per-card.
 
 ---
 
@@ -228,11 +218,11 @@ When one skill produces N similar cards (3 follow-up emails, 5 expense categoriz
 
 A single canonical component. It appears in multiple containers — same component, state synced across surfaces.
 
-- **Today** (Ready-for-you zone)
+- **Command Center** (Ready-for-you zone)
 - **Project Status tab** (per-project pending decisions)
-- **Messages** (when an inbound item produced a draft)
-- **Right-rail thread** (when surfaced via voice or chat)
-- **Calendar** (when a hold is being approved)
+- **Comms & Calendar** (when an inbound item produced a draft or calendar hold)
+- **Briefings / Meetings** (when an agenda item requires approval)
+- **Reports & Artifacts** (when reviewing prepared work)
 
 Acting from any one updates all the others. Single source of truth.
 
@@ -240,9 +230,9 @@ Acting from any one updates all the others. Single source of truth.
 
 ## What Approval Cards do *not* contain
 
-To preserve sausage > sausage-making:
+To preserve plain-English client surfaces:
 
-- ❌ Internal coordination ("Khadijah asked Maxine to…")
+- ❌ Internal coordination ("Khadijah asked a specialist skill to...")
 - ❌ Failed attempts / dead-ends
 - ❌ Routine processing summaries
 - ❌ Confidence scores or agent metadata

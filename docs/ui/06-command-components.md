@@ -2,6 +2,8 @@
 
 This document defines reusable command-and-control components for the MVP.
 
+Command components are the primary way users act on workflow state in the visual MVP.
+
 ## Core Decision
 
 The MVP needs reusable command components more than conversational surfaces.
@@ -42,13 +44,14 @@ Command types:
 - open artifact
 - open provider link
 - queue outbound action
+- pull back queued outbound action
 - complete step
 
 ### Approval Card
 
 Presents prepared work requiring user decision.
 
-Preserve from old intake:
+Preserve in the canonical component:
 
 - one canonical component per decision
 - compact and expanded density
@@ -122,6 +125,7 @@ Usage examples:
 
 - Gmail source message
 - Google Calendar event
+- Google Docs / Sheets / Slides file
 - travel provider booking page
 - project management item
 - external report/document
@@ -196,6 +200,7 @@ Common statuses:
 ## Shared Component Rules
 
 - Components must be tenant-scoped.
+- Components must be backed by durable state where they represent workflows, artifacts, approvals, providers, or outbound actions.
 - Components must not expose SIGMA internals.
 - Components must not expose PAC/PTQ, routing metadata, skill names, or raw agent logs to the client.
 - Components should prefer plain English.

@@ -4,31 +4,33 @@ Backend protocols whose behavior the UI must honor. The UI doesn't define these 
 
 ---
 
-## Email auto-responder protocol
+## Outbound write-back protocol
 
 ### Behavior
 
-- Approved outbound emails are **batched, not sent immediately**
-- Three batches per day: **8:00 AM · 12:00 PM · 4:00 PM EST**
-- On approve, email moves to drafts/outbox queue
-- At batch time, queued items send
-- client is notified via Agent Update after each batch fires
+- Governed outbound actions are approval-gated.
+- Approved actions are staged before execution.
+- Each queued action preserves source context, provider, client id, workflow run, artifact, and audit state.
+- Channel behavior may differ by provider, but the UI must always show queued, executed, failed, or pulled-back state.
+
+Email may use batch sends. Calendar, Docs, Sheets, Slides, PM tools, and social DMs may need different execution rules.
 
 ### UI implications
 
 | Surface | UI element |
 |---|---|
-| Approval Card | Post-approve state shows: *"Approved — sending in next batch (4:00 PM)"* |
-| Messages | **Outbox** indicator shows queued items: *"3 approved emails sending at 4:00 PM"* |
-| Right-rail thread | Agent Update lands at batch time: *"Sent 5 approved emails just now."* |
+| Approval Card | Post-approve state shows queued/execution state |
+| Comms & Calendar | Outbound queue/status cards show approved provider actions |
+| Completion Summary | Lists provider actions queued, executed, failed, or pulled back |
+| Admin provider/workflow views | Show execution and failure diagnostics |
 
 ### Pull-back affordance
 
-client can pull back any queued email from the Outbox before it sends. UI shows each queued item with a `[Pull back]` action. Pulling back returns the email to draft state in the agent's queue.
+client can pull back any queued outbound action before the provider executes it, where the channel supports pull-back. UI shows eligible queued items with a `[Pull back]` action.
 
 ### Why this is visible
 
-The batch send is intentional — prevents the system from feeling spammy or rushed, gives client a buffer to change her mind, batches comms into predictable rhythms. The UI exposes the schedule so she **trusts** the batch model rather than wondering when something will go.
+Visible queued state is intentional. It builds trust that the system is not acting invisibly, and it gives the client a clear window to change course before execution where the provider supports it.
 
 ---
 
@@ -47,8 +49,8 @@ When client hits Modify on an Approval Card and submits the 3-axis subform:
 
 | Surface | UI copy |
 |---|---|
-| Modify subform | *"Maxine will rework using your preferences and bring it back when ready (usually same-day or next morning)."* |
-| Submitted state | Card collapses with note: *"Sent for revision — Maxine will bring it back."* — no countdown |
+| Modify subform | *"We'll rework using your preferences and bring it back when ready."* |
+| Submitted state | Card collapses with note: *"Sent for revision."* — no countdown |
 | Returned state | New Approval Card with `v2` indicator, original card linked as parent |
 
 ### What the UI does NOT show
@@ -82,11 +84,11 @@ These would set false expectations and frame the wait as adversarial. The system
 
 Structured axes:
 - Make agent rework predictable and learnable
-- Feed preference learning (client who repeatedly asks for "warmer" reveals her brand voice)
+- Feed preference learning (a client who repeatedly asks for "warmer" reveals a brand voice preference)
 - Avoid the prompt-engineering pitfall of vague instructions
 - Keep card vocabulary minimal
 
-If she truly needs free-text direction, she opens the chat thread and says it — that's a User-Initiated interaction, not a card affordance.
+If the client truly needs free-text direction, it belongs in a future request-capture layer or in the relevant workflow surface, not as an Approval Card affordance.
 
 ---
 
@@ -97,16 +99,16 @@ If she truly needs free-text direction, she opens the chat thread and says it �
 When client clicks the third button on an Approval Card:
 
 1. Draft disappears from the agent's queue (agent stops touching this work)
-2. Task created in client's user-only PM list
+2. Task or ownership marker is created in the relevant client-owned work surface
 3. Agent's prior research, draft, and context are attached to the task
-4. For drafts: the document opens in editor mode for her to edit and send
-5. For actions: the task sits in her queue with the agent's recs as reference
+4. For drafts: the document opens in editor mode for the client to edit and send
+5. For actions: the task sits in the client-owned queue with the agent's recs as reference
 
 ### UI implications
 
 - Optional one-line reason field on click (feeds preference learning) — non-blocking
-- Task lands in user PM list (visible in Today's Decisions, in the Project's Decisions tab, in ⌘K search)
-- Agent never re-presents this work — it's permanently transferred to her ownership
+- Task or ownership marker lands in the relevant client-owned work surface
+- Agent never re-presents this work; it is permanently transferred to client ownership
 
 ---
 
@@ -115,16 +117,16 @@ When client clicks the third button on an Approval Card:
 ### Backend behavior (client never sees this vocabulary)
 
 1. **Trigger** (email arrives, meeting completed, webhook fires) creates a **PAC** (Pending Action Candidate)
-2. PAC sits on `vault/30-Projects/pac-master-list.md`
-3. Maxine assigns a **PTQ** (Project/Task Qualification) — the test for whether this becomes real work
+2. PAC is stored in durable runtime state
+3. Khadijah-owned qualification checks decide whether this becomes real work
 4. PTQ resolves: Yes → spin up Project; No → delete PAC; Defer → re-evaluate later
 
 ### UI surface
 
 - PAC/PTQ vocabulary is **never** shown to client
-- When a PTQ requires client's confirmation (e.g., "should we open a project for this podcast invite?"), it surfaces as an **agenda item on the next briefing** — not as a card on Today
-- Resolution happens during the Scheduled Call (briefing), client says yes/no/defer in conversation
-- Once resolved, the project is created (or not) and client sees the result via Agent Update or Approval Card
+- When a PTQ requires client's confirmation (for example, "should we open a project for this podcast invite?"), it surfaces as an **agenda item on the next briefing or relevant meeting**, not as a standalone card on Command Center
+- Resolution happens in the relevant Briefing or Meeting surface
+- Once resolved, the project/work item is created (or not) and client sees the result via completion summary, artifact, or Approval Card
 
 ### Why this matters for UI
 
@@ -136,25 +138,24 @@ This protocol is the reason **Question Cards don't exist** in the UI. The system
 
 ### Backend behavior
 
-Before each Scheduled briefing, Khadijah's prep protocol gathers context for each agenda item to **3 degrees of separation**. This bounds her response capacity:
+Before each Briefing, Khadijah's prep protocol gathers bounded context for each agenda item. Example:
 
 - Agenda item: WBEZ podcast invite
 - Degree 1: the producer's note, Sinclair's flag, the show's basic info
 - Degree 2: prior podcast appearances, similar invitations, calendar collisions
 - Degree 3: stated career goals, recent positioning decisions, audience overlap data
 
-Khadijah responds confidently within those 3 degrees. Beyond that (4th-degree and further: ad-hoc tangents, novel questions client raises), **Sinclair handles the response** — she's prepared for the role of interpreter.
+Prepared context should come from Client Universe/GBrain, provider state, artifacts, approvals, and relevant source refs.
 
 ### UI implications
 
-- Both agents are present in the Call Surface (see [05-call-surface.md](./05-call-surface.md))
-- Khadijah leads agenda items; her responses are sourced from prep
-- Sinclair takes notes and fields un-prepped territory
-- When client goes off-agenda, Khadijah doesn't pretend to know — she signals to Sinclair, or Sinclair jumps in proactively
+- Briefing steps show prepared context and linked artifacts/approvals
+- Open or unprepared questions become follow-up work rather than instant improvised answers
+- Sinclair-owned communication/calendar items can appear inside the Briefing when relevant
 
 ### Why this matters for UI
 
-The pairing isn't decorative — it's structural. The UI shows **both avatars** during calls because both are operating; missing this would obscure how the system actually thinks.
+The important UI requirement is not live agent presence. It is showing prepared state clearly and routing follow-up work through the right workflow/agent.
 
 ---
 
@@ -168,11 +169,11 @@ When an agent (Khadijah or Sinclair) needs client's time for a non-routine sched
 2. Hold appears as an Approval Card: *"Sinclair drafted calendar hold · 30 min Wed 2pm w/ Khadijah · Re: birthday weekend logistics"*
 3. client approves via standard 3-button flow
 4. Hold lands on calendar
-5. At scheduled time, the Call Surface activates
+5. At scheduled time, the relevant Briefing or Meeting surface is ready
 
 ### UI implications
 
-No special UI for scheduled-meeting requests. They use the same Approval Card component as any other scheduling artifact. The downstream effect (Call Surface activation) is invisible at approval time — it just becomes a calendar event with a `briefing` chip.
+No special UI for scheduled-meeting requests. They use the same Approval Card component as any other scheduling artifact. The downstream effect is that the relevant Briefing or Meeting workflow becomes scheduled and ready.
 
 ---
 
@@ -193,9 +194,9 @@ Sinclair runs continuous wellness monitoring:
 |---|---|
 | Steady state | Header pulse: steady glow |
 | Elevated stress | Header pulse: soft pulse animation |
-| Pre-programmed quick check-ins | One-line ping in Sinclair's right-rail thread |
-| Deeper scheduled check-in | Call Surface (Sinclair-only mode) |
-| Auto-adjustment (focus block held) | Visible in Calendar; surfaced in Today's agenda strip |
+| Pre-programmed quick check-ins | Goodnight or relevant Briefing step |
+| Deeper scheduled check-in | Future workflow surface unless promoted |
+| Auto-adjustment (focus block held) | Visible in Comms & Calendar; surfaced in Command Center schedule/status where relevant |
 | Sustained-stress recovery suggestion | Approval-style card: *"Shift these 3 things off Wed?"* |
 
 ### What wellness UI does *not* do
@@ -226,7 +227,7 @@ Each inferred preference becomes a small confirmation card.
 After Travel project enters Return phase and the debrief artifact is generated, a small batch of "preferences learned" cards appears in the Travel project's Status pane. Each is a one-tap Approve / Skip:
 
 ```
-[Scooter] · Preference inferred · Save?
+[Regine] · Preference inferred · Save?
 "Direct flights only for intl > 6h"
 [Save] [Skip]
 ```
@@ -244,32 +245,32 @@ Receipts enter the system via client texting/messaging an image to the system. T
 ### UI implications
 
 - **No "capture receipt" button anywhere in the UI** — receipts are an ingestion concern, not a UI surface
-- Receipts appear in Library under their context after ingestion
-- If parsing fails, Maxine surfaces a single Approval Card: *"Maxine couldn't parse a receipt — confirm details?"* with the image and editable fields
+- Receipts appear in Reports & Artifacts under their context after ingestion
+- If parsing fails, Khadijah surfaces a single Approval Card: *"Confirm receipt details?"* with the image and editable fields
 
 That's it. The UI doesn't make client think about receipts.
 
 ---
 
-## Universal Inbox Ingestion protocol
+## Communication Sweep protocol
 
 ### Behavior
 
-Sinclair ingests communications from every configured channel (per `agents/sinclair/skills/executive-assistant/universal-inbox-ingestion.md`):
+Sinclair ingests communications from configured channels through Communication Sweep:
 
 - Cron every 15 min + webhook push on incoming
 - Normalizes to standard item shape
 - Triages intent + priority
 - Routes to relevant agent
-- Stages `vault/15-Readiness/universal-inbox-triage.md`
+- Updates Client Universe, workflow runs, artifacts, approvals, and completion summaries as needed
 
 ### UI implications
 
-The Messages surface (see [04-surfaces.md §4.4](./04-surfaces.md#44-messages)) renders that artifact. The summary block, normalized items array, and routing field map directly to UI elements.
+The Comms & Calendar surface renders the prepared communication/schedule state. Summary blocks, normalized items, source links, draft artifacts, approval cards, and outbound status map directly to UI elements.
 
 UI must:
-- Auto-refresh on `event.inbox.triaged` (every 15 min)
-- Surface routing in user-facing language ("Sinclair handling" not "→ sinclair routing")
+- Refresh on provider sweep, webhook, manual sync, or workflow update events
+- Surface routing in user-facing language ("Sinclair is preparing this" not "→ sinclair routing")
 - Honor the architecture: Sinclair's view is *triage*, not raw inbox replacement
 
 ---

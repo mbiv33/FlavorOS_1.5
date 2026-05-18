@@ -1,188 +1,139 @@
 # 09 · Open Questions
 
-Designed but not yet finalized. These don't block visual design or the initial build, but each will need its own pass before shipping.
+These questions do not block the current build plan, but each needs a focused pass before the relevant feature ships.
 
----
+## Onboarding UI
 
-## Onboarding
+Status: required for MVP, not implemented.
 
-**Status:** out of scope for the framework PRD; needs its own spec.
+Open questions:
 
-**Touches:**
-- Context configuration (declaring W2 Work / LLC Work / Career / Personal — or whatever applies)
-- Account connection (Gmail, O365, social, phones, websites per context)
-- Agent introduction (client meets Khadijah and Sinclair; understands the team model)
-- Voice setup (push-to-talk vs always-on default; wake-phrase if any)
-- Preferences seeding (initial Travel/Work/Wellness/General prefs)
-- First-week protocol (heavier check-ins; gradual hand-off as preferences learned)
+- exact step sequence for profile, contexts, providers, approvals, and first workflow lanes,
+- how much client envelope detail is edited directly versus generated from guided inputs,
+- how provider readiness and consent states are shown,
+- how to introduce Khadijah, Sinclair, and Regine without making the UI agent-centric.
 
-**Why deferred:** onboarding is a guided flow with its own UX patterns (progressive disclosure, skip-able steps, conversational setup). Should not contaminate the steady-state UI framework. Build steady-state first; onboarding follows.
+Constraint: onboarding must create a governed Client Universe without storing secrets in repo-visible envelope files.
 
----
+## Current Structure Inventory
 
-## Notification model
+Status: needed for repo cleanup.
 
-**Status:** routing/escalation rules not yet designed.
+Open questions:
 
-**Open questions:**
-- Which Agent Escalations trigger push notifications vs in-app badge only?
-- SMS fallback for off-device escalations?
-- Email digest of Updates (opt-in for asynchronous catch-up)?
-- Quiet hours / Do Not Disturb integration?
-- Per-context notification preferences (e.g., W2 Work escalations off after 7pm)?
+- where to document actual current folder structure versus target/recommended structure,
+- whether to create a generated inventory or maintained doc,
+- how often current structure should be reconciled with `repo_structure.md`.
 
-**Constraint:** the system biases hard toward not-interrupting. Whatever gets designed should make Escalations feel rare and earned.
+Constraint: `repo_structure.md` is target/recommended structure, not current filesystem truth.
 
----
+## Provider Connection UX
 
-## Mobile UX (beyond layout collapse)
+Status: required for MVP, partially designed.
 
-**Status:** layout collapse rules locked. Full mobile spec deferred.
+Open questions:
 
-**Layout decisions already made:**
-- Left nav → hamburger
-- Right rail → docked tab at bottom
-- Calls → full-screen takeover
-- Header → unchanged
+- exact Google Workspace connection flow,
+- how Docs, Sheets, and Slides appear in provider readiness,
+- how tier 2 providers are shown without implying they are fully wired,
+- what a failed or degraded provider sync looks like on client versus admin surfaces.
 
-**Open:**
-- Voice-first on mobile (likely heavier than desktop)
-- Receipt-text-in workflow (already in protocol; confirm UX)
-- One-handed thumb zones for active-Travel mode
-- Push notification design
-- Lock-screen interactions (tap a notification to approve directly?)
+Constraint: provider access is not canonical data truth; UI should distinguish connected access from normalized FlavorOS state.
 
----
+## Outbound Write-Back UX
 
-## Group thread voice arbitration
+Status: required for MVP proof loop, not fully specified.
 
-**Status:** unresolved.
+Open questions:
 
-**Question:** when client is in the Group thread and asks something neither agent's name was prepended to, who responds?
+- how queued write-back is displayed after approval,
+- how pull-back/cancel works before execution,
+- how execution receipts appear,
+- how failures route to client versus admin,
+- how channel-specific behavior differs for Gmail, Calendar, Docs/Sheets/Slides, PM tools, social DMs.
 
-**Possibilities:**
-- Khadijah by default (as chief of staff)
-- Whoever has more relevant context for the question
-- Both, with one leading and the other adding nuance
-- client explicitly chooses by saying a name first
+Constraint: write-back is approval-gated and channel-correct.
 
-**Recommendation in interim:** Khadijah leads by default; Sinclair joins if her domain is implicated (calendar/comms/wellness). Tune via observation.
+## Briefing Data Model
 
----
+Status: Briefings are required, data model needs detail.
 
-## Cross-context Khadijah briefs
+Open questions:
 
-**Status:** acknowledged but pattern not detailed.
+- exact workflow state needed by Morning Standup, COB Work Day, and Goodnight,
+- how agenda items relate to artifacts, approvals, provider events, and Client Universe records,
+- what completion summary shape each briefing emits,
+- what Goodnight stores as soft personal context.
 
-**Scenario:** work in two contexts collides — e.g., NTC board meeting and FlourishED client engagement need the same morning. Khadijah's master brief mentions the collision. But what's the *presentation*?
+Constraint: Briefings are workflow/storage frameworks, not only UI cards.
 
-**Possibilities:**
-- A dedicated "Cross-context conflicts" subsection in the master brief
-- A specific kind of Approval Card ("which to prioritize?")
-- Simply text in the brief; client resolves via briefing conversation
+## Admin Diagnostics
 
-**Lean:** brief text + briefing conversation. No new component. But pressure-test against real cases when they occur.
+Status: admin shell exists; diagnostic depth needs detail.
 
----
+Open questions:
 
-## Visual design system
+- which fields are safe to show for provider events,
+- how to expose GBrain status without leaking sensitive context,
+- what workflow failure states need operator action,
+- how admin mode distinguishes diagnostics from client-facing summaries.
 
-**Status:** tone direction is set; comprehensive design system not yet produced.
+Constraint: client UI must not expose raw internals; admin UI can, within governance limits.
 
-**Locked tone:**
-- Professional but warm
-- Soft gradients, generous whitespace
-- Glassmorphism acceptable but not noisy
-- Per-agent color tokens (Khadijah coral · Sinclair gold · Maxine teal · Kyle purple · Scooter blue)
-- No gratuitous analytics widgets
+## Mobile UX
 
-**Open:**
-- Full type scale and family
-- Spacing tokens (8/16/24/40/etc.)
-- Dark mode parity from day one (committed; not yet specified)
-- Iconography system
-- Motion / transition language (calm, not bouncy)
-- Accessibility tokens (contrast, focus states, motion-reduced variants)
-- Persona avatar style (illustrated? photographic? abstract?)
+Status: deferred beyond initial layout.
 
-**Recommendation:** commission or build a design-system pass before serious engineering. Mockup at `docs/mockups/flavoros-mockup.html` is directional, not authoritative on tokens.
+Open questions:
 
----
+- compact navigation pattern,
+- approval card density,
+- briefing/meeting step navigation,
+- provider source-link behavior,
+- future voice affordances without making mobile chat-first.
 
-## Wellness Corner deeper specs
+Constraint: mobile should preserve the visual command model.
 
-**Status:** framework includes Wellness as one of five interaction types; specific protocols not detailed.
+## Visual Design System
 
-**Open:**
-- Exact stress-signal taxonomy (passive signals to monitor)
-- Threshold tuning (what counts as "elevated")
-- Voice tone shifts in Wellness mode (cooler? slower? warmer?)
-- Recovery suggestion patterns (when to suggest, what to suggest)
-- Family/personal-life integration (Sinclair's territory but boundary unclear)
+Status: direction exists; full design system is not complete.
 
-**Why deferred:** wellness is sensitive and personal. Best designed via observation of real use, with explicit client-in-the-loop tuning, rather than pre-specced abstract protocols.
+Open questions:
 
----
+- type scale and font choices,
+- spacing and density tokens,
+- color system for status/context/provider states,
+- iconography,
+- focus and accessibility tokens,
+- motion language,
+- dark mode parity.
 
-## ⌘K palette command vocabulary
+Constraint: operational surfaces should feel calm, structured, and high-trust.
 
-**Status:** concept locked; full command vocabulary undefined.
+## Future Voice And Chat
 
-**Examples that must work:**
-- "go to Paris" → jump to Paris trip
-- "find Acme contracts" → Library search filtered
-- "ask Khadijah about Q2" → opens Khadijah thread with prefilled
-- "schedule 30 min with Maxine on Tuesday" → drafts a calendar hold (Approval Card)
-- "what's pending" → opens Today's Ready-for-you zone
+Status: future-state only.
 
-**Open:** is the palette also a *natural language command* surface, or strictly search + structured actions? Recommendation: hybrid — search-first with command suggestions appearing as you type.
+Open questions:
 
----
+- whether voice is push-to-talk, session-based, or something else,
+- whether chat is contextual help, request capture, or agent conversation,
+- how voice/chat wraps existing workflow data without replacing it,
+- privacy and consent model for any always-on behavior.
 
-## Calendar deep view
+Constraint: visual MVP must work without voice/chat.
 
-**Status:** compact agenda strip on Today is locked. Full Calendar surface is acknowledged but minimally specced.
+## Settled For MVP
 
-**Open:**
-- Default view (week starting Monday committed; confirm)
-- Color-coding strategy (by context vs by agent vs by project type)
-- How to surface Sinclair-held holds vs human-scheduled events vs travel days
-- How briefings render as calendar events (chip? avatar? distinct shape?)
-- Calendar editing — does client edit events directly, or always via Sinclair?
+The following are settled unless the build plan changes:
 
-**Likely answer to last:** edits go through Sinclair (an Approval Card spawned from "client moved the 2pm to 3pm" via voice). Direct in-UI editing risks divergence from agent state.
-
----
-
-## Library — focused viewer details
-
-**Status:** Library exists; focused-viewer affordances need detail.
-
-**Open:**
-- How does client edit a sent artifact (e.g., add a note to her records)?
-- Re-send flow (does it open a new draft? does Sinclair take over?)
-- Versioning UI (when an artifact has v1 → v2 → v3 from Modify cycles)
-- Sharing artifacts externally (export to PDF? share link?)
-- Linking artifacts to each other (e.g., this brief references that contract)
-
----
-
-## What is intentionally NOT an open question
-
-The following are settled. Not re-opening unless client explicitly requests:
-
-- Three-pane layout (D-01)
-- Today opens calm (D-02)
-- No team surface for client (D-03)
-- client never creates projects (D-04)
-- Question Cards killed (D-08)
-- Suggestion Cards killed (D-09)
-- 3-button Approval Card (D-11)
-- 3-axis structured Modify (D-12)
-- 1-hour Modify floor, "when ready" copy (D-13)
-- Briefings are calls (D-20)
-- Two agents in briefings (D-21)
-- Push-to-talk default (D-24)
-- Three threads in right rail (D-26)
-- Receipts via text-in (D-33)
-- Context-agnostic UI (D-34)
+- one canonical development plan controls priority order,
+- visualization and surfaces are first,
+- Command Center is the default landing surface,
+- Briefings and Meetings are workflow-backed surfaces,
+- Approval Card is the canonical decision component,
+- three-agent model is Khadijah, Sinclair, Regine,
+- Google Workspace is tier 1 provider scope,
+- Travel / Logistics is retained but not the first proof loop,
+- finance execution and simulations are post-MVP unless promoted,
+- persistent right rail, voice orb, live transcript, and command palette are not MVP requirements.

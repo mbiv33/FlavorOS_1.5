@@ -1,5 +1,13 @@
 # Recommended Repository Structure
 
+## Status
+
+This document defines the target/recommended repository structure. It is not a guaranteed inventory of the current filesystem.
+
+Use `docs/planning/current_build_plan.md` for current development priority and use `git`/filesystem inspection for actual current folders.
+
+The repo still needs an explicit current-structure inventory if builders need a snapshot of what exists today versus what is target-state.
+
 ## Root Structure
 
 ```text
@@ -172,6 +180,16 @@ flavor-os/
 | `governance/` | Permissions, approvals, audit, isolation |
 | `configs/` | Declarative system settings |
 | `docs/` | Human/developer documentation |
+
+## Canonical Coverage Rule
+
+This repository should hold the canonical record of FlavorOS functionality, including future-state and deferred features.
+
+That means:
+
+- MVP implementation priorities may be narrower than total product scope
+- deferred features may remain as docs, workflow definitions, skill/protocol coverage, schemas, or inventory rows
+- external material should not remain the only place a meaningful product capability is defined
 
 ## MVP UI Note
 
