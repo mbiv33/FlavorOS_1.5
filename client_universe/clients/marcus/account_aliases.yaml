@@ -1,0 +1,30 @@
+client_id: marcus
+status: draft
+
+context_accounts:
+  - context_account_id: marcus_google_primary
+    context_id: primary
+    provider: google
+    account_alias: primary_google
+    context_account_purpose: gmail_calendar_drive
+    auth_scheme: oauth
+    oauth_connection_id: marcus_google_primary_oauth
+    expected_scopes:
+      - gmail.readonly
+      - calendar.readonly
+      - drive.metadata.readonly
+    secret_reference: client_scoped_secret_store://marcus/google/primary_google
+    notes:
+      - Secret reference is a pointer only; no raw OAuth material belongs in this file.
+
+oauth_connections:
+  - oauth_connection_id: marcus_google_primary_oauth
+    provider: google
+    account_alias: primary_google
+    consent_status: pending
+    refresh_status: not_started
+    external_account_id: pending
+    scopes: []
+    secret_reference: client_scoped_secret_store://marcus/google/primary_google
+    notes:
+      - OAuth metadata belongs here; refresh tokens and access tokens do not.

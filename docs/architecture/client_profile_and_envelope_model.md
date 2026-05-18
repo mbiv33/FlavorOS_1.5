@@ -126,6 +126,27 @@ onboarding:
   first_sync_verified: false
 ```
 
+## Canonical Repo Envelope Path
+
+FlavorOS 1.5 stores human-readable client envelopes under `client_universe/clients/<client_id>/`.
+
+```text
+client_universe/
+  clients/
+    marcus/
+      profile.yaml
+      preferences.yaml
+      account_aliases.yaml
+      hitl_policy.yaml
+      onboarding_status.yaml
+      artifacts/
+      sigma/
+      knowledge_base/
+      memory/
+```
+
+The full folder is the client envelope. `profile.yaml` is the minimum canonical profile slice, while the sibling files preserve preferences, context accounts, OAuth connection metadata references, HITL/authority defaults, onboarding status, provider sync status, and approval readiness.
+
 ## Allowed In Client Envelope Files
 
 Client envelope files may contain:
@@ -162,4 +183,3 @@ client
 ```
 
 The profile is declarative. Runtime truth lives in the database and approved provider/secrets systems.
-

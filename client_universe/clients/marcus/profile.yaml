@@ -1,0 +1,56 @@
+client_id: marcus
+status: development_test_client
+
+identity:
+  display_name: Marcus
+  timezone: America/New_York
+  locale: en-US
+
+contexts:
+  - context_id: primary
+    context_type: personal
+    display_name: Primary
+    status: active
+    context_accounts:
+      - context_account_id: marcus_google_primary
+        provider: google
+        context_account_purpose: gmail_calendar_drive
+        account_alias: primary_google
+        auth_scheme: oauth
+        oauth_connection_id: marcus_google_primary_oauth
+  - context_id: w2_work
+    context_type: work
+    display_name: W2 Work
+    status: pending
+    context_accounts: []
+  - context_id: llc_work
+    context_type: business
+    display_name: LLC Work
+    status: pending
+    context_accounts: []
+  - context_id: career
+    context_type: career
+    display_name: Career
+    status: pending
+    context_accounts: []
+  - context_id: personal
+    context_type: personal
+    display_name: Personal
+    status: pending
+    context_accounts: []
+
+authority_defaults:
+  outbound_comms: draft_only
+  calendar_commits: approval_required
+  travel_booking: approval_required
+  money_movement: blocked_without_explicit_approval
+  sensitive_relationship_actions: approval_required
+  irreversible_provider_actions: approval_required
+
+onboarding:
+  status: partial
+  oauth_ready: false
+  first_sync_verified: false
+  notes:
+    - Development/test client envelope created during Client Universe migration.
+    - Provider metadata may be present, but secrets must remain outside the repo.

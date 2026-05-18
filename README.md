@@ -3,7 +3,7 @@
 Multi-tenant executive assistant platform — MVP vertical slice (Next.js client/admin + FastAPI + PostgreSQL).
 
 - **Docs:** see [`docs/README.md`](docs/README.md) for product and architecture intent.
-- **Repo layout:** [`docs/repo_structure.md`](docs/repo_structure.md).
+- **Repo layout:** [`docs/architecture/repo_structure.md`](docs/architecture/repo_structure.md).
 
 ## Stack (this slice)
 
@@ -97,7 +97,7 @@ The client **Command Center** home polls **`GET /health`** using `NEXT_PUBLIC_AP
 
 **In this repo slice:** repository skeleton aligned with docs, `pnpm` workspaces, FastAPI with `X-Client-ID` tenant resolution, JWT login with `client` / `developer_admin` roles, `tenants` / `users` / `profiles` tables, Alembic migrations, Dockerized Postgres, Next.js shells with MVP route maps.
 
-**Explicitly deferred:** Composio OAuth, in-repo GBrain subsystem, orchestrator, briefing/meeting engines, voice, mobile shell — see [`docs/mvp_build_notes.md`](docs/mvp_build_notes.md).
+**Explicitly deferred:** Composio OAuth, in-repo GBrain subsystem, orchestrator, briefing/meeting engines, voice, mobile shell — see [`docs/planning/mvp_build_notes.md`](docs/planning/mvp_build_notes.md).
 
 ## Smoke checks
 

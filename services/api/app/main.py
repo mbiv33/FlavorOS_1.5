@@ -9,7 +9,17 @@ from sqlalchemy.exc import OperationalError
 
 from app.config import get_settings, parse_origins
 from app.database import SessionLocal
-from app.routers import auth, health, profiles
+from app.routers import (
+    approvals,
+    artifacts,
+    audit,
+    auth,
+    health,
+    profiles,
+    providers,
+    universe,
+    workflows,
+)
 from app.seed import seed_if_empty
 
 logger = logging.getLogger(__name__)
@@ -50,6 +60,12 @@ def create_app() -> FastAPI:
     app.include_router(health.router)
     app.include_router(auth.router)
     app.include_router(profiles.router)
+    app.include_router(universe.router)
+    app.include_router(artifacts.router)
+    app.include_router(approvals.router)
+    app.include_router(workflows.router)
+    app.include_router(providers.router)
+    app.include_router(audit.router)
     return app
 
 

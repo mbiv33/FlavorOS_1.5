@@ -1,0 +1,25 @@
+client_id: marcus
+status: draft
+
+communication:
+  default_tone: concise
+  outbound_mode: draft_only
+  preferred_summary_style: action_first
+
+workflows:
+  initial_lanes:
+    - briefings
+    - meetings
+    - approvals
+    - travel
+
+memory:
+  allowed_categories:
+    - preferences
+    - decisions
+    - recurring_patterns
+    - relationship_notes
+    - project_context
+
+notes:
+  - Keep development/test preferences separate from operator/admin authority.

@@ -59,11 +59,16 @@ Rules:
 Successful onboarding means:
 
 - client profile exists,
+- client envelope exists under `client_universe/clients/<client_id>/`,
 - at least one context exists,
 - authority defaults are set,
 - account/provider expectations are recorded,
+- context accounts are attached to contexts,
+- OAuth connection metadata references exist where OAuth is used,
 - consent has been captured where needed,
 - provider connection metadata exists where OAuth is used,
+- provider sync status is recorded separately from the profile,
+- approval defaults and approval-record readiness are defined,
 - secrets are stored outside the repo,
 - initial workflow lanes are known,
 - Command Center can render a safe initial state.
@@ -109,4 +114,3 @@ It should collect:
 - first Command Center preferences.
 
 It should not require a voice call, persistent chat, live transcript, or right rail.
-

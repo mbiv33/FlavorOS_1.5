@@ -13,12 +13,12 @@ class Base(DeclarativeBase):
 
 
 _settings = get_settings()
-engine = create_engine(
-    _settings.database_url,
-    pool_pre_ping=True,
-    pool_size=5,
-    max_overflow=10,
-)
+
+_pool_kwargs: dict = {"pool_pre_ping": True}
+if not _settings.database_url.startswith("sqlite"):
+    _pool_kwargs.update(pool_size=5, max_overflow=10)
+
+engine = create_engine(_settings.database_url, **_pool_kwargs)
 
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, expire_on_commit=False)
 

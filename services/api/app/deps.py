@@ -1,4 +1,4 @@
-"""FastAPI dependencies — DB session, tenant header, JWT user."""
+"""FastAPI dependencies — DB session, tenant header, JWT user, adapters."""
 
 from __future__ import annotations
 
@@ -11,6 +11,14 @@ from jose import JWTError, jwt
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.adapters import (
+    ComposioAdapter,
+    GBrainAdapter,
+    OrchestratorAdapter,
+    StubComposioAdapter,
+    StubGBrainAdapter,
+    StubOrchestratorAdapter,
+)
 from app.config import Settings, get_settings
 from app.database import get_session
 from app.models import Tenant, User
@@ -93,3 +101,24 @@ def require_tenant_match(
             detail="X-Client-ID does not match authenticated tenant",
         )
     return tenant, user
+
+
+# ---------------------------------------------------------------------------
+# Adapter singletons (swap to real implementations via app.dependency_overrides)
+# ---------------------------------------------------------------------------
+
+_composio: ComposioAdapter = StubComposioAdapter()
+_gbrain: GBrainAdapter = StubGBrainAdapter()
+_orchestrator: OrchestratorAdapter = StubOrchestratorAdapter()
+
+
+def get_composio() -> ComposioAdapter:
+    return _composio
+
+
+def get_gbrain() -> GBrainAdapter:
+    return _gbrain
+
+
+def get_orchestrator() -> OrchestratorAdapter:
+    return _orchestrator

@@ -1,0 +1,50 @@
+client_id: marcus
+status: partial
+
+client_profile:
+  exists: true
+  profile_path: client_universe/clients/marcus/profile.yaml
+
+client_envelope:
+  exists: true
+  envelope_path: client_universe/clients/marcus
+  required_files:
+    profile_yaml: present
+    preferences_yaml: present
+    account_aliases_yaml: present
+    hitl_policy_yaml: present
+    onboarding_status_yaml: present
+
+client_onboarding:
+  status: partial
+  consent_captured: false
+  contexts_defined: true
+  account_aliases_defined: true
+  authority_defaults_defined: true
+  first_workflow_lanes_defined: true
+
+provider_sync_status:
+  - provider: google
+    account_alias: primary_google
+    context_account_id: marcus_google_primary
+    oauth_connection_id: marcus_google_primary_oauth
+    readiness: pending_consent
+    first_sync_verified: false
+    last_health_check_at: null
+    notes:
+      - Provider sync must not be treated as ready until consent and health checks pass.
+
+approval_records:
+  runtime_source: database
+  seed_policy_path: client_universe/clients/marcus/hitl_policy.yaml
+  current_seed_state: defaults_defined
+
+artifacts:
+  client_artifacts_path: client_universe/clients/marcus/artifacts
+  sigma_artifacts_path: client_universe/clients/marcus/sigma
+  knowledge_base_path: client_universe/clients/marcus/knowledge_base
+  memory_path: client_universe/clients/marcus/memory
+
+blocked_items:
+  - OAuth consent must be captured before live provider sync.
+  - First sync health check must pass before activation.

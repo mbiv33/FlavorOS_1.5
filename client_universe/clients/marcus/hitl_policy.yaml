@@ -1,0 +1,32 @@
+client_id: marcus
+status: active
+
+authority_defaults:
+  outbound_comms: draft_only
+  calendar_commits: approval_required
+  travel_booking: approval_required
+  money_movement: blocked_without_explicit_approval
+  sensitive_relationship_actions: approval_required
+  irreversible_provider_actions: approval_required
+
+approval_required_for:
+  - public_facing_communications
+  - external_sends
+  - calendar_commitments
+  - travel_bookings
+  - money_movement
+  - invoices_and_payments
+  - sensitive_relationship_actions
+  - irreversible_provider_actions
+
+approval_record_defaults:
+  status: pending
+  decision_required: approve
+  allowed_decisions:
+    - approve
+    - revise
+    - defer
+    - handle_self
+
+notes:
+  - Runtime approval records belong in the database; this file defines defaults.

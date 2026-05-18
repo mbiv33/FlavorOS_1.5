@@ -1,18 +1,15 @@
-# Welcome to your InstantDB NextJS app 👋
+# FlavorOS (InstantDB Experiment)
 
-[InstantDB Docs](https://www.instantdb.com/docs)
-[NextJS Docs](https://nextjs.org/docs)
+**Status: Experimental — not part of the MVP client/admin/API slice.**
 
-This is a NextJS project scaffolded with create-instant-app.
+This app is an InstantDB-backed scaffold used for early prototyping. It is separate from the canonical FlavorOS MVP path defined in `apps/client`, `apps/admin`, and `services/api`.
 
-To run the development server:
-`npm run dev`
+## Running
 
-To push schema changes:
-`npx instant-cli push`
+```bash
+pnpm dev:flavoros    # http://localhost:3002 (or next available port)
+```
 
-To pull schema changes:
-`npx instant-cli pull`
+## Relationship to MVP
 
-
-Got any feedback or questions? Join our [Discord](https://discord.gg/hgVf9R6SBm)
+The MVP architecture uses FastAPI + PostgreSQL as the backend (see root [README](../../README.md)). This app may be used for isolated InstantDB experiments but should not be confused with the production client surface.

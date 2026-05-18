@@ -77,16 +77,17 @@ flavor-os/
 │
 ├── client_universe/
 │   ├── schemas/
-│   ├── profile/
-│   ├── dimensions/
-│   ├── context/
-│   ├── memory/
-│   ├── knowledge_base/
-│   ├── sigma/
-│   ├── projects/
-│   ├── artifacts/
-│   ├── relationships/
-│   └── approvals/
+│   └── clients/
+│       └── <client_id>/
+│           ├── profile.yaml
+│           ├── preferences.yaml
+│           ├── account_aliases.yaml
+│           ├── hitl_policy.yaml
+│           ├── onboarding_status.yaml
+│           ├── artifacts/
+│           ├── sigma/
+│           ├── knowledge_base/
+│           └── memory/
 │
 ├── subsystems/
 │   └── gbrain/
