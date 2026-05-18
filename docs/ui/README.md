@@ -26,3 +26,8 @@ Current UI build priorities:
 | `08-decisions-and-rationale.md` | Locked UI decisions and rationale |
 | `09-open-questions.md` | Questions needing future design passes |
 | `10-future-voice-and-chat-layer.md` | Future-state voice/chat/right-rail concepts, not MVP canon |
+| `11-command-center-wireframe.md` | Command Center zone-by-zone wireframe and data bindings |
+| `12-briefing-templates.md` | Morning Standup, COB Work Day, and Goodnight templates |
+| `13-meetings.md` | Meetings launcher + topic-scoped session screen |
+| `14-channel-surfaces.md` | Comms & Calendar, Projects, Reports & Artifacts, Travel/Logistics, Settings/Profile |
+| `15-admin-console.md` | Admin/operator console specification |

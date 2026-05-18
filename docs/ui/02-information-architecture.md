@@ -41,12 +41,19 @@ Client-facing surfaces:
 |---|---|
 | Command Center | Default landing surface for ready work, approvals, briefings, meetings, artifacts, and quiet status |
 | Briefings | Morning Standup, COB Work Day, Goodnight |
-| Meetings | Launcher for Comms & Calendar, Travel / Logistics, Projects, Reports & Artifacts |
-| Comms & Calendar | Communication and schedule workflow surface |
-| Projects | Project/work status, decisions, artifacts, and follow-up |
-| Reports & Artifacts | Generated work product, reports, packets, drafts, and artifact review |
-| Travel / Logistics | Retained MVP surface and future-capable workflow lane |
+| Meetings | Launcher for topic-scoped client-to-agent sessions (Comms & Calendar, Travel / Logistics, Projects, Reports & Artifacts, General) |
+| Comms & Calendar | Standing channel surface for communication and schedule workflow |
+| Projects | Standing channel surface for project/work status, decisions, artifacts, and follow-up |
+| Reports & Artifacts | Standing channel surface for generated work product, reports, packets, drafts, and artifact review |
+| Travel / Logistics | Standing channel surface and future-capable workflow lane |
 | Settings / Profile | Client profile, preferences, contexts, and provider/account posture |
+
+Channel surfaces (Comms & Calendar, Projects, Reports & Artifacts, Travel / Logistics) and Meetings are distinct:
+
+- Channel surfaces are **standing** browse/manage views over a lane of work, reachable directly from the left nav at any time.
+- Meetings are **transient, topic-scoped client-to-agent sessions** opened from the Meetings launcher. A Meeting reuses the same workflow, artifact, approval, and source-link data as the underlying channel surface but presents it as a focused workspace for decisions and next actions.
+
+Briefings are scheduled/recurring sessions (Morning Standup, COB Work Day, Goodnight). Meetings are user-initiated. Both share the Structured Interaction Surface defined in `05-structured-interaction-surface.md`.
 
 Admin/operator surfaces:
 
@@ -120,21 +127,45 @@ Each briefing should be backed by:
 
 The UI should display this durable state clearly. It should not behave like a static script or decorative meeting launcher.
 
-## Meetings As Work Lanes
+## Meetings As Client-To-Agent Sessions
 
-Meetings are focused workspaces for active operating lanes.
+Meetings are user-initiated, topic-scoped client-to-agent workspaces. They are not third-party calendar meetings (those belong in Comms & Calendar).
 
-Each Meeting should show:
+The client picks a topic from the Meeting launcher:
 
-- prepared state,
+- Comms & Calendar
+- Travel / Logistics
+- Projects
+- Reports & Artifacts
+- General Command Center review
+
+The Meeting screen then opens a focused workspace scoped to that topic, reusing the underlying channel surface's prepared state.
+
+Each Meeting screen should show:
+
+- prepared state for the chosen topic,
 - open decisions,
 - artifacts,
 - approval cards,
 - provider/source links,
 - queued outbound actions,
+- notes, questions, follow-up tasks,
 - completion summary.
 
-The MVP should prioritize Comms & Calendar as the first proof lane, while retaining Travel / Logistics, Projects, and Reports & Artifacts as visible surfaces and future-capable workflow lanes.
+The MVP should prioritize Comms & Calendar as the first proof lane for the underlying provider/normalization/write-back loop, while retaining Travel / Logistics, Projects, and Reports & Artifacts as visible standing surfaces and as Meeting topics.
+
+## App Launch And Role Routing
+
+The app launches to a login surface, with sign-up/onboarding as a major adjacent flow.
+
+After authentication, route by role:
+
+| Role | Landing surface |
+|---|---|
+| Client | Command Center |
+| Admin / Operator | Admin/operator console, with access to client-style surfaces where appropriate |
+
+Onboarding is required before a client first reaches the Command Center. It produces or prepares the governed Client Universe and is detailed in `docs/workflows/client_onboarding_model.md`.
 
 ## Provider Scope In UI
 

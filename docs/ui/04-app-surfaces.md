@@ -43,10 +43,10 @@ This table is a migration reference only. The MVP surfaces below are the canonic
 | Prior concept | FlavorOS 1.5 MVP Surface | Treatment |
 |---|---|---|
 | Today | Command Center Dashboard | Rewrite |
-| Work | Projects Meeting | Rewrite |
-| Travel | Travel Meeting | Rewrite |
-| Messages + Calendar | Comms & Calendar Meeting | Combine and narrow |
-| Library | Reports & Artifacts Meeting | Rewrite |
+| Work | Projects channel surface + Projects Meeting topic | Rewrite |
+| Travel | Travel / Logistics channel surface + Travel Meeting topic | Rewrite |
+| Messages + Calendar | Comms & Calendar channel surface + Meeting topic | Combine and narrow |
+| Library | Reports & Artifacts channel surface + Meeting topic | Rewrite |
 | Preferences | Settings/Admin/Profile | Move out of core MVP |
 | Command Palette | Future-state power-user layer | Archive |
 | Right Rail | Future-state or command components | Replace |
@@ -142,29 +142,36 @@ Briefing screens should contain structured dialog steps, prepared context, appro
 
 Briefing screens should not be static scripts or decorative launchers. Their job is to display prepared system state correctly.
 
-## 5. Meetings
+## 5. Meetings (Client-To-Agent Sessions)
 
-Meetings are user-initiated workspaces for specific work channels. They are not calendar meetings by default.
+Meetings are user-initiated, topic-scoped client-to-agent workspaces. They are not third-party calendar meetings.
 
-MVP Meeting Types:
+The Meetings surface is a **launcher** that lets the client open a focused session over an existing channel surface's prepared state.
+
+MVP Meeting topics:
 
 - Comms & Calendar
-- Travel
+- Travel / Logistics
 - Projects
 - Reports & Artifacts
+- General Command Center review
 
 Meeting launch cards should show:
 
-- channel name
+- topic name
 - what the system prepared
 - open decisions
 - available artifacts
 - last relevant update
 - primary command: open meeting
 
-## 6. Comms & Calendar Meeting
+Each Meeting screen reuses the Structured Interaction Surface (see `05-structured-interaction-surface.md`) and pulls its data from the corresponding channel surface.
 
-Combines communication and schedule review. This is not a full inbox or full calendar replacement.
+## 6. Comms & Calendar (Channel Surface)
+
+Comms & Calendar is a standing channel surface in the left nav for communication and schedule workflow. A Comms & Calendar Meeting can be launched over the same data for a focused decision session.
+
+This is not a full inbox or full calendar replacement.
 
 Comms & Calendar is the first proof lane for provider ingestion, normalization, artifacts, approvals, and approval-gated outbound write-back.
 
@@ -189,11 +196,9 @@ Excluded:
 - full calendar management UI
 - persistent agent DM thread
 
-## 7. Travel Meeting
+## 7. Travel / Logistics (Channel Surface)
 
-Travel is a structured review and command surface.
-
-Travel / Logistics is retained as an MVP surface and future-capable workflow lane, but it is not the first proof loop unless explicitly promoted for demo needs.
+Travel / Logistics is a standing channel surface and a Meeting topic. It is retained as an MVP surface and future-capable workflow lane, but it is not the first proof loop unless explicitly promoted for demo needs.
 
 Purpose:
 
@@ -211,6 +216,7 @@ Included:
 - approval cards for holds, bookings, or recommendations
 - travel brief artifact
 - external link cards for airline/hotel/provider actions
+- client library for travel documents
 - completion summary
 
 Excluded from MVP:
@@ -220,9 +226,9 @@ Excluded from MVP:
 - always-on voice reminders
 - full travel operations replacement
 
-## 8. Projects Meeting
+## 8. Projects (Channel Surface)
 
-Projects is a structured status, artifact, and approval surface.
+Projects is a standing channel surface and a Meeting topic. It functions as a light project-management command center for client + agent work.
 
 Purpose:
 
@@ -243,13 +249,13 @@ Included:
 
 Excluded:
 
-- arbitrary user-created projects
+- arbitrary user-created projects without agent involvement (post-MVP)
 - raw agent task logs
 - agent status dashboard
 
-## 9. Reports & Artifacts Meeting
+## 9. Reports & Artifacts (Channel Surface)
 
-Reports & Artifacts is the review surface for generated work product.
+Reports & Artifacts is a standing channel surface and a Meeting topic. It is the review surface for generated work product.
 
 Purpose:
 

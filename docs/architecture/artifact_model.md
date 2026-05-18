@@ -178,6 +178,7 @@ client_id: string
 tenant_id: string
 artifact_id: string
 workflow_run_id: string
+approval_batch_id: string | null   # groups N similar approvals produced by one workflow run / agent task
 decision_required: approve | revise | defer | handle_self
 stakes:
   money: string | null
@@ -189,6 +190,43 @@ status: pending | approved | revision_requested | deferred | handled_by_client |
 created_at: datetime
 decided_at: datetime | null
 ```
+
+### Batch grouping
+
+`approval_batch_id` is optional and groups multiple Approval Requests that the UI can render as one batch Approval Card (per `docs/ui/03-approval-card.md` §Bulk). When omitted, the request stands alone. Batches are created by the producing workflow run; clients still decide per-item unless the surface explicitly offers an "Approve all" affordance.
+
+## Approval Decisions
+
+Each terminal decision on an Approval Request produces an `approval_decisions` row. This preserves the audit trail and captures any structured revision request from the Modify flow.
+
+Recommended decision fields:
+
+```yaml
+approval_decision_id: string
+approval_request_id: string
+client_id: string
+tenant_id: string
+decision: approve | revise | defer | handle_self
+decided_at: datetime
+decided_by_user_id: string
+revision_request:                  # populated only when decision = revise
+  tone: [warmer | more_professional | ...]      # multi-select, may be empty
+  format: [narrative | outline | ...]            # multi-select, may be empty
+  sender_request: [clarity | additional_details | ...]  # multi-select, may be empty
+  notes: string | null                           # optional, currently unused — structured-only per UI spec
+post_decision_status: string       # mirrors the resulting approval_requests.status
+notes: string | null
+```
+
+### Revision Request
+
+The `revision_request` payload mirrors the three-axis structured subform in `docs/ui/03-approval-card.md` §Modify subform. Axes are open vocabularies (config-driven per workflow), but the schema fixes the three-axis shape so revision intent survives the round trip from UI to the rework `agent_task`.
+
+A `revise` decision implies:
+
+- the linked `client_artifacts.status` transitions to `revised` (in flight),
+- a new `agent_task` is enqueued with `revision_request` as input,
+- the resulting follow-up Client Artifact is linked back via `related_artifact_ids` and produces a fresh Approval Request marked as the next version.
 
 ## Approval Card Rules
 

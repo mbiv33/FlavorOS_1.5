@@ -20,7 +20,9 @@ The single canonical decision component. Used everywhere client makes a decision
 ├────────────────────────────────────────────────────┤
 │ ▸ Why this amount  (single block, collapsed default)│  ← Reasoning
 ├────────────────────────────────────────────────────┤
-│ [✓ Approve]  [✎ Modify]  [✕ I'll do myself]         │  ← Decision row
+│ [✓ Approve]  [✎ Modify]  [✕ I'll do myself]  [Defer]│  ← Decision row (Defer conditional)
+├────────────────────────────────────────────────────┤
+│ Open source ↗  (link to provider source, when set)  │  ← Source affordance, not a decision
 └────────────────────────────────────────────────────┘
 ```
 
@@ -111,19 +113,24 @@ Not split into multiple sub-blocks. One pass, fully synthesized.
 
 ---
 
-## Decision row — three buttons. No Ask.
+## Decision row — Approve / Modify / I'll do myself. Defer when allowed. No Ask.
 
 ```
-[✓ Approve]  [✎ Modify]  [✕ I'll do myself]
+[✓ Approve]  [✎ Modify]  [✕ I'll do myself]   [Defer]   ← Defer renders only when the workflow allows it
 ```
 
-| Button | Behavior |
-|---|---|
-| **Approve** | Sets artifact for use/send. Card transitions to post-approve state showing scheduling info (see below). Eventually collapses into handled-tray. |
-| **Modify** | Opens 3-axis structured subform (see below). Submitting hands the artifact back to the agent for thorough rework. **Minimum 1 hour return time** — this is a floor, not a deadline. |
-| **I'll do myself** | Draft disappears from the agent's queue. Task or ownership marker is created in the relevant client-owned work surface, with the agent's prior research/draft attached as context. The agent never re-touches this work. |
+| Button | Schema `decision_required` | Behavior |
+|---|---|---|
+| **Approve** | `approve` | Sets artifact for use/send. Card transitions to post-approve state showing scheduling info (see below). Eventually collapses into handled-tray. |
+| **Modify** | `revise` | Opens 3-axis structured subform (see below). Submitting hands the artifact back to the agent for thorough rework. **Minimum 1 hour return time** — this is a floor, not a deadline. The structured selections are persisted as `approval_decisions.revision_request`. |
+| **I'll do myself** | `handle_self` | Draft disappears from the agent's queue. Task or ownership marker is created in the relevant client-owned work surface, with the agent's prior research/draft attached as context. The agent never re-touches this work. |
+| **Defer** *(conditional)* | `defer` | Renders only when the workflow definition allows defer (e.g., briefing or meeting agenda steps that can carry forward). Defers the decision; the card returns to the same surface in the next applicable run. |
 
 **No "Ask" button.** Clarification belongs in the relevant Briefing, Meeting, or future request-capture layer, not as an affordance on the card. This keeps the card vocabulary tight and pushes ambiguity to the right surface.
+
+### Source affordance
+
+Below the decision row, a single **Open source ↗** link renders when `client_artifacts.source_links[]` is non-empty. It opens the provider source (Gmail thread, Calendar event, Doc, etc.) per the Link Card spec in `06-command-components.md`. Open source is **not a decision** — it does not transition the approval state.
 
 ### Modify subform — three structured axes
 
@@ -187,11 +194,30 @@ See [07-protocols-affecting-ui.md](./07-protocols-affecting-ui.md) for the outbo
 pending ──Approve──> approved ──[scheduled time]──> sent ──> handled-tray
         ──Modify──> revising  ──[1hr+]──> pending (v2)
         ──I'll do myself──> transferred (logged)  +  client-owned work item
+        ──Defer──> deferred  ──[next workflow run]──> pending
         ──[time elapsed]──> stale  (header pulses; preference-driven escalation)
         ──[agent retracts]──> withdrawn (notice shown briefly)
 ```
 
 **`stale`** is important: long-pending high-stakes cards should escalate, not silently rot. Behavior driven by Preferences (e.g., "auto-decline meeting requests un-replied after 24h", "never auto-act on money").
+
+## Status Mapping
+
+The plain-English status labels above are **projections** of the schema, not parallel vocabulary. The Approval Card reads `approval_requests.status` and the linked `client_artifacts.status` and renders them as follows:
+
+| Schema (`approval_requests.status`) | Linked `client_artifacts.status` | UI label |
+|---|---|---|
+| `pending` | `prepared` / `pending_review` | Ready to approve |
+| `approved` | `approved` | Approved · scheduled |
+| `approved` | `sent` | Sent |
+| `approved` | `filed` | Filed |
+| `revision_requested` | `revised` (in flight) | Revising |
+| `deferred` | `deferred` | Deferred |
+| `handled_by_client` | (artifact archived or linked to client-owned work item) | Transferred · you're handling this |
+| `expired` | — | Stale |
+| `cancelled` | — | Withdrawn |
+
+Components must derive the UI label from this table. They must not introduce new label strings outside this set, and they must not show the raw schema enum to the client.
 
 ---
 

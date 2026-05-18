@@ -51,12 +51,15 @@ Header
 
 ### Meeting Flow
 
-Used by:
+Used by topic-scoped client-to-agent Meetings opened from the Meetings launcher:
 
 - Comms & Calendar
-- Travel
+- Travel / Logistics
 - Projects
 - Reports & Artifacts
+- General Command Center review
+
+A Meeting reuses the underlying channel surface's data but presents it as a focused workspace.
 
 Typical structure:
 

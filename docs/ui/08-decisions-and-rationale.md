@@ -22,11 +22,11 @@ This is the UI decision log. If this file conflicts with the current build plan,
 
 **Rationale:** Briefings are where prepared state, approvals, artifacts, context, and completion summaries come together. The UI must display the data correctly.
 
-### D-04 · Meetings Are Work Lanes
+### D-04 · Channel Surfaces And Meetings Are Distinct
 
-**Decision:** Comms & Calendar, Travel / Logistics, Projects, and Reports & Artifacts are focused Meeting surfaces.
+**Decision:** Comms & Calendar, Travel / Logistics, Projects, and Reports & Artifacts are standing channel surfaces in the left nav. Meetings is a separate launcher that opens topic-scoped client-to-agent sessions over those same channel surfaces.
 
-**Rationale:** The client should enter a prepared workspace for a lane of work, review what the system has staged, and act through commands, artifacts, and approvals.
+**Rationale:** The client needs both modes: a standing place to browse/manage a lane of work, and a focused, time-bound session to make decisions with an agent. Collapsing them into one concept hid the difference between "manage this lane" and "work this lane with an agent right now." Channel surface and Meeting share the underlying workflow, artifact, approval, and source-link data, so this is a presentation split, not a data split.
 
 ### D-05 · Comms & Calendar Is The First Proof Lane
 

@@ -9,7 +9,7 @@ This taxonomy follows the current build plan priority: visualization and surface
 | # | Type | What it is | Primary surface |
 |---|---|---|---|
 | 1 | Briefing | Scheduled or recurring guided workflow for day-start, day-close, or personal context | Briefings / Structured Interaction Surface |
-| 2 | Meeting | User-launched channel workspace for a work lane | Meetings / Structured Interaction Surface |
+| 2 | Meeting | User-launched, topic-scoped client-to-agent workspace over a channel surface's data | Meetings launcher / Structured Interaction Surface |
 | 3 | Approval | A prepared artifact or governed action requiring explicit client decision | Approval Card |
 | 4 | Update | Quiet confirmation, completion summary, or status change | Command Center, Completion Summary, relevant Meeting |
 | 5 | Escalation | Rare blocking or urgent item that needs client action | Ready-for-you zone, header/status indicator, relevant workflow surface |
@@ -32,16 +32,19 @@ They are not decorative launch cards. Their job is to display the system's prepa
 
 ## 2. Meeting
 
-Meetings are user-launched workspaces for specific operating lanes. They are not calendar meetings by default.
+Meetings are user-launched, topic-scoped client-to-agent workspaces opened from the Meetings launcher. They are not third-party calendar meetings.
 
-MVP meeting types:
+MVP meeting topics:
 
 - Comms & Calendar
 - Travel / Logistics
 - Projects
 - Reports & Artifacts
+- General Command Center review
 
-Meetings should show prepared work, workflow state, source/provider links, artifacts, decisions, approvals, and completion summaries for the selected lane.
+Meetings reuse the underlying channel surface's data and show prepared work, workflow state, source/provider links, artifacts, decisions, approvals, and completion summaries for the selected topic.
+
+The channel surfaces themselves (Comms & Calendar, Projects, Reports & Artifacts, Travel / Logistics) are standing left-nav surfaces, not Meetings. A Meeting is a focused session opened over one of them.
 
 ## 3. Approval
 
