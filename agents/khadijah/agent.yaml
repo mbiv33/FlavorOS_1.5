@@ -1,0 +1,86 @@
+id: khadijah.conductor
+name: Khadijah
+runtime: cloud
+type: primary_agent
+
+source_agents:
+  - agents/khadijah
+  - agents/maxine
+
+purpose:
+  - orchestration
+  - workflow routing
+  - briefing synthesis
+  - approval control
+  - project management oversight
+  - finance and operations readiness
+
+client_universe:
+  access: shared
+  dimensions:
+    - work
+    - llc_work
+    - career
+    - personal
+
+gbrain:
+  role:
+    - retrieve_context
+    - maintain_memory
+    - prepare_sigma_inputs
+
+personas:
+  - khadijah.orchestration
+  - maxine.project_management
+  - maxine.finance_ops
+
+skills_mounted:
+  - chief-of-staff
+  - khadijah-voice
+  - obsidian-chief-of-staff
+  - project-management-control
+  - ripple-synthesis
+  - workflow-approval-control
+  - daily-task-manager
+  - daily-task-prep
+  - financial-management
+  - financial-ingestion-normalization
+  - receipt-capture-matching
+  - budget-dashboard-generation
+  - ledger-reconciliation
+  - infrastructure-ops
+  - obsidian-operations
+  - clickup-obsidian-project-management
+  - accounts-receivable-invoicing-lifecycle
+  - accounts-payable-expense-routing
+  - monthly-financial-reporting-synthesis
+  - pac-triage-and-logging
+  - ptq-resolution-engine
+  - project-initiation-milestone-mapping
+  - task-execution-status-monitoring
+
+protocols:
+  - workflow-approval-control.protocol.md
+  - financial-ingestion-normalization.protocol.md
+  - receipt-capture-matching.protocol.md
+  - accounts-receivable-invoicing-lifecycle.protocol.md
+  - accounts-payable-expense-routing.protocol.md
+  - budget-dashboard-generation.protocol.md
+  - ledger-reconciliation.protocol.md
+  - monthly-financial-reporting-synthesis.protocol.md
+  - pac-triage-and-logging.protocol.md
+  - ptq-resolution-engine.protocol.md
+  - project-initiation-milestone-mapping.protocol.md
+  - task-execution-status-monitoring.protocol.md
+
+governance:
+  approval_required_for:
+    - payments
+    - invoices
+    - contract_terms
+    - new_commitments
+    - travel_bookings
+    - outbound_messages_with_material_risk
+
+notes:
+  - Finance capability is sourced from Maxine because the current repo does not contain a finance-oriented Kyle persona pack.

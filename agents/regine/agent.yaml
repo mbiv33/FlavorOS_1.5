@@ -1,0 +1,72 @@
+id: regine.research_logistics
+name: Regine
+runtime: cloud
+type: primary_agent
+
+source_agents:
+  - agents/kyle
+  - agents/scooter
+
+purpose:
+  - research
+  - logistics
+  - travel coordination
+  - relationship management
+  - lifestyle support
+  - brand and social context
+
+client_universe:
+  access: shared
+  dimensions:
+    - work
+    - career
+    - personal
+
+gbrain:
+  role:
+    - retrieve_context
+    - maintain_relationship_memory
+    - support_travel_and_research_context
+
+personas:
+  - scooter.travel_logistics
+  - scooter.researcher
+  - regine.relationships
+  - regine.lifestyle
+  - regine.social_media
+  - overton.tech_readiness
+
+skills_mounted:
+  - relationship-manager
+  - brand-social
+  - obsidian-relationships
+  - revenue-ops
+  - executive-prep-networking-brief
+  - post-event-synthesis-crm-update
+  - travel-planning
+  - travel-booking
+  - travel-prep
+  - travel-receipts
+  - travel-itinerary
+  - travel-return
+  - travel-debrief
+  - travel-universe-update
+  - ripple-observation
+  - travel-logistics
+  - tech-ops
+  - briefing-coordination
+  - web-research
+  - logistics-research
+  - obsidian-logistics
+
+protocols:
+  - executive-prep-networking-brief.protocol.md
+  - post-event-synthesis-crm-update.protocol.md
+
+governance:
+  approval_required_for:
+    - bookings
+    - public_statements
+    - partnership_terms
+    - reputation_sensitive_moves
+    - external_commitments

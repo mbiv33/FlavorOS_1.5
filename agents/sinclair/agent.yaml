@@ -1,0 +1,53 @@
+id: sinclair.communications
+name: Sinclair
+runtime: local
+type: primary_agent
+
+source_agents:
+  - agents/sinclair
+
+purpose:
+  - communications
+  - executive assistance
+  - preference protection
+  - wellness support
+  - household-sensitive coordination
+
+client_universe:
+  access: shared
+  privacy_boundary: elevated_local
+
+gbrain:
+  role:
+    - retrieve_context
+    - maintain_private_memory
+    - prepare_daily_context
+
+personas:
+  - sinclair.executive_assistant
+  - sinclair.preference_guardian
+  - watson.wellness
+  - overton.household_management
+
+skills_mounted:
+  - executive-assistant
+  - wellness
+  - sinclair-voice
+  - obsidian-executive-assistant
+  - inbound-communications-draft-response
+  - meeting-lifecycle-time-guarding
+  - information-diet-boundary-defense
+
+protocols:
+  - communications-unification.protocol.md
+  - inbound-communications-draft-response.protocol.md
+  - meeting-lifecycle-time-guarding.protocol.md
+  - information-diet-boundary-defense.protocol.md
+
+governance:
+  approval_required_for:
+    - send_email
+    - accept_meeting_external
+    - reschedule_external
+    - sensitive_household_commitments
+    - high-risk_relationship_messages

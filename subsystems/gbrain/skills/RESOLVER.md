@@ -1,0 +1,168 @@
+# GBrain Skill Resolver
+
+This is the dispatcher. Skills are the implementation. **Read the skill file before acting.** If two skills could match, read both. They are designed to chain (e.g., ingest then enrich for each entity).
+
+## Always-on (every message)
+
+| Trigger | Skill |
+|---------|-------|
+| Every inbound message (spawn parallel, don't block) | `skills/signal-detector/SKILL.md` |
+| Any brain read/write/lookup/citation | `skills/brain-ops/SKILL.md` |
+
+## Brain operations
+
+| Trigger | Skill |
+|---------|-------|
+| "What do we know about", "tell me about", "search for", "who is", "background on", "notes on" | `skills/query/SKILL.md` |
+| "Who knows who", "relationship between", "connections", "graph query" | `skills/query/SKILL.md` (use graph-query) |
+| Creating/enriching a person or company page | `skills/enrich/SKILL.md` |
+| Where does a new file go? Filing rules | `skills/repo-architecture/SKILL.md` |
+| Fix broken citations in brain pages | `skills/citation-fixer/SKILL.md` |
+| "citation audit", "check citations", "fix citations" | `skills/citation-fixer/SKILL.md` (focused fix). For broader brain health, chain into `skills/maintain/SKILL.md` |
+| "Research", "track", "extract from email", "investor updates", "donations" | `skills/data-research/SKILL.md` |
+| Share a brain page as a link | `skills/publish/SKILL.md` |
+| "validate frontmatter", "check frontmatter", "fix frontmatter", "frontmatter audit", "brain lint" | `skills/frontmatter-guard/SKILL.md` |
+
+## Content & media ingestion
+
+| Trigger | Skill |
+|---------|-------|
+| User shares a link, article, tweet, or idea | `skills/idea-ingest/SKILL.md` |
+| "watch this video", "process this YouTube link", "ingest this PDF", "save this podcast", "process this book", "summarize this book", "PDF book", "ingest it into my brain", "what's in this screenshot", "check out this repo" | `skills/media-ingest/SKILL.md` |
+| Meeting transcript received | `skills/meeting-ingestion/SKILL.md` |
+| Generic "ingest this" (auto-routes to above) | `skills/ingest/SKILL.md` |
+
+## Thinking skills (from GStack)
+
+| Trigger | Skill |
+|---------|-------|
+| "Brainstorm", "I have an idea", "office hours" | GStack: office-hours |
+| "Review this plan", "CEO review", "poke holes" | GStack: ceo-review |
+| "Debug", "fix", "broken", "investigate" | GStack: investigate |
+| "Retro", "what shipped", "retrospective" | GStack: retro |
+
+> These skills come from GStack. If GStack is installed, the agent reads them directly.
+> If not, brain-only mode still works (brain skills function without thinking skills).
+
+## Operational
+
+| Trigger | Skill |
+|---------|-------|
+| Task add/remove/complete/defer/review | `skills/daily-task-manager/SKILL.md` |
+| Morning prep, meeting context, day planning | `skills/daily-task-prep/SKILL.md` |
+| Daily briefing, "what's happening today" | `skills/briefing/SKILL.md` |
+| Cron scheduling, quiet hours, job staggering | `skills/cron-scheduler/SKILL.md` |
+| Save or load reports | `skills/reports/SKILL.md` |
+| "Create a skill", "improve this skill" | `skills/skill-creator/SKILL.md` |
+| "Skillify this", "is this a skill?", "make this proper" | `skills/skillify/SKILL.md` |
+| "Is gbrain healthy?", morning health check, skillpack-check | `skills/skillpack-check/SKILL.md` |
+| Post-restart health + auto-fix, "did the container restart break anything", smoke test | `skills/smoke-test/SKILL.md` |
+| Cross-modal review, second opinion | `skills/cross-modal-review/SKILL.md` |
+| "Validate skills", skill health check | `skills/testing/SKILL.md` |
+| Webhook setup, external event processing | `skills/webhook-transforms/SKILL.md` |
+| "Spawn agent", "background task", "parallel tasks", "steer agent", "pause/resume agent", "gbrain jobs submit", "submit a gbrain job", "submit a shell job", "shell job" | `skills/minion-orchestrator/SKILL.md` |
+| "present options", "ask before proceeding", "choice gate", "user decision" | `skills/ask-user/SKILL.md` |
+
+## Setup & migration
+
+| Trigger | Skill |
+|---------|-------|
+| "Set up GBrain", first boot | `skills/setup/SKILL.md` |
+| "Now what?", "fill my brain", "cold start", "bootstrap", "import my data", "what should I import first" | `skills/cold-start/SKILL.md` |
+| "Migrate from Obsidian/Notion/Logseq" | `skills/migrate/SKILL.md` |
+| Brain health check, maintenance run | `skills/maintain/SKILL.md` |
+| "Extract links", "build link graph", "populate timeline" | `skills/maintain/SKILL.md` (extraction sections) |
+| "Run dream", "process today's session", "synthesize my conversations", "consolidate yesterday's conversations", "what patterns did you see", "did the dream cycle run" | `skills/maintain/SKILL.md` (dream cycle section) |
+| "Brain health", "what features am I missing", "brain score" | Run `gbrain features --json` |
+| "Set up autopilot", "run brain maintenance", "keep brain updated" | Run `gbrain autopilot --install --repo ~/brain` |
+| Agent identity, "who am I", customize agent | `skills/soul-audit/SKILL.md` |
+| "Populate links", "extract links", "backfill graph" | `skills/maintain/SKILL.md` (graph population phase) |
+| "Populate timeline", "extract timeline entries" | `skills/maintain/SKILL.md` (graph population phase) |
+
+## Identity & access (always-on)
+
+| Trigger | Skill |
+|---------|-------|
+| Non-owner sends a message | Check `ACCESS_POLICY.md` before responding |
+| Agent needs to know its identity/vibe | Read `SOUL.md` |
+| Agent needs user context | Read `USER.md` |
+| Operational cadence (what to check and when) | Read `HEARTBEAT.md` |
+
+## Disambiguation rules
+
+When multiple skills could match:
+1. Prefer the most specific skill (meeting-ingestion over ingest)
+2. If the user mentions a URL, route by content type (link → idea-ingest, video → media-ingest)
+3. If the user mentions a person/company, check if enrich or query fits better
+4. Chaining is explicit in each skill's Phases section
+5. When in doubt, ask the user (see `skills/ask-user/SKILL.md` for the choice-gate pattern)
+
+## Conventions (cross-cutting)
+
+These apply to ALL brain-writing skills:
+- `skills/conventions/quality.md` — citations, back-links, notability gate
+- `skills/conventions/brain-first.md` — check brain before external APIs
+- `skills/conventions/brain-routing.md` — which brain (DB) and which source (repo) to target; cross-brain federation is latent-space only
+- `skills/conventions/subagent-routing.md` — when to use Minions vs inline work
+- `skills/ask-user/SKILL.md` — choice-gate pattern for human input at decision points
+- `skills/_brain-filing-rules.md` — where files go
+- `skills/_output-rules.md` — output quality standards
+
+## Uncategorized
+
+| Trigger | Skill |
+|---------|-------|
+| "personalized version of this book", "mirror this book", "two-column book analysis", "apply this book to my life", "how does this book apply to me" | `skills/book-mirror/SKILL.md` |
+| "enrich this article", "enrich brain pages", "batch enrich", "make brain pages useful" | `skills/article-enrichment/SKILL.md` |
+| "strategic reading", "read this through the lens of", "apply this to my problem", "what can I learn from this about", "extract a playbook from" | `skills/strategic-reading/SKILL.md` |
+| "concept synthesis", "synthesize my concepts", "find patterns across my notes", "build my intellectual map", "trace idea evolution" | `skills/concept-synthesis/SKILL.md` |
+| "perplexity research", "what's new about", "current state of", "web research", "what changed about" | `skills/perplexity-research/SKILL.md` |
+| "crawl my archive", "find gold in my archive", "archive crawler", "scan my dropbox for", "mine my old files for" | `skills/archive-crawler/SKILL.md` |
+| "verify this academic claim", "check this study", "academic verify", "validate citation", "is this study real" | `skills/academic-verify/SKILL.md` |
+| "make pdf from brain", "brain pdf", "convert brain page to pdf", "publish this page as pdf", "export brain page" | `skills/brain-pdf/SKILL.md` |
+| "voice note", "ingest this voice memo", "transcribe and file", "voice note ingest", "save this audio note" | `skills/voice-note-ingest/SKILL.md` |
+
+
+<!-- gbrain:skillpack:begin -->
+
+<!-- Installed by gbrain 0.25.1 — do not hand-edit between markers. -->
+<!-- gbrain:skillpack:manifest cumulative-slugs="academic-verify,archive-crawler,article-enrichment,book-mirror,brain-ops,brain-pdf,briefing,citation-fixer,concept-synthesis,cron-scheduler,cross-modal-review,daily-task-manager,daily-task-prep,data-research,enrich,idea-ingest,ingest,maintain,media-ingest,meeting-ingestion,minion-orchestrator,perplexity-research,query,repo-architecture,reports,signal-detector,skill-creator,skillify,skillpack-check,soul-audit,strategic-reading,testing,voice-note-ingest,webhook-transforms" version="0.25.1" -->
+
+| Trigger | Skill |
+|---------|-------|
+| "academic-verify" | `skills/academic-verify/SKILL.md` |
+| "archive-crawler" | `skills/archive-crawler/SKILL.md` |
+| "article-enrichment" | `skills/article-enrichment/SKILL.md` |
+| "book-mirror" | `skills/book-mirror/SKILL.md` |
+| "brain-ops" | `skills/brain-ops/SKILL.md` |
+| "brain-pdf" | `skills/brain-pdf/SKILL.md` |
+| "briefing" | `skills/briefing/SKILL.md` |
+| "citation-fixer" | `skills/citation-fixer/SKILL.md` |
+| "concept-synthesis" | `skills/concept-synthesis/SKILL.md` |
+| "cron-scheduler" | `skills/cron-scheduler/SKILL.md` |
+| "cross-modal-review" | `skills/cross-modal-review/SKILL.md` |
+| "daily-task-manager" | `skills/daily-task-manager/SKILL.md` |
+| "daily-task-prep" | `skills/daily-task-prep/SKILL.md` |
+| "data-research" | `skills/data-research/SKILL.md` |
+| "enrich" | `skills/enrich/SKILL.md` |
+| "idea-ingest" | `skills/idea-ingest/SKILL.md` |
+| "ingest" | `skills/ingest/SKILL.md` |
+| "maintain" | `skills/maintain/SKILL.md` |
+| "media-ingest" | `skills/media-ingest/SKILL.md` |
+| "meeting-ingestion" | `skills/meeting-ingestion/SKILL.md` |
+| "minion-orchestrator" | `skills/minion-orchestrator/SKILL.md` |
+| "perplexity-research" | `skills/perplexity-research/SKILL.md` |
+| "query" | `skills/query/SKILL.md` |
+| "repo-architecture" | `skills/repo-architecture/SKILL.md` |
+| "reports" | `skills/reports/SKILL.md` |
+| "signal-detector" | `skills/signal-detector/SKILL.md` |
+| "skill-creator" | `skills/skill-creator/SKILL.md` |
+| "skillify" | `skills/skillify/SKILL.md` |
+| "skillpack-check" | `skills/skillpack-check/SKILL.md` |
+| "soul-audit" | `skills/soul-audit/SKILL.md` |
+| "strategic-reading" | `skills/strategic-reading/SKILL.md` |
+| "testing" | `skills/testing/SKILL.md` |
+| "voice-note-ingest" | `skills/voice-note-ingest/SKILL.md` |
+| "webhook-transforms" | `skills/webhook-transforms/SKILL.md` |
+
+<!-- gbrain:skillpack:end -->
