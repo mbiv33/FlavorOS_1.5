@@ -86,12 +86,21 @@ bash deploy/hostinger-agents/sync-cloud-agent-bundles.sh --restart
 Defaults:
 
 - Khadijah Hermes data root: `/docker/hermes-agent-kxed/data`
+- Sinclair Hermes data root: `/docker/hermes-agent-isuk/data`
 - Regine OpenClaw data root: `/docker/openclaw-pn8l/data`
+
+For a Hermes-only cloud run, skip OpenClaw:
+
+```bash
+cd /srv/flavoros
+bash deploy/hostinger-agents/sync-cloud-agent-bundles.sh --restart --skip-openclaw
+```
 
 Override the roots if Hostinger generated different container ids:
 
 ```bash
 KHADIJAH_DATA_ROOT=/docker/<hermes-container>/data \
+SINCLAIR_DATA_ROOT=/docker/<hermes-container>/data \
 REGINE_DATA_ROOT=/docker/<openclaw-container>/data \
 bash deploy/hostinger-agents/sync-cloud-agent-bundles.sh --restart
 ```

@@ -5,15 +5,25 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
 BACKUP_DIR="${BACKUP_DIR:-/root/flavoros-agent-backups/${STAMP}}"
 RESTART=0
+SKIP_OPENCLAW=0
 
 KHADIJAH_DATA_ROOT="${KHADIJAH_DATA_ROOT:-/docker/hermes-agent-kxed/data}"
+SINCLAIR_DATA_ROOT="${SINCLAIR_DATA_ROOT:-/docker/hermes-agent-isuk/data}"
 REGINE_DATA_ROOT="${REGINE_DATA_ROOT:-/docker/openclaw-pn8l/data}"
 KHADIJAH_CONTAINER="${KHADIJAH_CONTAINER:-hermes-agent-kxed-hermes-agent-1}"
+SINCLAIR_CONTAINER="${SINCLAIR_CONTAINER:-hermes-agent-isuk-hermes-agent-1}"
 REGINE_CONTAINER="${REGINE_CONTAINER:-openclaw-pn8l-openclaw-1}"
 
-if [[ "${1:-}" == "--restart" ]]; then
-  RESTART=1
-fi
+for arg in "$@"; do
+  case "${arg}" in
+    --restart) RESTART=1 ;;
+    --skip-openclaw) SKIP_OPENCLAW=1 ;;
+    *)
+      echo "Unknown argument: ${arg}" >&2
+      exit 64
+      ;;
+  esac
+done
 
 if [[ "$(id -u)" -ne 0 ]]; then
   echo "Run this on the VPS as root so /docker agent data directories can be written." >&2
@@ -62,13 +72,25 @@ copy_agent() {
 }
 
 copy_agent "khadijah" "${KHADIJAH_DATA_ROOT}"
-copy_agent "regine" "${REGINE_DATA_ROOT}"
+copy_agent "sinclair" "${SINCLAIR_DATA_ROOT}"
+
+if [[ "${SKIP_OPENCLAW}" == "0" ]]; then
+  copy_agent "regine" "${REGINE_DATA_ROOT}"
+fi
 
 echo "Backups: ${BACKUP_DIR}"
 
 if [[ "${RESTART}" == "1" ]]; then
-  docker restart "${KHADIJAH_CONTAINER}" "${REGINE_CONTAINER}"
+  if [[ "${SKIP_OPENCLAW}" == "1" ]]; then
+    docker restart "${KHADIJAH_CONTAINER}" "${SINCLAIR_CONTAINER}"
+  else
+    docker restart "${KHADIJAH_CONTAINER}" "${SINCLAIR_CONTAINER}" "${REGINE_CONTAINER}"
+  fi
 else
   echo "Restart when ready:"
-  echo "  docker restart ${KHADIJAH_CONTAINER} ${REGINE_CONTAINER}"
+  if [[ "${SKIP_OPENCLAW}" == "1" ]]; then
+    echo "  docker restart ${KHADIJAH_CONTAINER} ${SINCLAIR_CONTAINER}"
+  else
+    echo "  docker restart ${KHADIJAH_CONTAINER} ${SINCLAIR_CONTAINER} ${REGINE_CONTAINER}"
+  fi
 fi
