@@ -31,11 +31,13 @@ Use `../README.md` as the main docs index.
 | 3 | `../workflows/planned_feature_catalog.md` | Retained MVP and future feature catalog |
 | 4 | `feature_migration_inventory.md` | Migration/status tracker |
 | 5 | `mvp_build_notes.md` | Supporting context only |
+| — | `build_roadmap_assessment.md` | Point-in-time execution snapshot; defers to rank 1 if conflict |
 
 ## Current Planning Notes
 
 | File | Purpose |
 |---|---|
 | `current_build_plan.md` | Canonical development plan and current priority order |
+| `build_roadmap_assessment.md` | Where-we-are assessment, gap diagnosis, and recommended build order toward first vertical slice |
 | `mvp_build_notes.md` | Supporting MVP context and implementation notes |
 | `feature_migration_inventory.md` | Canonical inventory of MVP and future feature coverage in this repo |
