@@ -3,14 +3,12 @@
   "private": true,
   "packageManager": "pnpm@9.15.4",
   "scripts": {
-    "dev:client": "pnpm --filter client dev",
-    "dev:flavoros": "pnpm --filter flavoros dev",
-    "lint": "pnpm --filter client lint",
-    "typecheck": "pnpm --filter client typecheck",
-    "build": "pnpm --filter client --filter flavoros build",
+    "dev": "pnpm --filter flavoros dev",
+    "lint": "pnpm --filter flavoros lint",
+    "build": "pnpm --filter flavoros build",
     "api:lint": "cd services/api && .venv/bin/ruff check app/",
     "api:test": "cd services/api && .venv/bin/python3 -m pytest tests/ -v",
     "check:agents": "bash scripts/check-agent-runtime-config.sh",
-    "check": "pnpm lint && pnpm typecheck && pnpm build && pnpm api:lint && pnpm api:test"
+    "check": "pnpm lint && pnpm build && pnpm api:lint && pnpm api:test"
   }
 }
