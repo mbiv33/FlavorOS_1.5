@@ -11,6 +11,7 @@
     "build": "pnpm --filter client --filter admin --filter flavoros build",
     "api:lint": "cd services/api && .venv/bin/ruff check app/",
     "api:test": "cd services/api && .venv/bin/python3 -m pytest tests/ -v",
+    "check:agents": "bash scripts/check-agent-runtime-config.sh",
     "check": "pnpm lint && pnpm typecheck && pnpm build && pnpm api:lint && pnpm api:test"
   }
 }

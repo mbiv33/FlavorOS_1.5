@@ -3,6 +3,10 @@
 agents:
   khadijah_conductor:
     runtime: cloud
+    engine: hermes
+    service: flavoros-agent-khadijah-hermes
+    agent_config: agents/khadijah/agent.yaml
+    instruction_root: agents/khadijah
     personas:
       - khadijah_orchestration
       - maxine_project_management
@@ -16,6 +20,10 @@ agents:
       - finance_oversight
   sinclair_communications:
     runtime: local
+    engine: hermes
+    service: flavoros-agent-sinclair-hermes
+    agent_config: agents/sinclair/agent.yaml
+    instruction_root: agents/sinclair
     personas:
       - sinclair_executive_assistant
       - sinclair_preference_guardian
@@ -30,6 +38,10 @@ agents:
       - household_sensitive_context
   regine_research_logistics:
     runtime: cloud
+    engine: openclaw
+    service: flavoros-agent-regine-openclaw
+    agent_config: agents/regine/agent.yaml
+    instruction_root: agents/regine
     personas:
       - scooter_travel_logistics
       - scooter_researcher

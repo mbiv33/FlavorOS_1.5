@@ -1,3 +1,60 @@
 runtimes:
-  local_next: apps/client + apps/admin on localhost
-  api: services/api
+  local_next:
+    description: apps/client + apps/admin on localhost
+  api:
+    description: services/api
+
+agent_engines:
+  hermes:
+    description: Hermes runtime worker for FlavorOS agents.
+    default_binary: hermes
+    default_args:
+      - agent
+      - run
+      - --config
+      - "{agent_config}"
+      - --instructions
+      - "{instruction_root}"
+  openclaw:
+    description: OpenClaw runtime worker for FlavorOS agents.
+    default_binary: openclaw
+    default_args:
+      - agent
+      - --agent
+      - main
+      - --local
+      - --config
+      - "{agent_config}"
+
+agent_runtime_targets:
+  cloud_vps:
+    description: Cloud background-agent host reached over SSH.
+    ssh_host: root@2.24.65.59
+    repo_dir: /srv/flavoros
+    env_file: /etc/flavoros/agents.env
+    log_command: journalctl
+    health_checks:
+      - systemctl is-active flavoros-agent-khadijah-hermes
+      - systemctl is-active flavoros-agent-regine-openclaw
+    services:
+      khadijah_conductor:
+        unit: flavoros-agent-khadijah-hermes.service
+        engine: hermes
+        agent_config: agents/khadijah/agent.yaml
+        instruction_root: agents/khadijah
+      regine_research_logistics:
+        unit: flavoros-agent-regine-openclaw.service
+        engine: openclaw
+        agent_config: agents/regine/agent.yaml
+        instruction_root: agents/regine
+
+  local_private:
+    description: Local-only private boundary for Sinclair communications.
+    workspace: /Users/marcusbivines/FlavorOS_1.5
+    env_file: .env.local
+    launch_command: scripts/run-local-hermes-sinclair.sh
+    services:
+      sinclair_communications:
+        engine: hermes
+        agent_config: agents/sinclair/agent.yaml
+        instruction_root: agents/sinclair
