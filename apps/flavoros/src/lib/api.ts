@@ -221,6 +221,15 @@ export async function pullBackOutboundAction(
   });
 }
 
+export async function executeOutboundAction(
+  session: FlavorOSSession,
+  outboundId: string,
+): Promise<OutboundActionRead> {
+  return apiRequest<OutboundActionRead>(`/outbound-actions/${outboundId}/execute`, session, {
+    method: "POST",
+  });
+}
+
 export async function listProviderConnections(
   session: FlavorOSSession,
 ): Promise<ProviderConnection[]> {

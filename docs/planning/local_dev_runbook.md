@@ -1,6 +1,8 @@
 # Local Dev Runbook
 
-Repeatable setup for the **demo vertical slice** on one machine. Canonical task checklist: [build_vertical_slice_tasks.md](./build_vertical_slice_tasks.md).
+**Last updated:** 2026-05-19 (K3 verification guardrails)
+
+Repeatable setup for the **demo vertical slice** on one machine. Historical slice checklist: [archive/build_vertical_slice_tasks.md](./archive/build_vertical_slice_tasks.md).
 
 ## Prerequisites
 
@@ -54,6 +56,43 @@ alembic upgrade head
 ```
 
 API startup seed runs unless `API_SKIP_STARTUP_SEED=true`.
+
+## Restart API after outbound migration (Lane J / K3)
+
+If the API process started **before** the `outbound_actions` migration landed, routes like `GET /outbound-actions` may return **404** until you restart against a migrated database. Follow this order every time you pull outbound write-back changes or switch branches:
+
+1. **Stop** the running `uvicorn` process (Ctrl+C).
+2. **Migrate** (from `services/api` with venv active):
+
+```bash
+cd services/api
+source .venv/bin/activate
+alembic upgrade head
+```
+
+3. **Seed refresh** — leave `API_SKIP_STARTUP_SEED` unset (or `false`) so startup seed runs on next boot. If you use `API_SKIP_STARTUP_SEED=true` in `.env`, restart once without it or run your seed path manually so demo pending `send_communication_draft` approvals exist.
+4. **Start API** on `127.0.0.1:8001` (see [Start API](#start-api) below).
+5. **Health check:**
+
+```bash
+curl -sf http://127.0.0.1:8001/health
+```
+
+6. **Smoke** (from repo root, with demo credentials in DB):
+
+```bash
+./scripts/smoke-vertical-slice.sh
+```
+
+The smoke script asserts **outbound status in JSON** after approve (`executed` or `failed` by default), not only row count.
+
+**Deferred execution (optional):** to test enqueue-without-inline-send, start the API with `OUTBOUND_DEFER_EXECUTION=true`, then run:
+
+```bash
+SMOKE_OUTBOUND_DEFER=1 ./scripts/smoke-vertical-slice.sh
+```
+
+Expect `queued` in the decide response and in `GET /outbound-actions`. Default demo/dev should leave defer **off** so approve → executed remains the investor path.
 
 ## Start API
 
@@ -126,18 +165,22 @@ Login first; `apps/flavoros/src/app/admin/layout.tsx` uses `SessionGuard` + `App
 
 Key files: `admin-surfaces.ts`, `components/admin/AdminSurfacePanel.tsx`, `hooks/useAdminOverview.ts`.
 
-## API tests (Lane B)
+## API tests (Lane B + J + K3)
 
 From `services/api` with project venv (Python 3.11+ recommended):
 
 ```bash
 cd services/api
-.venv/bin/python -m pytest tests/test_provider_first_sync.py tests/test_approvals_decide.py -q
+.venv/bin/python -m pytest \
+  tests/test_provider_first_sync.py \
+  tests/test_approvals_decide.py \
+  tests/test_outbound_actions.py \
+  -q
 ```
 
-Expect **22 passed**. Use `.venv` — system Python 3.9 may fail on modern typing in dependencies.
+Expect **30 passed** (includes outbound lifecycle, defer path, pull-back, and failure hooks). Use `.venv` — system Python 3.9 may fail on modern typing in dependencies.
 
-CI runs the same tests in [`.github/workflows/api-integration-tests.yml`](../../.github/workflows/api-integration-tests.yml) (additive job; does not change `ci.yml`).
+CI runs the same three files on every PR that touches `services/api/**` in [`.github/workflows/api-integration-tests.yml`](../../.github/workflows/api-integration-tests.yml) (additive job; does not change `ci.yml`). The workflow job is not skipped when only docs change — API path filters gate it.
 
 ## Quick smoke script (Lane D)
 
@@ -147,7 +190,7 @@ From repo root (API must be running on `127.0.0.1:8001`):
 ./scripts/smoke-vertical-slice.sh
 ```
 
-Checks `GET /health` and `GET /docs`. Full demo path still requires manual login → onboarding → Command Center (see [build_vertical_slice_tasks.md](./build_vertical_slice_tasks.md) verification checklist).
+Checks `GET /health`, `GET /docs`, and (when auth + seed are available) approve → outbound lifecycle with **status assertions** on the decide response and list. Full demo path still requires manual login → onboarding → Command Center (see [archive/build_vertical_slice_tasks.md](./archive/build_vertical_slice_tasks.md) verification checklist).
 
 ## Parallel agent coordination
 
@@ -163,10 +206,12 @@ When multiple agents work the repo, use [parallel_lanes_tracker.md](./parallel_l
 | Postgres connection failed | Port conflict with Docker | Local Postgres on 5432 or change `DATABASE_URL` |
 | Empty Command Center after sync | Processor not run | Confirm step 4 complete; check `workflow_run_id` on sync response |
 | Redirect loop to login | No session in localStorage | Complete login; check `(client)/layout` SessionGuard |
+| `/outbound-actions` 404 | Stale API process or missing migration | [Restart API after outbound migration](#restart-api-after-outbound-migration-lane-j--k3) |
+| Smoke: outbound stayed `queued` | `OUTBOUND_DEFER_EXECUTION=true` on API | Unset for inline demo, or run `SMOKE_OUTBOUND_DEFER=1` with defer enabled |
 
 ## Related docs
 
 - [next_session_handoff.md](./next_session_handoff.md) — **start here** in a new agent session
-- [build_vertical_slice_tasks.md](./build_vertical_slice_tasks.md) — file-level slice checklist (steps 1–5 complete)
-- [build_roadmap_assessment.md](./build_roadmap_assessment.md) — sequencing and gaps (updated 2026-05-19)
+- [archive/build_vertical_slice_tasks.md](./archive/build_vertical_slice_tasks.md) — archived file-level slice checklist (steps 1–5 complete)
+- [build_roadmap_assessment.md](./build_roadmap_assessment.md) — sequencing and gaps
 - [parallel_lanes_tracker.md](./parallel_lanes_tracker.md) — parallel agent coordination

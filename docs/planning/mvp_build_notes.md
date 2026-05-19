@@ -1,12 +1,16 @@
 # MVP Build Notes
 
+**Last updated:** 2026-05-19 14:13 EDT
+
 ## Status
 
 This file is supporting context. The canonical development plan and build priority order live in `current_build_plan.md`.
 
 Use this file for background on MVP purpose, agents, surfaces, and non-negotiables. If this file conflicts with `current_build_plan.md`, the current build plan wins.
 
-**Execution state (2026-05-19):** Demo vertical slice (steps 1–5) and parallel lanes C/G/H/E plus post-slice B/D/F are complete. Lane I (channel surfaces) is in progress. For next work, see [`next_session_handoff.md`](./next_session_handoff.md), [`parallel_lanes_tracker.md`](./parallel_lanes_tracker.md), and [`build_roadmap_assessment.md`](./build_roadmap_assessment.md).
+**Execution state (2026-05-19 14:13 EDT):** Demo vertical slice (steps 1–5) and post-slice lanes A through J are complete. For active follow-on work, see [`next_session_handoff.md`](./next_session_handoff.md), [`parallel_lanes_tracker.md`](./parallel_lanes_tracker.md), and [`build_roadmap_assessment.md`](./build_roadmap_assessment.md).
+
+**Use this file for background, not live execution tracking.**
 
 ## MVP Positioning
 

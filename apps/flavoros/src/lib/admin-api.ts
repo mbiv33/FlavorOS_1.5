@@ -52,6 +52,9 @@ export type AdminOverview = {
   artifactsPending: number;
   approvalsPending: number;
   auditRecent: number;
+  outboundQueued: number;
+  outboundFailed: number;
+  outboundTotal: number;
 };
 
 const CONNECTED_PROVIDER_STATUSES = new Set([
@@ -135,13 +138,15 @@ export async function listAuditEvents(
 export async function fetchAdminOverview(
   session: FlavorOSSession,
 ): Promise<AdminOverview> {
-  const [providers, workflows, artifacts, approvals, audit] = await Promise.all([
-    listProviders(session),
-    listWorkflows(session),
-    listArtifacts(session),
-    listApprovals(session, "pending"),
-    listAuditEvents(session, 50),
-  ]);
+  const [providers, workflows, artifacts, approvals, audit, outbound] =
+    await Promise.all([
+      listProviders(session),
+      listWorkflows(session),
+      listArtifacts(session),
+      listApprovals(session, "pending"),
+      listAuditEvents(session, 50),
+      listOutboundActions(session),
+    ]);
 
   return {
     providersConnected: providers.filter((p) =>
@@ -157,5 +162,8 @@ export async function fetchAdminOverview(
     ).length,
     approvalsPending: approvals.length,
     auditRecent: audit.length,
+    outboundQueued: outbound.filter((o) => o.status === "queued").length,
+    outboundFailed: outbound.filter((o) => o.status === "failed").length,
+    outboundTotal: outbound.length,
   };
 }

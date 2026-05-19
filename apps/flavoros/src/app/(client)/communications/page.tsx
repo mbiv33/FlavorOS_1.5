@@ -1,17 +1,40 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import { SurfaceFrame, SurfaceSection } from "@/components/SurfaceFrame";
 import { StatStrip } from "@/components/StatStrip";
 import { PileRow } from "@/components/PileRow";
 import { Card } from "@/components/Card";
 import { StatusChip } from "@/components/StatusChip";
-import { mapOutboundStatusToChip } from "@/lib/mappers";
+import { formatOutboundExecutionSnippet, mapOutboundStatusToChip } from "@/lib/mappers";
+import { loadSession, pullBackOutboundAction } from "@/lib/api";
 import { useCommunicationsData } from "@/lib/hooks/useCommunicationsData";
 
 export default function CommunicationsPage() {
-  const { piles, stats, contactGroups, outboundActions, loading, error, refresh } =
-    useCommunicationsData();
+  const {
+    piles,
+    stats,
+    contactGroups,
+    outboundActions,
+    loading,
+    error,
+    refresh,
+    handleAfterDecide,
+  } = useCommunicationsData();
+  const [pullingId, setPullingId] = useState<string | null>(null);
+
+  async function handlePullBack(outboundId: string) {
+    const session = loadSession();
+    if (!session) return;
+    setPullingId(outboundId);
+    try {
+      await pullBackOutboundAction(session, outboundId);
+      refresh();
+    } finally {
+      setPullingId(null);
+    }
+  }
 
   return (
     <SurfaceFrame
@@ -43,7 +66,7 @@ export default function CommunicationsPage() {
                 provider sync.
               </p>
             ) : (
-              <PileRow piles={piles} onAfterDecide={refresh} />
+              <PileRow piles={piles} onAfterDecide={handleAfterDecide} />
             )}
           </SurfaceSection>
 
@@ -51,21 +74,39 @@ export default function CommunicationsPage() {
             <SurfaceSection title="Outbound queue">
               <Card>
                 <ul className="divide-y divide-border">
-                  {outboundActions.slice(0, 8).map((o) => (
-                    <li
-                      key={o.id}
-                      className="flex items-center justify-between gap-3 px-4 py-3"
-                    >
-                      <div>
-                        <p className="text-sm font-medium">{o.action_type}</p>
-                        <p className="text-xs text-muted">
-                          {o.provider}
-                          {o.last_error_summary ? ` · ${o.last_error_summary}` : ""}
-                        </p>
-                      </div>
-                      <StatusChip status={mapOutboundStatusToChip(o.status)} />
-                    </li>
-                  ))}
+                  {outboundActions.slice(0, 8).map((o) => {
+                    const executionSnippet = formatOutboundExecutionSnippet(o);
+                    const canPullBack = o.status === "queued";
+                    return (
+                      <li
+                        key={o.id}
+                        className="flex items-center justify-between gap-3 px-4 py-3"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium">{o.action_type}</p>
+                          <p className="text-xs text-muted">{o.provider}</p>
+                          {executionSnippet ? (
+                            <p className="mt-1 text-xs text-muted-strong">
+                              {executionSnippet}
+                            </p>
+                          ) : null}
+                        </div>
+                        <div className="flex shrink-0 items-center gap-2">
+                          {canPullBack ? (
+                            <button
+                              type="button"
+                              disabled={pullingId === o.id}
+                              onClick={() => handlePullBack(o.id)}
+                              className="rounded-md border border-border-strong px-2 py-1 text-xs font-medium hover:bg-surface-muted disabled:opacity-40"
+                            >
+                              {pullingId === o.id ? "Pulling…" : "Pull back"}
+                            </button>
+                          ) : null}
+                          <StatusChip status={mapOutboundStatusToChip(o.status)} />
+                        </div>
+                      </li>
+                    );
+                  })}
                 </ul>
               </Card>
             </SurfaceSection>

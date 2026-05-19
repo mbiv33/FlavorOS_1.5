@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from app.deps import get_db, require_tenant_match
 from app.models import AuditEvent, OutboundAction, Tenant, User
 from app.schemas import OutboundActionRead
+from app.workflows import calendar_outbound, communications_outbound
 
 router = APIRouter(prefix="/outbound-actions", tags=["outbound-actions"])
 
@@ -90,6 +91,56 @@ def pull_back_outbound(outbound_id: uuid.UUID, tu: TenantUser, db: DB):
             },
         )
     )
+    db.commit()
+    db.refresh(outbound)
+    return outbound
+
+
+@router.post("/{outbound_id}/execute", response_model=OutboundActionRead)
+def execute_outbound_action(outbound_id: uuid.UUID, tu: TenantUser, db: DB):
+    tenant, user = tu
+    outbound = db.execute(
+        select(OutboundAction).where(
+            OutboundAction.id == outbound_id,
+            OutboundAction.client_id == tenant.id,
+        )
+    ).scalar_one_or_none()
+    if not outbound:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Outbound action not found"
+        )
+    if outbound.status == "executed":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Outbound action already executed",
+        )
+    if outbound.status != "queued":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Cannot execute outbound in status {outbound.status}",
+        )
+    try:
+        if outbound.provider == communications_outbound.COMMUNICATIONS_PROVIDER:
+            communications_outbound.execute_outbound_with_audit(
+                db, outbound=outbound, user=user
+            )
+        elif outbound.provider == calendar_outbound.CALENDAR_PROVIDER:
+            calendar_outbound.execute_calendar_outbound_with_audit(
+                db, outbound=outbound, user=user
+            )
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Unsupported outbound provider: {outbound.provider}",
+            )
+    except (
+        communications_outbound.OutboundExecuteConflictError,
+        calendar_outbound.CalendarExecuteConflictError,
+    ) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        ) from exc
     db.commit()
     db.refresh(outbound)
     return outbound

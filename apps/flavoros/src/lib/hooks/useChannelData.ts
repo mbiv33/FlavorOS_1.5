@@ -7,6 +7,7 @@ import {
   listApprovals,
   listOutboundActions,
   loadSession,
+  type ApprovalDecideRead,
   type ArtifactRead,
   type ApprovalRead,
   type OutboundActionRead,
@@ -26,6 +27,7 @@ export type ChannelData = {
   loading: boolean;
   error: string | null;
   refresh: () => void;
+  applyDecideResult: (result: ApprovalDecideRead) => void;
 };
 
 function buildInboxItems(
@@ -51,6 +53,29 @@ export function useChannelData(): ChannelData {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+
+  function applyDecideResult(result: ApprovalDecideRead) {
+    setApprovals((prevApprovals) => {
+      const nextApprovals = prevApprovals.filter((a) => a.id !== result.id);
+      setOutboundActions((prevOutbound) => {
+        let nextOutbound = prevOutbound;
+        if (result.outbound_action) {
+          const outbound = result.outbound_action;
+          const idx = prevOutbound.findIndex((o) => o.id === outbound.id);
+          nextOutbound =
+            idx >= 0
+              ? prevOutbound.map((o, i) => (i === idx ? outbound : o))
+              : [...prevOutbound, outbound];
+        }
+        setArtifacts((artifacts) => {
+          setInboxItems(buildInboxItems(artifacts, nextApprovals, nextOutbound));
+          return artifacts;
+        });
+        return nextOutbound;
+      });
+      return nextApprovals;
+    });
+  }
 
   useEffect(() => {
     const session = loadSession();
@@ -86,5 +111,6 @@ export function useChannelData(): ChannelData {
     loading,
     error,
     refresh: () => setRefreshKey((k) => k + 1),
+    applyDecideResult,
   };
 }

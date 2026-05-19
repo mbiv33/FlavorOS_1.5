@@ -1,12 +1,16 @@
-# Build Vertical Slice Tasks (Steps 1–5)
+# Archived Build Vertical Slice Tasks (Steps 1–5)
 
-## Status
+## Historical status
 
-File-level implementation checklist for the **demo vertical slice** defined in [`build_roadmap_assessment.md`](./build_roadmap_assessment.md). Scope is **steps 1–5 only** (step 6+ operator console is out of scope here).
+**Last updated:** 2026-05-19 14:13 EDT
 
-**Progress as of 2026-05-19:** Steps 1–5 complete. Demo vertical slice done.
+File-level implementation checklist for the **demo vertical slice** defined in [`../build_roadmap_assessment.md`](../build_roadmap_assessment.md). Scope is **steps 1–5 only** (step 6+ operator console is out of scope here).
 
-**Next session:** [next_session_handoff.md](./next_session_handoff.md) — post-slice lanes, ready work, constraints.
+**Progress as of 2026-05-19 14:13 EDT:** Steps 1–5 complete. Demo vertical slice done.
+
+**Archive status:** historical execution doc.  
+**Use this file as archive/history only.**  
+For active work, start with [next_session_handoff.md](../next_session_handoff.md) and [parallel_lanes_tracker.md](../parallel_lanes_tracker.md).
 
 | Step | Status |
 |---|---|
@@ -24,9 +28,9 @@ File-level implementation checklist for the **demo vertical slice** defined in [
 
 | Canon | Role |
 |---|---|
-| [`current_build_plan.md`](./current_build_plan.md) | Phases, proof loop, non-negotiables |
-| [`build_roadmap_assessment.md`](./build_roadmap_assessment.md) | Why and in what order |
-| **This file** | What to change, file by file |
+| [`current_build_plan.md`](../current_build_plan.md) | Phases, proof loop, non-negotiables |
+| [`build_roadmap_assessment.md`](../build_roadmap_assessment.md) | Why and in what order |
+| **This file** | Historical record of what changed, file by file, for slice steps 1–5 |
 
 ### Demo slice definition
 

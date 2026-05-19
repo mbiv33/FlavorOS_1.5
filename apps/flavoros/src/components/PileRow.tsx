@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import type { ApprovalDecideRead } from "@/lib/api";
 import { PileItemList, type PileListItem } from "./PileItemList";
 
 export type PileTone =
@@ -70,7 +71,7 @@ export function PileRow({
   onAfterDecide,
 }: {
   piles: PileDef[];
-  onAfterDecide?: () => void;
+  onAfterDecide?: (result?: ApprovalDecideRead) => void;
 }) {
   const [openKey, setOpenKey] = useState<string | null>(null);
 

@@ -18,6 +18,7 @@ import {
 } from "@/lib/admin-api";
 import type { ApprovalRead, ArtifactRead, ProviderConnection } from "@/lib/api";
 import { getAdminSurface } from "@/lib/admin-surfaces";
+import { formatOutboundExecutionSnippet } from "@/lib/mappers";
 
 type LiveRow = {
   id: string;
@@ -40,7 +41,18 @@ function truncateId(id: string): string {
   return id.length > 8 ? `${id.slice(0, 8)}…` : id;
 }
 
-async function fetchLiveRows(surface: string): Promise<LiveRow[]> {
+const OUTBOUND_STATUS_FILTERS: { label: string; value: string | null }[] = [
+  { label: "All", value: null },
+  { label: "Queued", value: "queued" },
+  { label: "Failed", value: "failed" },
+  { label: "Executed", value: "executed" },
+  { label: "Pulled back", value: "pulled_back" },
+];
+
+async function fetchLiveRows(
+  surface: string,
+  outboundStatus?: string | null,
+): Promise<LiveRow[]> {
   const session = getAdminSession();
   if (!session) {
     throw new Error("Not signed in");
@@ -88,13 +100,17 @@ async function fetchLiveRows(surface: string): Promise<LiveRow[]> {
       }));
     }
     case "outbound": {
-      const rows = await listOutboundActions(session);
+      const rows = await listOutboundActions(
+        session,
+        outboundStatus ?? undefined,
+      );
       return rows.map((o: OutboundActionRead) => {
+        const executionSnippet = formatOutboundExecutionSnippet(o);
         const parts = [
           o.provider,
           o.approval_id ? `approval ${truncateId(o.approval_id)}` : null,
           o.artifact_id ? `artifact ${truncateId(o.artifact_id)}` : null,
-          o.last_error_summary ?? null,
+          executionSnippet,
         ].filter(Boolean);
         return {
           id: o.id,
@@ -179,6 +195,9 @@ export function AdminSurfacePanel({ surface }: { surface: string }) {
   const [loading, setLoading] = useState(spec?.liveData ?? false);
   const [error, setError] = useState<string | null>(null);
   const [sessionMissing, setSessionMissing] = useState(false);
+  const [outboundStatusFilter, setOutboundStatusFilter] = useState<string | null>(
+    null,
+  );
 
   useEffect(() => {
     if (!spec?.liveData) {
@@ -192,13 +211,18 @@ export function AdminSurfacePanel({ surface }: { surface: string }) {
       return;
     }
 
-    fetchLiveRows(surface)
+    setLoading(true);
+    setError(null);
+    fetchLiveRows(
+      surface,
+      surface === "outbound" ? outboundStatusFilter : undefined,
+    )
       .then(setRows)
       .catch((err) => {
         setError(err instanceof Error ? err.message : "Failed to load data");
       })
       .finally(() => setLoading(false));
-  }, [surface, spec?.liveData]);
+  }, [surface, spec?.liveData, outboundStatusFilter]);
 
   if (!spec) return null;
 
@@ -227,6 +251,28 @@ export function AdminSurfacePanel({ surface }: { surface: string }) {
         <Card>
           <CardMeta>Loading live data…</CardMeta>
         </Card>
+      )}
+
+      {surface === "outbound" && spec.liveData && !sessionMissing && (
+        <div className="flex flex-wrap gap-2">
+          {OUTBOUND_STATUS_FILTERS.map((filter) => {
+            const active = outboundStatusFilter === filter.value;
+            return (
+              <button
+                key={filter.label}
+                type="button"
+                onClick={() => setOutboundStatusFilter(filter.value)}
+                className={`rounded-full border px-3 py-1 text-xs font-medium ${
+                  active
+                    ? "border-accent bg-accent text-accent-foreground"
+                    : "border-border-strong hover:bg-surface-muted"
+                }`}
+              >
+                {filter.label}
+              </button>
+            );
+          })}
+        </div>
       )}
 
       {spec.liveData && !loading && !error && !sessionMissing && (

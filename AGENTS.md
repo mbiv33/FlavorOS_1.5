@@ -1,5 +1,7 @@
 # AGENTS.md
 
+**Shared vocabulary:** See [`docs/FLAVOROS_TAXONOMY.md`](docs/FLAVOROS_TAXONOMY.md) for canonical terms, outbound statuses, surfaces, and repo pointers before cross-cutting PRs.
+
 ## GBrain Configuration (configured by /setup-gbrain)
 - Mode: local-stdio
 - Engine: pglite

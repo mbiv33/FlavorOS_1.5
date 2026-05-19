@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { StatusChip } from "./StatusChip";
-import { decideApproval, loadSession } from "@/lib/api";
+import { decideApproval, loadSession, type ApprovalDecideRead } from "@/lib/api";
 import type { CardStatus, AgentName, ItemKind } from "@/lib/fixtures";
 
 export type PileListItem = {
@@ -25,7 +25,7 @@ export function PileItemList({
 }: {
   items: PileListItem[];
   emptyLabel?: string;
-  onAfterDecide?: () => void;
+  onAfterDecide?: (result?: ApprovalDecideRead) => void;
 }) {
   const [decidedIds, setDecidedIds] = useState<Set<string>>(new Set());
   const [pendingId, setPendingId] = useState<string | null>(null);
@@ -36,9 +36,9 @@ export function PileItemList({
     if (!session) return;
     setPendingId(item.id);
     try {
-      await decideApproval(session, item.approvalId, decision);
+      const result = await decideApproval(session, item.approvalId, decision);
       setDecidedIds((prev) => new Set([...prev, item.id]));
-      onAfterDecide?.();
+      onAfterDecide?.(result);
     } finally {
       setPendingId(null);
     }
@@ -129,17 +129,11 @@ function ItemActions({
     );
   }
   if (item.kind === "update") {
-    const isSent = item.status === "Sent";
     return (
       <div className="mt-3 flex flex-wrap gap-2">
         <button className="rounded-md border border-border-strong px-3 py-1 text-xs font-medium hover:bg-surface-muted">
           Open
         </button>
-        {isSent ? (
-          <button className="rounded-md border border-border-strong px-3 py-1 text-xs font-medium hover:bg-surface-muted">
-            Pull back
-          </button>
-        ) : null}
         {item.sourceLinkLabel ? (
           <button className="text-xs text-muted hover:text-foreground">
             Open source ↗

@@ -42,6 +42,42 @@ export function mapOutboundStatusToChip(status: OutboundStatus): CardStatus {
   }
 }
 
+/** Receipt or error line for outbound queue rows and admin detail. */
+export function formatOutboundExecutionSnippet(
+  outbound: Pick<
+    OutboundActionRead,
+    "status" | "last_error_summary" | "execution_result_json"
+  >,
+): string | null {
+  if (outbound.status === "failed") {
+    return outbound.last_error_summary ?? "Execution failed";
+  }
+  if (outbound.status === "executed" && outbound.execution_result_json) {
+    const result = outbound.execution_result_json;
+    const summary =
+      typeof result.response_summary === "string"
+        ? result.response_summary
+        : null;
+    const receipt =
+      typeof result.receipt_status === "string" ? result.receipt_status : null;
+    const externalId =
+      typeof result.external_result_id === "string"
+        ? result.external_result_id
+        : null;
+    if (summary) return summary;
+    if (receipt && externalId) return `${receipt} · ${externalId}`;
+    if (receipt) return receipt;
+    if (externalId) return externalId;
+  }
+  if (outbound.status === "queued") {
+    return null;
+  }
+  if (outbound.last_error_summary) {
+    return outbound.last_error_summary;
+  }
+  return null;
+}
+
 export function enrichInboxItemsWithOutbound(
   items: InboxItem[],
   outboundByApprovalId: Map<string, OutboundActionRead>,
@@ -50,11 +86,12 @@ export function enrichInboxItemsWithOutbound(
     if (!item.approvalId) return item;
     const outbound = outboundByApprovalId.get(item.approvalId);
     if (!outbound) return item;
+    const executionSnippet = formatOutboundExecutionSnippet(outbound);
     return {
       ...item,
       status: mapOutboundStatusToChip(outbound.status),
       detail:
-        outbound.last_error_summary ??
+        executionSnippet ??
         item.detail ??
         `Outbound ${outbound.status}`,
       when: relativeTime(outbound.updated_at),

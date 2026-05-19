@@ -19,7 +19,7 @@ from app.schemas import (
     ApprovalRead,
     OutboundActionRead,
 )
-from app.workflows import communications_outbound
+from app.workflows import calendar_outbound, communications_outbound
 
 router = APIRouter(prefix="/approvals", tags=["approvals"])
 
@@ -94,11 +94,16 @@ def decide_approval(approval_id: uuid.UUID, body: ApprovalDecide, tu: TenantUser
     )
 
     outbound_action = None
-    if body.decision == "approved" and communications_outbound.is_communications_send(approval):
+    if body.decision == "approved":
         try:
-            outbound_action = communications_outbound.maybe_enqueue_and_execute(
-                db, approval=approval, user=user
-            )
+            if communications_outbound.is_communications_send(approval):
+                outbound_action = communications_outbound.maybe_enqueue_and_execute(
+                    db, approval=approval, user=user
+                )
+            elif calendar_outbound.is_calendar_send(approval):
+                outbound_action = calendar_outbound.maybe_enqueue_and_execute_calendar(
+                    db, approval=approval, user=user
+                )
         except ValueError as exc:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,

@@ -19,7 +19,14 @@ from app.models import (
     Tenant,
     User,
 )
-from app.workflows.communications_outbound import COMMUNICATIONS_SEND_GOVERNED_ACTION
+from app.workflows.calendar_outbound import (
+    CALENDAR_SEND_GOVERNED_ACTION,
+    enqueue_calendar_for_approval,
+)
+from app.workflows.communications_outbound import (
+    COMMUNICATIONS_SEND_GOVERNED_ACTION,
+    enqueue_for_approval,
+)
 
 
 def _make_gmail_connection(db: Session, tenant: Tenant) -> ProviderConnection:
@@ -173,7 +180,9 @@ def test_approve_comms_creates_outbound_executed(
     tenant_a: Tenant,
     user_a: User,
     auth_headers_a: dict,
+    monkeypatch: pytest.MonkeyPatch,
 ):
+    monkeypatch.setenv("OUTBOUND_DEFER_EXECUTION", "false")
     _make_gmail_connection(db, tenant_a)
     art = _make_comms_draft(db, tenant_a)
     appr = _make_comms_approval(db, tenant_a, art.id)
@@ -282,7 +291,9 @@ def test_outbound_execution_failure(
     db: Session,
     tenant_a: Tenant,
     auth_headers_a: dict,
+    monkeypatch: pytest.MonkeyPatch,
 ):
+    monkeypatch.setenv("OUTBOUND_DEFER_EXECUTION", "false")
     _make_gmail_connection(db, tenant_a)
     art = _make_comms_draft(db, tenant_a)
     art.meta = {**(art.meta or {}), "_force_failure": True}
@@ -298,3 +309,196 @@ def test_outbound_execution_failure(
     )
     assert resp.status_code == 200
     assert resp.json()["outbound_action"]["status"] == "failed"
+
+
+def test_enqueue_for_approval_idempotent(
+    db: Session,
+    tenant_a: Tenant,
+    user_a: User,
+):
+    _make_gmail_connection(db, tenant_a)
+    art = _make_comms_draft(db, tenant_a)
+    appr = _make_comms_approval(db, tenant_a, art.id)
+
+    first = enqueue_for_approval(db, approval=appr, user=user_a)
+    second = enqueue_for_approval(db, approval=appr, user=user_a)
+    assert first.id == second.id
+
+    count = db.execute(
+        select(OutboundAction).where(OutboundAction.approval_id == appr.id)
+    ).scalars().all()
+    assert len(count) == 1
+
+
+def test_execute_endpoint_runs_queued_outbound(
+    client: TestClient,
+    db: Session,
+    tenant_a: Tenant,
+    auth_headers_a: dict,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    monkeypatch.setenv("OUTBOUND_DEFER_EXECUTION", "true")
+    _make_gmail_connection(db, tenant_a)
+    art = _make_comms_draft(db, tenant_a)
+    appr = _make_comms_approval(db, tenant_a, art.id)
+
+    decide = client.post(
+        f"/approvals/{appr.id}/decide",
+        json={"decision": "approved"},
+        headers=auth_headers_a,
+    )
+    assert decide.status_code == 200
+    outbound_id = decide.json()["outbound_action"]["id"]
+    assert decide.json()["outbound_action"]["status"] == "queued"
+
+    execute = client.post(
+        f"/outbound-actions/{outbound_id}/execute",
+        headers=auth_headers_a,
+    )
+    assert execute.status_code == 200
+    assert execute.json()["status"] == "executed"
+    assert execute.json()["executed_at"] is not None
+
+    audit_actions = {
+        e.action
+        for e in db.execute(
+            select(AuditEvent).where(
+                AuditEvent.client_id == tenant_a.id,
+                AuditEvent.resource_id == uuid.UUID(outbound_id),
+            )
+        ).scalars()
+    }
+    assert "outbound.executed" in audit_actions
+
+
+def test_execute_on_executed_returns_409(
+    client: TestClient,
+    db: Session,
+    tenant_a: Tenant,
+    auth_headers_a: dict,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    monkeypatch.setenv("OUTBOUND_DEFER_EXECUTION", "false")
+    _make_gmail_connection(db, tenant_a)
+    art = _make_comms_draft(db, tenant_a)
+    appr = _make_comms_approval(db, tenant_a, art.id)
+
+    decide = client.post(
+        f"/approvals/{appr.id}/decide",
+        json={"decision": "approved"},
+        headers=auth_headers_a,
+    )
+    assert decide.status_code == 200
+    outbound_id = decide.json()["outbound_action"]["id"]
+    assert decide.json()["outbound_action"]["status"] == "executed"
+
+    again = client.post(
+        f"/outbound-actions/{outbound_id}/execute",
+        headers=auth_headers_a,
+    )
+    assert again.status_code == 409
+    assert "executed" in again.json()["detail"]
+
+
+def _make_gcal_connection(db: Session, tenant: Tenant) -> ProviderConnection:
+    conn = ProviderConnection(
+        client_id=tenant.id,
+        provider="googlecalendar",
+        context_account_id=f"gcal-{uuid.uuid4()}",
+        status="connected",
+        enabled=True,
+    )
+    db.add(conn)
+    db.commit()
+    db.refresh(conn)
+    return conn
+
+
+def _make_calendar_hold(db: Session, tenant: Tenant) -> Artifact:
+    art = Artifact(
+        client_id=tenant.id,
+        kind="client",
+        title="Investor sync hold",
+        body="Placeholder hold for investor sync.",
+        meta={
+            "artifact_type": "calendar_hold",
+            "channel": "calendar",
+            "start": "2026-06-01T15:00:00Z",
+            "end": "2026-06-01T16:00:00Z",
+        },
+        status="ready",
+    )
+    db.add(art)
+    db.commit()
+    db.refresh(art)
+    return art
+
+
+def _make_calendar_approval(
+    db: Session,
+    tenant: Tenant,
+    artifact_id: uuid.UUID,
+) -> Approval:
+    appr = Approval(
+        client_id=tenant.id,
+        artifact_id=artifact_id,
+        governed_action=CALENDAR_SEND_GOVERNED_ACTION,
+        reason="Place this calendar hold after review.",
+        decision="pending",
+    )
+    db.add(appr)
+    db.commit()
+    db.refresh(appr)
+    return appr
+
+
+def test_approve_calendar_defer_then_execute(
+    client: TestClient,
+    db: Session,
+    tenant_a: Tenant,
+    auth_headers_a: dict,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    monkeypatch.setenv("OUTBOUND_DEFER_EXECUTION", "true")
+    _make_gcal_connection(db, tenant_a)
+    hold = _make_calendar_hold(db, tenant_a)
+    appr = _make_calendar_approval(db, tenant_a, hold.id)
+
+    decide = client.post(
+        f"/approvals/{appr.id}/decide",
+        json={"decision": "approved"},
+        headers=auth_headers_a,
+    )
+    assert decide.status_code == 200
+    outbound = decide.json()["outbound_action"]
+    assert outbound is not None
+    assert outbound["provider"] == "googlecalendar"
+    assert outbound["action_type"] == "calendar_create_hold"
+    assert outbound["status"] == "queued"
+
+    execute = client.post(
+        f"/outbound-actions/{outbound['id']}/execute",
+        headers=auth_headers_a,
+    )
+    assert execute.status_code == 200
+    assert execute.json()["status"] == "executed"
+    assert execute.json()["execution_result_json"] is not None
+
+
+def test_enqueue_calendar_for_approval_idempotent(
+    db: Session,
+    tenant_a: Tenant,
+    user_a: User,
+):
+    _make_gcal_connection(db, tenant_a)
+    hold = _make_calendar_hold(db, tenant_a)
+    appr = _make_calendar_approval(db, tenant_a, hold.id)
+
+    first = enqueue_calendar_for_approval(db, approval=appr, user=user_a)
+    second = enqueue_calendar_for_approval(db, approval=appr, user=user_a)
+    assert first.id == second.id
+
+    rows = db.execute(
+        select(OutboundAction).where(OutboundAction.approval_id == appr.id)
+    ).scalars().all()
+    assert len(rows) == 1

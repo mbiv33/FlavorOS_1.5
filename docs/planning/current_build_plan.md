@@ -1,5 +1,7 @@
 # Current Build Plan
 
+**Last updated:** 2026-05-19 14:13 EDT
+
 ## Purpose
 
 This is the single canonical development plan for FlavorOS 1.5.

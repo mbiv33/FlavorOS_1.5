@@ -1,4 +1,4 @@
-"""Approval-gated communications outbound write-back (Lane J)."""
+"""Approval-gated communications outbound write-back (Lane J / K1)."""
 
 from __future__ import annotations
 
@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.adapters.gmail_outbound import apply_send_result, get_gmail_outbound_adapter
 from app.models import Approval, Artifact, AuditEvent, OutboundAction, ProviderConnection, User
 
 COMMUNICATIONS_SEND_GOVERNED_ACTION = "send_communication_draft"
@@ -18,6 +19,14 @@ COMMUNICATIONS_ACTION_TYPE = "gmail_send_draft"
 OUTBOUND_STATUSES = frozenset({"queued", "executed", "failed", "pulled_back"})
 
 CONNECTED_STATUSES = frozenset({"connected", "syncing", "ready"})
+
+
+class OutboundExecuteConflictError(Exception):
+    """Outbound cannot be executed in its current status."""
+
+    def __init__(self, status: str) -> None:
+        self.status = status
+        super().__init__(f"Cannot execute outbound in status: {status}")
 
 
 def is_communications_send(approval: Approval) -> bool:
@@ -123,34 +132,66 @@ def create_outbound_for_approval(
 
 
 def _should_defer_execution() -> bool:
+    """When true, decide only enqueues; execution runs via POST /execute or worker."""
     return os.environ.get("OUTBOUND_DEFER_EXECUTION", "").lower() in ("1", "true", "yes")
 
 
-def _stub_should_fail(outbound: OutboundAction) -> bool:
-    payload = outbound.payload_json or {}
-    return bool(payload.get("_force_failure"))
+def _should_inline_execute() -> bool:
+    """Inline execute on approve when demo env explicitly enables it."""
+    if _should_defer_execution():
+        return False
+    for key in (
+        "OUTBOUND_INLINE_EXECUTE_ON_APPROVE",
+        "OUTBOUND_INLINE_EXECUTE",
+    ):
+        if os.environ.get(key, "").lower() in ("1", "true", "yes"):
+            return True
+    defer_default = os.environ.get("OUTBOUND_DEFER_EXECUTION", "true").lower()
+    return defer_default in ("0", "false", "no")
 
 
-def execute_outbound(db: Session, outbound: OutboundAction) -> None:
+def execute_outbound(
+    db: Session,
+    outbound: OutboundAction,
+    *,
+    actor_id: uuid.UUID | None = None,
+    client_id: uuid.UUID | None = None,
+) -> None:
     if outbound.status != "queued":
         return
-    if _stub_should_fail(outbound):
+    try:
+        if outbound.provider == COMMUNICATIONS_PROVIDER:
+            adapter = get_gmail_outbound_adapter()
+            result = adapter.send_draft(outbound)
+            apply_send_result(outbound, result)
+        else:
+            raise ValueError(f"Unsupported outbound provider: {outbound.provider}")
+    except Exception as exc:
         outbound.status = "failed"
-        outbound.last_error_summary = "Stub provider execution failed (test hook)"
+        outbound.last_error_summary = str(exc)[:500]
         outbound.updated_at = datetime.now(timezone.utc)
+        if client_id is not None:
+            _audit_outbound(
+                db,
+                client_id=client_id,
+                actor_id=actor_id,
+                action="outbound.failed",
+                outbound=outbound,
+                extra={"error": outbound.last_error_summary},
+            )
         return
-    outbound.status = "executed"
-    outbound.executed_at = datetime.now(timezone.utc)
-    outbound.execution_result_json = {
-        "provider": outbound.provider,
-        "external_result_id": f"stub-{outbound.id}",
-        "receipt_status": "success",
-        "response_summary": "Stub gmail send completed",
-    }
     outbound.updated_at = datetime.now(timezone.utc)
+    if client_id is not None:
+        _audit_outbound(
+            db,
+            client_id=client_id,
+            actor_id=actor_id,
+            action="outbound.executed",
+            outbound=outbound,
+        )
 
 
-def maybe_enqueue_and_execute(
+def enqueue_for_approval(
     db: Session,
     *,
     approval: Approval,
@@ -189,16 +230,34 @@ def maybe_enqueue_and_execute(
         action="outbound.queued",
         outbound=outbound,
     )
+    return outbound
 
-    if not _should_defer_execution():
-        execute_outbound(db, outbound)
-        action = "outbound.executed" if outbound.status == "executed" else "outbound.failed"
-        _audit_outbound(
-            db,
-            client_id=approval.client_id,
-            actor_id=user.id,
-            action=action,
-            outbound=outbound,
-        )
 
+def execute_outbound_with_audit(
+    db: Session,
+    *,
+    outbound: OutboundAction,
+    user: User,
+) -> OutboundAction:
+    """Execute a queued outbound row; raise if status is not queued."""
+    if outbound.status != "queued":
+        raise OutboundExecuteConflictError(outbound.status)
+    execute_outbound(
+        db,
+        outbound,
+        actor_id=user.id,
+        client_id=outbound.client_id,
+    )
+    return outbound
+
+
+def maybe_enqueue_and_execute(
+    db: Session,
+    *,
+    approval: Approval,
+    user: User,
+) -> OutboundAction:
+    outbound = enqueue_for_approval(db, approval=approval, user=user)
+    if _should_inline_execute() and outbound.status == "queued":
+        execute_outbound_with_audit(db, outbound=outbound, user=user)
     return outbound

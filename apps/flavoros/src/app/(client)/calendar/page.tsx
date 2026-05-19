@@ -1,16 +1,43 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import { SurfaceFrame, SurfaceSection } from "@/components/SurfaceFrame";
 import { StatStrip } from "@/components/StatStrip";
 import { PileRow } from "@/components/PileRow";
 import { MiniCalendar } from "@/components/MiniCalendar";
 import { Card } from "@/components/Card";
+import { StatusChip } from "@/components/StatusChip";
+import { formatOutboundExecutionSnippet, mapOutboundStatusToChip } from "@/lib/mappers";
+import { loadSession, pullBackOutboundAction } from "@/lib/api";
 import { useCalendarData } from "@/lib/hooks/useCalendarData";
 
 export default function CalendarPage() {
-  const { piles, stats, month, highlightDates, todayItems, loading, error } =
-    useCalendarData();
+  const {
+    piles,
+    stats,
+    month,
+    highlightDates,
+    todayItems,
+    outboundActions,
+    loading,
+    error,
+    refresh,
+    handleAfterDecide,
+  } = useCalendarData();
+  const [pullingId, setPullingId] = useState<string | null>(null);
+
+  async function handlePullBack(outboundId: string) {
+    const session = loadSession();
+    if (!session) return;
+    setPullingId(outboundId);
+    try {
+      await pullBackOutboundAction(session, outboundId);
+      refresh();
+    } finally {
+      setPullingId(null);
+    }
+  }
 
   return (
     <SurfaceFrame
@@ -41,9 +68,51 @@ export default function CalendarPage() {
                 No calendar items yet — events will appear after the first provider sync.
               </p>
             ) : (
-              <PileRow piles={piles} />
+              <PileRow piles={piles} onAfterDecide={handleAfterDecide} />
             )}
           </SurfaceSection>
+
+          {outboundActions.length > 0 ? (
+            <SurfaceSection title="Outbound queue">
+              <Card>
+                <ul className="divide-y divide-border">
+                  {outboundActions.slice(0, 8).map((o) => {
+                    const executionSnippet = formatOutboundExecutionSnippet(o);
+                    const canPullBack = o.status === "queued";
+                    return (
+                      <li
+                        key={o.id}
+                        className="flex items-center justify-between gap-3 px-4 py-3"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium">{o.action_type}</p>
+                          <p className="text-xs text-muted">{o.provider}</p>
+                          {executionSnippet ? (
+                            <p className="mt-1 text-xs text-muted-strong">
+                              {executionSnippet}
+                            </p>
+                          ) : null}
+                        </div>
+                        <div className="flex shrink-0 items-center gap-2">
+                          {canPullBack ? (
+                            <button
+                              type="button"
+                              disabled={pullingId === o.id}
+                              onClick={() => handlePullBack(o.id)}
+                              className="rounded-md border border-border-strong px-2 py-1 text-xs font-medium hover:bg-surface-muted disabled:opacity-40"
+                            >
+                              {pullingId === o.id ? "Pulling…" : "Pull back"}
+                            </button>
+                          ) : null}
+                          <StatusChip status={mapOutboundStatusToChip(o.status)} />
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </Card>
+            </SurfaceSection>
+          ) : null}
 
           <CalendarTodayGrid
             todayItems={todayItems}

@@ -149,7 +149,9 @@ export function formatTileMeta(
     case "approvals":
       return `${overview.approvalsPending} needs approval`;
     case "outbound":
-      return "Gmail outbound queue";
+      return overview.outboundTotal === 0
+        ? "No outbound actions"
+        : `${overview.outboundQueued} queued · ${overview.outboundFailed} failed · ${overview.outboundTotal} total`;
     case "logs":
       return `${overview.auditRecent} recent audit events`;
     case "config":

@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.config import get_settings
 from app.models import Approval, Artifact, Profile, ProviderConnection, Tenant, User
+from app.workflows.calendar_outbound import CALENDAR_SEND_GOVERNED_ACTION
 from app.workflows.communications_outbound import COMMUNICATIONS_SEND_GOVERNED_ACTION
 
 _pwd = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -102,6 +103,44 @@ def seed_if_empty(db: Session) -> None:
             artifact_id=draft.id,
             governed_action=COMMUNICATIONS_SEND_GOVERNED_ACTION,
             reason="Review and approve sending this email draft.",
+            decision="pending",
+        )
+    )
+
+    gcal = ProviderConnection(
+        client_id=demo_id,
+        provider="googlecalendar",
+        context_account_id="demo-gcal-primary",
+        status="connected",
+        enabled=True,
+        composio_user_id="demo-composio-user",
+    )
+    db.add(gcal)
+    db.flush()
+
+    hold = Artifact(
+        client_id=demo_id,
+        kind="client",
+        title="Investor sync hold",
+        body="Placeholder hold for investor sync — approve to create calendar event.",
+        meta={
+            "artifact_type": "calendar_hold",
+            "channel": "calendar",
+            "start": "2026-06-01T15:00:00Z",
+            "end": "2026-06-01T16:00:00Z",
+            "location": "Zoom",
+        },
+        status="ready",
+    )
+    db.add(hold)
+    db.flush()
+
+    db.add(
+        Approval(
+            client_id=demo_id,
+            artifact_id=hold.id,
+            governed_action=CALENDAR_SEND_GOVERNED_ACTION,
+            reason="Review and approve placing this calendar hold.",
             decision="pending",
         )
     )

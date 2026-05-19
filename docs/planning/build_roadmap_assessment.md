@@ -2,6 +2,8 @@
 
 ## Status
 
+**Last updated:** 2026-05-19 14:22 EDT
+
 This file memorializes a **point-in-time execution assessment** (May 2026): where the repo stands relative to the MVP proof loop, what actually blocks shipping, and the recommended build order for the next 2–4 weeks.
 
 It does **not** replace the canonical development plan. If anything here conflicts with `current_build_plan.md`, the current build plan wins.
@@ -10,13 +12,13 @@ It does **not** replace the canonical development plan. If anything here conflic
 |---|---|
 | `current_build_plan.md` | Phases, proof loop, non-negotiables |
 | **This file** | Snapshot assessment + practical sequencing |
-| [`build_vertical_slice_tasks.md`](./build_vertical_slice_tasks.md) | File-level checklist for demo vertical slice (steps 1–5) |
+| [`archive/build_vertical_slice_tasks.md`](./archive/build_vertical_slice_tasks.md) | Archived file-level checklist for demo vertical slice (steps 1–5) |
 | [`next_session_handoff.md`](./next_session_handoff.md) | **Start here** in a new agent session — done work, ready lanes, constraints |
 | [`parallel_lanes_tracker.md`](./parallel_lanes_tracker.md) | Parallel lane ownership and session log |
 
 ## Executive Summary
 
-*Updated 2026-05-19 after vertical slice + post-slice lanes A through J.*
+*Updated 2026-05-19 14:22 EDT after vertical slice + post-slice lanes A through J.*
 
 FlavorOS has crossed the **first integration milestone**:
 
@@ -40,7 +42,7 @@ The bottleneck has shifted from “can FlavorOS take an approved action back out
 
 ## Where The Repo Stands
 
-*Updated 2026-05-19.*
+*Updated 2026-05-19 14:22 EDT.*
 
 | Layer | Status | Notes |
 |---|---|---|
@@ -86,7 +88,7 @@ From `current_build_plan.md`, the MVP must prove:
 
 ## Gap Diagnosis
 
-*Updated 2026-05-19.*
+*Updated 2026-05-19 14:22 EDT.*
 
 ### Closed (vertical slice + post-slice)
 
@@ -291,7 +293,7 @@ These can be done in parallel **if ownership boundaries stay clean**.
 
 ## Follow-Up: File-Level Task List
 
-- **Slice (historical):** [`build_vertical_slice_tasks.md`](./build_vertical_slice_tasks.md) — steps 1–5 complete
+- **Slice (historical):** [`archive/build_vertical_slice_tasks.md`](./archive/build_vertical_slice_tasks.md) — steps 1–5 complete
 - **Next work:** [`next_session_handoff.md`](./next_session_handoff.md) — Lane J hardening + taxonomy + runtime follow-ons
 
 When starting implementation in a new agent session, point the agent at:

@@ -1,5 +1,7 @@
 # Feature Migration Inventory
 
+**Last updated:** 2026-05-19 14:13 EDT
+
 ## Purpose
 
 This file is the canonical inventory for whether planned FlavorOS functionality has been captured in the FlavorOS 1.5 repo.

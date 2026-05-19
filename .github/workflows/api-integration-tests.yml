@@ -16,7 +16,7 @@ on:
 
 jobs:
   vertical-slice-integration:
-    name: Provider sync + approvals decide
+    name: Provider sync + approvals + outbound actions
     runs-on: ubuntu-latest
     defaults:
       run:
