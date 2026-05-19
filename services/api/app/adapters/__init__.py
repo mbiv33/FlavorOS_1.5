@@ -6,7 +6,7 @@ provider SDKs, a live GBrain process, or a full orchestration engine.
 Swap in real implementations via ``deps.py`` dependency overrides.
 """
 
-from app.adapters.composio import ComposioAdapter, StubComposioAdapter
+from app.adapters.composio import ComposioAdapter, RealComposioAdapter, StubComposioAdapter
 from app.adapters.gbrain import GBrainAdapter, LocalFileGBrainAdapter, StubGBrainAdapter
 from app.adapters.gmail_outbound import (
     GmailOutboundAdapter,
@@ -20,6 +20,7 @@ from app.adapters.orchestrator import OrchestratorAdapter, StubOrchestratorAdapt
 
 __all__ = [
     "ComposioAdapter",
+    "RealComposioAdapter",
     "StubComposioAdapter",
     "GBrainAdapter",
     "LocalFileGBrainAdapter",

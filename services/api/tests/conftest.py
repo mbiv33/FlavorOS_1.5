@@ -58,6 +58,8 @@ def settings() -> Settings:
         database_url="sqlite://",
         api_skip_startup_seed=True,
         jwt_secret="test-secret",
+        composio_api_key="",
+        anthropic_api_key="",
     )
 
 

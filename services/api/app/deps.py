@@ -16,6 +16,7 @@ from app.adapters import (
     GBrainAdapter,
     LocalFileGBrainAdapter,
     OrchestratorAdapter,
+    RealComposioAdapter,
     StubComposioAdapter,
     StubGBrainAdapter,
     StubOrchestratorAdapter,
@@ -108,14 +109,21 @@ def require_tenant_match(
 # Adapter singletons (swap to real implementations via app.dependency_overrides)
 # ---------------------------------------------------------------------------
 
-_composio: ComposioAdapter = StubComposioAdapter()
+_composio_stub: ComposioAdapter = StubComposioAdapter()
+_composio_real_cache: dict[str, ComposioAdapter] = {}
 _gbrain_stub: GBrainAdapter = StubGBrainAdapter()
 _gbrain_file_cache: dict[str, GBrainAdapter] = {}
 _orchestrator: OrchestratorAdapter = StubOrchestratorAdapter()
 
 
-def get_composio() -> ComposioAdapter:
-    return _composio
+def get_composio(settings: Annotated[Settings, Depends(get_settings)]) -> ComposioAdapter:
+    if settings.composio_api_key:
+        if settings.composio_api_key not in _composio_real_cache:
+            _composio_real_cache[settings.composio_api_key] = RealComposioAdapter(
+                api_key=settings.composio_api_key,
+            )
+        return _composio_real_cache[settings.composio_api_key]
+    return _composio_stub
 
 
 def get_gbrain(settings: Annotated[Settings, Depends(get_settings)]) -> GBrainAdapter:

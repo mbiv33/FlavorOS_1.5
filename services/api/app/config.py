@@ -35,6 +35,9 @@ class Settings(BaseSettings):
     dev_admin_password: str = "devadmin"
     # When True, skip lifespan DB seed (API starts; tenant routes need DB).
     api_skip_startup_seed: bool = False
+    composio_api_key: str = ""
+    composio_redirect_uri: str = ""
+    anthropic_api_key: str = ""
     gbrain_adapter: str = "stub"
     gbrain_store_dir: str = ".gbrain/flavoros-ingest"
 

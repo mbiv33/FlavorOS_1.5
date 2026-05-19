@@ -11,14 +11,22 @@ Covers:
 from __future__ import annotations
 
 import uuid
+from unittest.mock import MagicMock, patch
 
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import AgentTask, Approval, Artifact, Tenant, User, WorkflowRun
+from app.models import (
+    AgentTask,
+    Approval,
+    Artifact,
+    NormalizedItem,
+    ProviderEvent,
+    Tenant,
+    WorkflowRun,
+)
 from app.workflows.provider_first_sync import process_provider_first_sync
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -319,3 +327,124 @@ def test_sync_endpoint_materializes_artifact_and_approval(
     assert approvals[0].decision == "pending"
     assert approvals[0].artifact_id == report.id
     assert approvals[0].governed_action == "provider_first_sync_review"
+
+
+# ---------------------------------------------------------------------------
+# LLM path and fallback tests (real email items in NormalizedItem)
+# ---------------------------------------------------------------------------
+
+
+def _make_workflow_run_with_items(
+    db: Session, tenant: Tenant, items: list[dict]
+) -> WorkflowRun:
+    """Create a WorkflowRun backed by a NormalizedItem with real email items."""
+    pe = ProviderEvent(
+        client_id=tenant.id,
+        provider="gmail",
+        event_type="provider_first_sync",
+        idempotency_key=f"test:{uuid.uuid4()}",
+        status="received",
+        payload={"records_synced": len(items)},
+    )
+    db.add(pe)
+    db.flush()
+
+    ni = NormalizedItem(
+        client_id=tenant.id,
+        provider_event_id=pe.id,
+        item_type="email_sync_receipt",
+        title="gmail first sync",
+        data={
+            "provider_connection_id": str(uuid.uuid4()),
+            "records_synced": len(items),
+            "status": "ready",
+            "items": items,
+        },
+    )
+    db.add(ni)
+    db.flush()
+
+    run = WorkflowRun(
+        client_id=tenant.id,
+        workflow_type="provider_first_sync",
+        agent="sinclair",
+        status="queued",
+        input_data={
+            "provider": "gmail",
+            "provider_connection_id": str(uuid.uuid4()),
+            "normalized_item_id": str(ni.id),
+        },
+    )
+    db.add(run)
+    db.flush()
+    db.add(
+        AgentTask(
+            client_id=tenant.id,
+            workflow_run_id=run.id,
+            agent="sinclair",
+            task_type="provider_first_sync_review",
+            status="queued",
+            payload={},
+        )
+    )
+    db.commit()
+    db.refresh(run)
+    return run
+
+
+_FAKE_ITEMS = [
+    {
+        "subject": "Q2 review agenda",
+        "snippet": "Please review before Thursday.",
+        "message_id": "msg1",
+    },
+    {"subject": "Invoice #1234", "snippet": "Your invoice is attached.", "message_id": "msg2"},
+]
+
+
+def test_processor_llm_path_uses_sinclair_response(db: Session, tenant_a: Tenant):
+    """When NormalizedItem has items and Sinclair succeeds, artifact body = LLM response."""
+    run = _make_workflow_run_with_items(db, tenant_a, _FAKE_ITEMS)
+
+    mock_response = MagicMock()
+    mock_response.content = [MagicMock(text="Two emails need attention: Q2 review and an invoice.")]
+
+    with (
+        patch("app.workflows.provider_first_sync.get_settings") as mock_settings,
+        patch("anthropic.Anthropic") as mock_anthropic,
+    ):
+        mock_settings.return_value.anthropic_api_key = "test-key"
+        mock_anthropic.return_value.messages.create.return_value = mock_response
+
+        process_provider_first_sync(db, run.id)
+
+    artifact = db.execute(
+        select(Artifact).where(Artifact.client_id == tenant_a.id)
+    ).scalar_one()
+    assert artifact.title == "Gmail inbox review (2 messages)"
+    assert artifact.body == "Two emails need attention: Q2 review and an invoice."
+    assert artifact.meta["items_count"] == 2
+
+
+def test_processor_llm_fallback_on_anthropic_error(db: Session, tenant_a: Tenant):
+    """When Sinclair raises, processor still creates artifact with canned body (no exception)."""
+    run = _make_workflow_run_with_items(db, tenant_a, _FAKE_ITEMS)
+
+    with (
+        patch("app.workflows.provider_first_sync.get_settings") as mock_settings,
+        patch("anthropic.Anthropic") as mock_anthropic,
+    ):
+        mock_settings.return_value.anthropic_api_key = "test-key"
+        mock_anthropic.return_value.messages.create.side_effect = Exception("API error")
+
+        process_provider_first_sync(db, run.id)
+
+    artifact = db.execute(
+        select(Artifact).where(Artifact.client_id == tenant_a.id)
+    ).scalar_one()
+    assert artifact.title == "Gmail inbox review (2 messages)"
+    assert "2 messages" in artifact.body
+    assert artifact.meta["items_count"] == 2
+
+    run_refreshed = db.get(WorkflowRun, run.id)
+    assert run_refreshed.status == "completed"

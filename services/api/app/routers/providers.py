@@ -131,12 +131,15 @@ async def create_provider_connect_link(
         )
 
     user_ref = conn.composio_user_id or composio_user_id(tenant.id, user.id)
+    # Embed provider_connection_id in redirect URI so the public callback can
+    # identify the connection without requiring auth headers.
+    callback_uri = f"{body.redirect_uri}?provider_connection_id={conn.id}"
     result = await composio.create_connect_link(
         client_id=tenant.id,
         composio_user_id=user_ref,
         provider=conn.provider,
         toolkit=conn.toolkit,
-        redirect_uri=body.redirect_uri,
+        redirect_uri=callback_uri,
         auth_config_id=conn.auth_config_id,
     )
     conn.composio_user_id = user_ref
@@ -171,17 +174,25 @@ async def create_provider_connect_link(
 @router.get("/callback", response_model=ProviderCallbackRead)
 def provider_callback(
     provider_connection_id: uuid.UUID,
-    tu: TenantUser,
     db: DB,
     status_value: str = Query("connected", alias="status"),
-    connected_account_id: str | None = None,
+    connected_account_id: str | None = Query(None, alias="connected_account_id"),
+    connected_account_id_camel: str | None = Query(None, alias="connectedAccountId"),
 ):
-    tenant, user = tu
-    conn = _get_connection(db, tenant, provider_connection_id)
+    # Public endpoint — called by browser redirect from Composio OAuth flow.
+    # provider_connection_id in the URL is the only identifier; no auth headers possible.
+    conn = db.execute(
+        select(ProviderConnection).where(ProviderConnection.id == provider_connection_id)
+    ).scalar_one_or_none()
+    if not conn:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Provider connection not found")
+
     status_map = {
         "ACTIVE": "connected",
         "active": "connected",
         "connected": "connected",
+        "success": "connected",
+        "SUCCESS": "connected",
         "INITIATED": "pending_consent",
         "initiated": "pending_consent",
         "FAILED": "failed",
@@ -193,13 +204,14 @@ def provider_callback(
         "revoked": "revoked",
     }
     conn.status = status_map.get(status_value, "failed")
-    conn.connected_account_id = connected_account_id or conn.connected_account_id
+    resolved_account_id = connected_account_id or connected_account_id_camel
+    conn.connected_account_id = resolved_account_id or conn.connected_account_id
     conn.status_reason = f"Composio callback status: {status_value}"
     conn.last_checked_at = datetime.now(timezone.utc)
     db.add(
         AuditEvent(
-            client_id=tenant.id,
-            actor_id=user.id,
+            client_id=conn.client_id,
+            actor_id=None,
             action="provider_connection.callback_recorded",
             resource_type="provider_connection",
             resource_id=conn.id,
@@ -239,7 +251,12 @@ async def sync_provider(
 
     conn.status = "syncing"
     db.flush()
-    result = await composio.trigger_sync(client_id=tenant.id, provider=conn.provider)
+    user_ref = conn.composio_user_id or composio_user_id(tenant.id, user.id)
+    result = await composio.trigger_sync(
+        client_id=tenant.id,
+        provider=conn.provider,
+        composio_user_id=user_ref,
+    )
     conn.status = "ready" if not result.errors else "degraded"
     conn.status_reason = "; ".join(result.errors) if result.errors else "First sync verified."
     conn.last_sync_at = datetime.now(timezone.utc)
@@ -268,6 +285,7 @@ async def sync_provider(
             "provider_connection_id": str(conn.id),
             "records_synced": result.records_synced,
             "status": conn.status,
+            "items": result.items,
         },
     )
     db.add(normalized_item)

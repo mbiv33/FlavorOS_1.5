@@ -1,6 +1,7 @@
 """Adapter contract smoke tests — stubs return safe defaults."""
 
 import uuid
+from unittest.mock import patch
 
 import pytest
 
@@ -9,6 +10,8 @@ from app.adapters import (
     StubGBrainAdapter,
     StubOrchestratorAdapter,
 )
+from app.config import Settings
+from app.deps import get_composio
 
 
 @pytest.mark.asyncio
@@ -36,3 +39,28 @@ async def test_stub_orchestrator_launch_returns_result():
     )
     assert result.run_id is not None
     assert result.status == "completed"
+
+
+def test_composio_injection_returns_stub_when_no_api_key():
+    stub_settings = Settings(
+        database_url="sqlite://",
+        api_skip_startup_seed=True,
+        jwt_secret="test-secret",
+        composio_api_key="",
+    )
+    adapter = get_composio(stub_settings)
+    assert isinstance(adapter, StubComposioAdapter)
+
+
+def test_composio_injection_returns_real_when_api_key_set():
+    from app.adapters import RealComposioAdapter
+
+    real_settings = Settings(
+        database_url="sqlite://",
+        api_skip_startup_seed=True,
+        jwt_secret="test-secret",
+        composio_api_key="test-api-key",
+    )
+    with patch("app.adapters.composio.RealComposioAdapter.__init__", return_value=None):
+        adapter = get_composio(real_settings)
+    assert isinstance(adapter, RealComposioAdapter)
