@@ -1,107 +1,90 @@
+"use client";
+
 import Link from "next/link";
 import { SurfaceFrame, SurfaceSection } from "@/components/SurfaceFrame";
 import { StatStrip } from "@/components/StatStrip";
-import { PileRow, type PileDef } from "@/components/PileRow";
-import { StatusChip } from "@/components/StatusChip";
-import { DataTable, type Column } from "@/components/DataTable";
-import {
-  reportsItems,
-  reportsStats,
-  type ArtifactPileItem,
-  type ReportsPile,
-} from "@/lib/fixtures";
+import { PileRow } from "@/components/PileRow";
+import { Card } from "@/components/Card";
+import { useReportsData } from "@/lib/hooks/useReportsData";
 
-const PILE_DEF: Record<
-  ReportsPile,
-  { label: string; tone: "violet" | "blue" | "emerald"; subtitle: string }
-> = {
-  reports: {
-    label: "Reports",
-    tone: "violet",
-    subtitle: "Formal reports across contexts",
-  },
-  briefs: {
-    label: "Briefs",
-    tone: "blue",
-    subtitle: "Project & travel briefs",
-  },
-  drafts: {
-    label: "Drafts",
-    tone: "emerald",
-    subtitle: "Outbound drafts in flight",
-  },
-};
-
-const PILE_ORDER: ReportsPile[] = ["reports", "briefs", "drafts"];
-
-const COLUMNS: Column<ArtifactPileItem>[] = [
-  {
-    key: "title",
-    header: "Title",
-    render: (r) => <span className="font-medium">{r.title}</span>,
-  },
-  { key: "type", header: "Type", render: (r) => r.artifactType },
-  { key: "context", header: "Context", render: (r) => r.context },
-  { key: "agent", header: "Prepared by", render: (r) => r.agent },
-  {
-    key: "status",
-    header: "Status",
-    render: (r) => <StatusChip status={r.status} />,
-  },
-  {
-    key: "updated",
-    header: "Updated",
-    render: (r) => <span className="text-muted">{r.updated}</span>,
-  },
-];
-
-export default function ReportsArtifactsPage() {
-  const piles: PileDef[] = PILE_ORDER.map((key) => {
-    const def = PILE_DEF[key];
-    return {
-      key,
-      label: def.label,
-      tone: def.tone,
-      subtitle: def.subtitle,
-      items: reportsItems
-        .filter((i) => i.pile === key)
-        .map((r) => ({
-          id: r.id,
-          kind: r.kind,
-          title: r.title,
-          status: r.status,
-          agent: r.agent,
-          detail: `${r.artifactType} · ${r.context}`,
-          when: r.updated,
-          sourceLinkLabel: r.sourceLinkLabel,
-        })),
-    };
-  });
+export default function ReportsPage() {
+  const { piles, stats, tableRows, loading, error } = useReportsData();
 
   return (
     <SurfaceFrame
-      title="Reports & Artifacts"
-      description="Generated work product, drafts, and reports — across every context."
+      title="Reports"
+      description="Weekly updates, metrics, and reporting artifacts."
       action={
         <Link
-          href="/meetings/reports-artifacts"
+          href="/meetings/reports"
           className="rounded-md border border-border-strong px-3 py-1.5 text-xs font-medium hover:bg-surface-muted"
         >
           Open meeting
         </Link>
       }
     >
-      <SurfaceSection title="Stats">
-        <StatStrip stats={reportsStats} />
-      </SurfaceSection>
+      {error ? (
+        <p className="rounded-md bg-rose-50 px-4 py-3 text-sm text-rose-800">{error}</p>
+      ) : loading ? (
+        <p className="text-sm text-muted">Loading reports…</p>
+      ) : (
+        <>
+          <SurfaceSection title="Stats">
+            <StatStrip stats={stats} />
+          </SurfaceSection>
 
-      <SurfaceSection title="Piles">
-        <PileRow piles={piles} />
-      </SurfaceSection>
+          <SurfaceSection title="Piles">
+            {piles.every((p) => p.items.length === 0) ? (
+              <p className="text-sm text-muted">
+                No report items yet — updates will appear after the first provider sync.
+              </p>
+            ) : (
+              <PileRow piles={piles} />
+            )}
+          </SurfaceSection>
 
-      <SurfaceSection title="Document Product Library">
-        <DataTable columns={COLUMNS} rows={reportsItems} />
-      </SurfaceSection>
+          <SurfaceSection title="Recent reports">
+            <Card>
+              {tableRows.length === 0 ? (
+                <p className="text-sm text-muted">No report rows from sync yet.</p>
+              ) : (
+                <ReportsTable rows={tableRows} />
+              )}
+            </Card>
+          </SurfaceSection>
+        </>
+      )}
     </SurfaceFrame>
+  );
+}
+
+function ReportsTable({
+  rows,
+}: {
+  rows: { id: string; title: string; status: string; updated: string; agent: string }[];
+}) {
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-left text-sm">
+        <thead>
+          <tr className="border-b border-border text-xs text-muted">
+            <th className="pb-2 font-medium">Report</th>
+            <th className="pb-2 font-medium">Status</th>
+            <th className="pb-2 font-medium">Updated</th>
+            <th className="pb-2 font-medium">Owner</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr key={row.id} className="border-b border-border last:border-0">
+              <td className="py-2.5 font-medium">{row.title}</td>
+              <td className="py-2.5 text-muted">{row.status}</td>
+              <td className="py-2.5 text-muted">{row.updated}</td>
+              <td className="py-2.5 text-muted">{row.agent}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }

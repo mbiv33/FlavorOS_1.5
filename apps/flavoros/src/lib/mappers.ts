@@ -1,3 +1,7 @@
+import type { PileListItem } from "@/components/PileItemList";
+import type { PileDef, PileTone } from "@/components/PileRow";
+import type { Stat, StatTone } from "@/components/StatStrip";
+
 import type { ArtifactRead, ApprovalRead } from "./api";
 import type {
   BriefingDefinition,
@@ -7,7 +11,7 @@ import type {
 import { BRIEFING_DEFINITIONS } from "./briefings-config";
 import type { InboxItem, InboxPile, CardStatus } from "./fixtures";
 
-function relativeTime(iso: string): string {
+export function relativeTime(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
   const mins = Math.floor(diff / 60000);
   if (mins < 1) return "just now";
@@ -129,4 +133,211 @@ export function briefingAttentionItems(
       .map(artifactToInboxItem),
   ];
   return items.slice(0, 6);
+}
+
+export type PileMeta = {
+  label: string;
+  tone: PileTone;
+  subtitle: string;
+};
+
+const INBOX_PILE_ORDER: InboxPile[] = ["urgent", "needs-attention", "updates"];
+
+/** Map API inbox pile to a surface-specific pile key (same order as typical 3-pile surfaces). */
+export function mapInboxPileToSurface<K extends string>(
+  item: InboxItem,
+  pileOrder: readonly K[],
+): K {
+  const idx = INBOX_PILE_ORDER.indexOf(item.pile);
+  const safeIdx = idx < 0 ? pileOrder.length - 1 : Math.min(idx, pileOrder.length - 1);
+  return pileOrder[safeIdx];
+}
+
+export function inboxItemToPileListItem(item: InboxItem): PileListItem {
+  return {
+    id: item.id,
+    kind: item.kind,
+    title: item.title,
+    status: item.status,
+    agent: item.agent,
+    detail: item.detail,
+    when: item.when,
+    canDefer: item.canDefer,
+    sourceLinkLabel: item.sourceLinkLabel,
+    approvalId: item.approvalId,
+  };
+}
+
+export function buildPileDefs<K extends string>(
+  items: InboxItem[],
+  pileOrder: readonly K[],
+  pileMeta: Record<K, PileMeta>,
+): PileDef[] {
+  return pileOrder.map((key) => {
+    const meta = pileMeta[key];
+    const pileItems = items
+      .filter((item) => mapInboxPileToSurface(item, pileOrder) === key)
+      .map(inboxItemToPileListItem);
+    return {
+      key,
+      label: meta.label,
+      tone: meta.tone,
+      subtitle: meta.subtitle,
+      items: pileItems,
+    };
+  });
+}
+
+export type ChannelStatLabels = {
+  pending?: string;
+  ready?: string;
+  drafts?: string;
+  approved?: string;
+};
+
+export function buildChannelStats(
+  artifacts: ArtifactRead[],
+  approvals: ApprovalRead[],
+  labels?: ChannelStatLabels,
+): Stat[] {
+  const pending = approvals.length;
+  const ready = artifacts.filter((a) => a.status === "ready").length;
+  const drafts = artifacts.filter((a) => a.status === "draft").length;
+  const approved = artifacts.filter((a) => a.status === "approved").length;
+
+  const stat = (
+    id: string,
+    label: string,
+    value: number,
+    tone: StatTone,
+  ): Stat => ({ id, label, value: String(value), tone });
+
+  return [
+    stat(
+      "pending",
+      labels?.pending ?? "Pending approvals",
+      pending,
+      pending > 0 ? "attention" : "ok",
+    ),
+    stat(
+      "ready",
+      labels?.ready ?? "Ready for review",
+      ready,
+      ready > 0 ? "attention" : "ok",
+    ),
+    stat(
+      "drafts",
+      labels?.drafts ?? "Drafts",
+      drafts,
+      drafts > 0 ? "neutral" : "ok",
+    ),
+    stat(
+      "approved",
+      labels?.approved ?? "Approved",
+      approved,
+      approved > 0 ? "ok" : "neutral",
+    ),
+  ];
+}
+
+export function artifactHighlightDays(artifacts: ArtifactRead[]): number[] {
+  const now = new Date();
+  const month = now.getMonth();
+  const year = now.getFullYear();
+  const days = new Set<number>();
+  for (const a of artifacts) {
+    const d = new Date(a.updated_at);
+    if (d.getMonth() === month && d.getFullYear() === year) {
+      days.add(d.getDate());
+    }
+  }
+  return [...days].sort((a, b) => a - b);
+}
+
+export function buildCurrentMonthGrid(): {
+  label: string;
+  weekdays: string[];
+  weeks: Array<Array<number | null>>;
+  today: number;
+} {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth();
+  const label = now.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+  const weekdays = ["S", "M", "T", "W", "Th", "F", "S"];
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const cells: Array<number | null> = [
+    ...Array.from({ length: firstDay }, () => null),
+    ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
+  ];
+  while (cells.length % 7 !== 0) cells.push(null);
+  const weeks: Array<Array<number | null>> = [];
+  for (let i = 0; i < cells.length; i += 7) {
+    weeks.push(cells.slice(i, i + 7));
+  }
+  return { label, weekdays, weeks, today: now.getDate() };
+}
+
+export type GoalChip = {
+  id: string;
+  label: string;
+  value: string;
+  detail: string;
+  tone: StatTone;
+};
+
+/** Milestone chips from live artifacts; empty when none. */
+export function buildGoalChips(artifacts: ArtifactRead[]): GoalChip[] {
+  const actionable = artifacts.filter(
+    (a) => a.status === "ready" || a.status === "draft" || a.status === "approved",
+  );
+  if (actionable.length === 0) return [];
+
+  return actionable.slice(0, 4).map((a) => {
+    let tone: StatTone = "ok";
+    if (a.status === "ready") tone = "attention";
+    if (a.status === "draft") tone = "neutral";
+    return {
+      id: a.id,
+      label: a.title.slice(0, 28),
+      value: a.status === "approved" ? "Done" : a.status,
+      detail: relativeTime(a.updated_at),
+      tone,
+    };
+  });
+}
+
+export type ContactGroup = {
+  context: string;
+  contacts: { id: string; name: string; meta: string }[];
+};
+
+export type TripSummary = {
+  id: string;
+  title: string;
+  phase: string;
+  when: string;
+  summary: string;
+};
+
+export function buildTripSummaries(artifacts: ArtifactRead[]): TripSummary[] {
+  if (artifacts.length === 0) return [];
+  return artifacts.slice(0, 4).map((a) => ({
+    id: a.id,
+    title: a.title.slice(0, 48),
+    phase: a.status,
+    when: relativeTime(a.updated_at),
+    summary: a.body?.slice(0, 120) ?? "Synced from your connected providers.",
+  }));
+}
+
+export function buildContactGroups(artifacts: ArtifactRead[]): ContactGroup[] {
+  if (artifacts.length === 0) return [];
+  const recent = artifacts.slice(0, 6).map((a, i) => ({
+    id: `contact-${a.id}`,
+    name: a.title.slice(0, 40),
+    meta: `${a.kind} · ${relativeTime(a.updated_at)}`,
+  }));
+  return [{ context: "Recent sync", contacts: recent }];
 }

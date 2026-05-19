@@ -46,13 +46,26 @@
 | B — API tests 4/5 | Was slice steps 4–5 | `done` | `test_provider_first_sync.py`, `test_approvals_decide.py` |
 | D — Env + smoke | Was slice step 1 | `done` | `scripts/smoke-vertical-slice.sh` |
 | F — Settings | Was slice step 3 | `done` | `useSettingsData` |
-| I — Channel surfaces | Was slice step 3 | `in_progress` | Briefings on API; calendar/comms still fixtures |
+| I — Channel surfaces | Was slice step 3 | `done` | I0–I6: `useChannelData`, all channel pages + CC widgets on API |
 | J — Write-back | Slice step 5 + stable decide | `blocked` | MVP step 7 |
+
+## Lane I sub-lanes (complete)
+
+| Sub-lane | Owner | Status | Branch | Notes |
+|---|---|---|---|---|
+| I0 — Channel foundation | Session | `done` | — | `useChannelData.ts`, append-only `mappers.ts` helpers |
+| I1 — Communications | Session | `done` | — | `useCommunicationsData`, `communications-config.ts` |
+| I2 — Calendar | Session | `done` | — | `useCalendarData`, `MiniCalendar` props |
+| I3 — Projects + Reports | Session | `done` | — | `useProjectsData`, `useReportsData` |
+| I4 — Travel | Session | `done` | — | `useTravelData` |
+| I5 — Meetings | Session | `done` | — | `useMeetingsData`, `MeetingTopicView` |
+| I6 — CC widgets | Session | `done` | — | `GoalsStrip` + `MiniCalendar` on Command Center |
 
 ## Session log (last 5 entries)
 
 | Date | Agent | Lane | Action |
 |---|---|---|---|
+| 2026-05-19 | Session | I (I0–I6) | Channel surfaces: useChannelData + hooks/configs; pytest 22 pass; tsc clean; smoke OK |
 | 2026-05-19 | Parallel plan | E, H, D, tracker | Plan implementation: freeze zone in tracker, CI workflow, gbrain integration doc, smoke script |
 | 2026-05-19 | Subagent | I | Briefings wired: useBriefingsData, mappers, briefings-config |
 | 2026-05-19 | Planning sync | G | Handoff + assessment + runbook sync |

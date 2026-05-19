@@ -27,6 +27,7 @@ Documented in [build_vertical_slice_tasks.md](./build_vertical_slice_tasks.md). 
 | **C** — Admin console | Done | Live `/admin` via `admin-api.ts`, `admin-surfaces.ts`, `AdminSurfacePanel`, `useAdminOverview` |
 | **F** — Settings | Done | `useSettingsData` → `getProfile` + `listProviderConnections` |
 | **G** — Docs | Done | [local_dev_runbook.md](./local_dev_runbook.md), tracker updates |
+| **I** — Channel surfaces | Done | `useChannelData`, I1–I6 surfaces + CC widgets on API data |
 
 **Slice lock:** `complete` — post-slice work is allowed; avoid drive-by edits to slice-owned files unless tasked.
 
@@ -61,23 +62,12 @@ Before first commit: update your lane row in [parallel_lanes_tracker.md](./paral
 
 ## Ready work (pick one lane per session)
 
-### Lane I — Channel surfaces (recommended next UI work)
+### Lane I — Channel surfaces (complete)
 
-**Status:** `ready`  
-**Goal:** Replace `fixtures.ts` on remaining `(client)` pages with API data using the same pattern as Command Center.
+**Status:** `done`  
+**Delivered:** `useChannelData.ts` + per-surface `*-config.ts` / `use*Data` hooks; communications, calendar, projects, reports, travel, meetings (+ topic detail), briefings, and Command Center goals/calendar widgets wired to live artifacts/approvals. Honest empty states; no fixture display rows on those pages.
 
-**Pattern to copy:**
-
-- `apps/flavoros/src/lib/mappers.ts` — artifact/approval → inbox piles
-- `apps/flavoros/src/lib/hooks/useCommandCenterData.ts`
-- `apps/flavoros/src/app/(client)/command-center/page.tsx`
-
-**Still fixture-driven (start here):**
-
-- `(client)/calendar`, `communications`, `travel`, `briefings/*`, `meetings/*`
-- `components/GoalsStrip.tsx`, `components/MiniCalendar.tsx`
-
-**Acceptance:** Page loads with session; data from `GET /artifacts` and/or `GET /approvals` where appropriate; empty states when `[]`; no regression on Command Center.
+**Pattern for future surfaces:** `useChannelData` → surface config → `buildPileDefs` / mapper helpers (see `briefings-config.ts`, `useBriefingsData.ts`).
 
 ---
 
@@ -120,14 +110,12 @@ Before first commit: update your lane row in [parallel_lanes_tracker.md](./paral
 flowchart TD
   start[New session]
   smoke[Lane D: smoke script optional]
-  channel[Lane I: one channel surface at a time]
   ci[Lane E: pytest in CI]
   gbrain[Lane H: GBrain when prioritized]
   writeback[Lane J: write-back when unblocked]
 
   start --> smoke
-  smoke --> channel
-  channel --> ci
+  smoke --> ci
   ci --> gbrain
   gbrain --> writeback
 ```
@@ -135,7 +123,6 @@ flowchart TD
 | Week | Focus | Outcome |
 |---|---|---|
 | 1 | Lane D + dogfood slice + refresh any bugs | Repeatable local + optional CI smoke |
-| 1–2 | Lane I (1–2 surfaces) | Calendar or briefings on real API |
 | 2 | Lane E | API tests run on every PR |
 | 3+ | Lane H or J | Platform depth vs outbound trust boundary |
 
@@ -171,8 +158,9 @@ curl -sf http://127.0.0.1:8001/health
 | Admin UI panel | `apps/flavoros/src/components/admin/AdminSurfacePanel.tsx` |
 | Settings hook | `apps/flavoros/src/lib/hooks/useSettingsData.ts` |
 | Command Center mappers | `apps/flavoros/src/lib/mappers.ts` |
+| Shared channel loader | `apps/flavoros/src/lib/hooks/useChannelData.ts` |
 | Sync processor | `services/api/app/workflows/provider_first_sync.py` |
-| Fixtures (remaining) | `apps/flavoros/src/lib/fixtures.ts` |
+| Fixtures (types only) | `apps/flavoros/src/lib/fixtures.ts` — display arrays unused on client routes |
 | Production app | `https://flavoros.vercel.app` |
 
 ---

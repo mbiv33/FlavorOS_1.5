@@ -1,46 +1,39 @@
+"use client";
+
+import Link from "next/link";
 import { SurfaceFrame, SurfaceSection } from "@/components/SurfaceFrame";
-import { LaunchCard } from "@/components/LaunchCard";
-import { meetings } from "@/lib/fixtures";
+import { Card } from "@/components/Card";
+import { useMeetingsData } from "@/lib/hooks/useMeetingsData";
 
-const CHANNEL_HREF: Record<keyof typeof meetings, string | null> = {
-  communications: "/communications",
-  calendar: "/calendar",
-  travel: "/travel",
-  projects: "/projects",
-  "reports-artifacts": "/reports",
-  general: null,
-};
+export default function MeetingsPage() {
+  const { meetingCards, loading, error } = useMeetingsData();
 
-export default function MeetingsLauncher() {
   return (
     <SurfaceFrame
       title="Meetings"
-      description="Open a focused, topic-scoped session with FlavorOS over a channel surface."
+      description="Channel meetings — prep, agenda, and linked inbox items."
     >
-      <SurfaceSection title="Pick a topic">
-        <div className="grid gap-3 sm:grid-cols-2">
-          {(Object.keys(meetings) as Array<keyof typeof meetings>).map(
-            (topic) => {
-              const m = meetings[topic];
-              const channelHref = CHANNEL_HREF[topic];
-              return (
-                <LaunchCard
-                  key={topic}
-                  title={m.title}
-                  meta={m.preparedSummary}
-                  statusLine={`${m.openApprovals} open approvals · ${m.artifactCount} artifacts · ${m.lastUpdate}`}
-                  primaryHref={`/meetings/${topic}`}
-                  primaryLabel="Open meeting"
-                  secondaryHref={channelHref ?? undefined}
-                  secondaryLabel={
-                    channelHref ? "Open channel surface" : undefined
-                  }
-                />
-              );
-            },
-          )}
-        </div>
-      </SurfaceSection>
+      {error ? (
+        <p className="rounded-md bg-rose-50 px-4 py-3 text-sm text-rose-800">{error}</p>
+      ) : loading ? (
+        <p className="text-sm text-muted">Loading meetings…</p>
+      ) : (
+        <SurfaceSection title="Channels">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {meetingCards.map((m) => (
+              <Link key={m.topic} href={m.href}>
+                <Card className="h-full transition-colors hover:border-ring">
+                  <p className="text-sm font-semibold">{m.title}</p>
+                  <p className="mt-1 text-xs text-muted">{m.description}</p>
+                  <p className="mt-3 text-xs font-medium text-muted-strong">
+                    {m.count} item{m.count === 1 ? "" : "s"} in inbox
+                  </p>
+                </Card>
+              </Link>
+            ))}
+          </div>
+        </SurfaceSection>
+      )}
     </SurfaceFrame>
   );
 }

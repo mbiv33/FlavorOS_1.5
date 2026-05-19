@@ -1,61 +1,16 @@
+"use client";
+
 import Link from "next/link";
 import { SurfaceFrame, SurfaceSection } from "@/components/SurfaceFrame";
 import { StatStrip } from "@/components/StatStrip";
-import { PileRow, type PileDef } from "@/components/PileRow";
+import { PileRow } from "@/components/PileRow";
 import { MiniCalendar } from "@/components/MiniCalendar";
 import { Card } from "@/components/Card";
-import {
-  calendarPileItems,
-  calendarStats,
-  type CalendarPile,
-} from "@/lib/fixtures";
-
-const PILE_DEF: Record<
-  CalendarPile,
-  { label: string; tone: "violet" | "rose" | "blue"; subtitle: string }
-> = {
-  today: {
-    label: "Today",
-    tone: "violet",
-    subtitle: "Events scheduled today",
-  },
-  conflicts: {
-    label: "Conflicts",
-    tone: "rose",
-    subtitle: "Overlapping commitments needing resolution",
-  },
-  upcoming: {
-    label: "Upcoming",
-    tone: "blue",
-    subtitle: "Next 7 days",
-  },
-};
-
-const PILE_ORDER: CalendarPile[] = ["today", "conflicts", "upcoming"];
+import { useCalendarData } from "@/lib/hooks/useCalendarData";
 
 export default function CalendarPage() {
-  const piles: PileDef[] = PILE_ORDER.map((key) => {
-    const def = PILE_DEF[key];
-    return {
-      key,
-      label: def.label,
-      tone: def.tone,
-      subtitle: def.subtitle,
-      items: calendarPileItems
-        .filter((i) => i.pile === key)
-        .map((c) => ({
-          id: c.id,
-          kind: c.kind,
-          title: c.title,
-          status: c.status,
-          agent: c.agent,
-          detail: `${c.context} · ${c.detail}`,
-          when: c.when,
-          canDefer: c.canDefer,
-          sourceLinkLabel: c.sourceLinkLabel,
-        })),
-    };
-  });
+  const { piles, stats, month, highlightDates, todayItems, loading, error } =
+    useCalendarData();
 
   return (
     <SurfaceFrame
@@ -70,33 +25,73 @@ export default function CalendarPage() {
         </Link>
       }
     >
-      <SurfaceSection title="Stats">
-        <StatStrip stats={calendarStats} />
-      </SurfaceSection>
+      {error ? (
+        <p className="rounded-md bg-rose-50 px-4 py-3 text-sm text-rose-800">{error}</p>
+      ) : loading ? (
+        <p className="text-sm text-muted">Loading calendar…</p>
+      ) : (
+        <>
+          <SurfaceSection title="Stats">
+            <StatStrip stats={stats} />
+          </SurfaceSection>
 
-      <SurfaceSection title="Piles">
-        <PileRow piles={piles} />
-      </SurfaceSection>
+          <SurfaceSection title="Piles">
+            {piles.every((p) => p.items.length === 0) ? (
+              <p className="text-sm text-muted">
+                No calendar items yet — events will appear after the first provider sync.
+              </p>
+            ) : (
+              <PileRow piles={piles} />
+            )}
+          </SurfaceSection>
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
-        <SurfaceSection title="Today">
-          <Card>
-            <ul className="divide-y divide-border">
-              {calendarPileItems
-                .filter((c) => c.pile === "today")
-                .map((c) => (
-                  <li key={c.id} className="py-3 first:pt-0 last:pb-0">
-                    <p className="text-sm font-medium">{c.title}</p>
-                    <p className="text-xs text-muted">{c.detail}</p>
-                  </li>
-                ))}
-            </ul>
-          </Card>
-        </SurfaceSection>
-        <SurfaceSection title="Month">
-          <MiniCalendar />
-        </SurfaceSection>
-      </div>
+          <CalendarTodayGrid
+            todayItems={todayItems}
+            month={month}
+            highlightDates={highlightDates}
+          />
+        </>
+      )}
     </SurfaceFrame>
+  );
+}
+
+function CalendarTodayGrid({
+  todayItems,
+  month,
+  highlightDates,
+}: {
+  todayItems: { id: string; title: string; detail: string }[];
+  month: { label: string; weekdays: string[]; weeks: Array<Array<number | null>>; today: number };
+  highlightDates: number[];
+}) {
+  return (
+    <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
+      <SurfaceSection title="Today">
+        <Card>
+          {todayItems.length === 0 ? (
+            <p className="text-sm text-muted">Nothing scheduled for today from sync.</p>
+          ) : (
+            <ul className="divide-y divide-border">
+              {todayItems.map((c) => (
+                <li key={c.id} className="py-3 first:pt-0 last:pb-0">
+                  <p className="text-sm font-medium">{c.title}</p>
+                  <p className="text-xs text-muted">{c.detail}</p>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
+      </SurfaceSection>
+      <SurfaceSection title="Month">
+        <MiniCalendar
+          label={month.label}
+          weekdays={month.weekdays}
+          weeks={month.weeks}
+          today={month.today}
+          highlightDates={highlightDates}
+        />
+      </SurfaceSection>
+    </div>
   );
 }

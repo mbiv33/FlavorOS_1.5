@@ -1,7 +1,20 @@
-import { calendarMonth } from "@/lib/fixtures";
+export type MiniCalendarProps = {
+  label?: string;
+  weekdays?: string[];
+  weeks?: Array<Array<number | null>>;
+  today?: number;
+  highlightDates?: number[];
+};
 
-export function MiniCalendar() {
-  const { label, weekdays, weeks, today, marked } = calendarMonth;
+const DEFAULT_WEEKDAYS = ["S", "M", "T", "W", "Th", "F", "S"];
+
+export function MiniCalendar({
+  label = "This month",
+  weekdays = DEFAULT_WEEKDAYS,
+  weeks = [],
+  today,
+  highlightDates = [],
+}: MiniCalendarProps) {
   return (
     <div className="rounded-xl border border-border bg-surface p-4">
       <div className="mb-3 flex items-center justify-between">
@@ -29,8 +42,8 @@ export function MiniCalendar() {
         ))}
         {weeks.flat().map((day, i) => {
           if (day === null) return <div key={i} />;
-          const isToday = day === today;
-          const isMarked = marked.includes(day);
+          const isToday = today !== undefined && day === today;
+          const isMarked = highlightDates.includes(day);
           return (
             <div key={i} className="flex items-center justify-center py-1">
               <span

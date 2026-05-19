@@ -8,13 +8,40 @@ import { GoalsStrip } from "@/components/GoalsStrip";
 import { MiniCalendar } from "@/components/MiniCalendar";
 import { Card, CardMeta, CardTitle } from "@/components/Card";
 import { useCommandCenterData } from "@/lib/hooks/useCommandCenterData";
-import { buildGreeting, todayDateLine } from "@/lib/mappers";
+import { useChannelData } from "@/lib/hooks/useChannelData";
+import {
+  artifactHighlightDays,
+  buildCurrentMonthGrid,
+  buildGoalChips,
+  buildGreeting,
+  relativeTime,
+  todayDateLine,
+} from "@/lib/mappers";
+import type { Stat } from "@/components/StatStrip";
 
 export default function CommandCenterPage() {
   const { profile, inboxItems, loading, error } = useCommandCenterData();
+  const {
+    artifacts,
+    loading: channelLoading,
+    error: channelError,
+  } = useChannelData();
 
   const greeting = profile ? buildGreeting(profile.display_name) : "Good day.";
   const dateLine = todayDateLine();
+  const goalStats: Stat[] = buildGoalChips(artifacts).map((g) => ({
+    id: g.id,
+    label: g.label,
+    value: g.value,
+    tone: g.tone,
+  }));
+  const month = buildCurrentMonthGrid();
+  const highlightDates = artifactHighlightDays(artifacts);
+  const eventCards = artifacts.slice(0, 3).map((a) => ({
+    id: a.id,
+    title: a.title,
+    meta: `${a.kind} · ${relativeTime(a.updated_at)}`,
+  }));
 
   return (
     <SurfaceFrame
@@ -37,7 +64,13 @@ export default function CommandCenterPage() {
           </Link>
         }
       >
-        <GoalsStrip />
+        {channelError ? (
+          <p className="text-sm text-rose-800">{channelError}</p>
+        ) : channelLoading ? (
+          <p className="text-sm text-muted">Loading milestones…</p>
+        ) : (
+          <GoalsStrip stats={goalStats} />
+        )}
       </SurfaceSection>
 
       {error ? (
@@ -51,7 +84,9 @@ export default function CommandCenterPage() {
               Client Inbox
             </h2>
           </header>
-          <p className="text-sm text-muted">No items yet — your inbox will populate after the first provider sync.</p>
+          <p className="text-sm text-muted">
+            No items yet — your inbox will populate after the first provider sync.
+          </p>
         </section>
       ) : (
         <ClientInbox items={inboxItems} />
@@ -67,20 +102,26 @@ export default function CommandCenterPage() {
       >
         <div className="grid gap-4 md:grid-cols-[1fr_320px]">
           <div className="space-y-3">
-            <Card>
-              <CardTitle>Team sync</CardTitle>
-              <CardMeta>Today · 10:30 AM · Calendar source</CardMeta>
-            </Card>
-            <Card>
-              <CardTitle>Board prep</CardTitle>
-              <CardMeta>Thursday · 2:00 PM · Calendar source</CardMeta>
-            </Card>
-            <Card>
-              <CardTitle>Atlanta site visit</CardTitle>
-              <CardMeta>May 24–26 · Travel</CardMeta>
-            </Card>
+            {channelLoading ? (
+              <p className="text-sm text-muted">Loading events…</p>
+            ) : eventCards.length === 0 ? (
+              <p className="text-sm text-muted">No events from sync yet.</p>
+            ) : (
+              eventCards.map((ev) => (
+                <Card key={ev.id}>
+                  <CardTitle>{ev.title}</CardTitle>
+                  <CardMeta>{ev.meta}</CardMeta>
+                </Card>
+              ))
+            )}
           </div>
-          <MiniCalendar />
+          <MiniCalendar
+            label={month.label}
+            weekdays={month.weekdays}
+            weeks={month.weeks}
+            today={month.today}
+            highlightDates={highlightDates}
+          />
         </div>
       </SurfaceSection>
     </SurfaceFrame>

@@ -1,87 +1,19 @@
+"use client";
+
 import Link from "next/link";
 import { SurfaceFrame, SurfaceSection } from "@/components/SurfaceFrame";
 import { StatStrip } from "@/components/StatStrip";
-import { PileRow, type PileDef } from "@/components/PileRow";
-import { StatusChip } from "@/components/StatusChip";
-import { DataTable, type Column } from "@/components/DataTable";
-import {
-  projectsItems,
-  projectsStats,
-  type ProjectPileItem,
-  type ProjectsPile,
-} from "@/lib/fixtures";
-
-const PILE_DEF: Record<
-  ProjectsPile,
-  { label: string; tone: "amber" | "rose" | "emerald"; subtitle: string }
-> = {
-  active: {
-    label: "Active",
-    tone: "amber",
-    subtitle: "In progress · awaiting your input",
-  },
-  blocked: {
-    label: "Blocked",
-    tone: "rose",
-    subtitle: "Held on missing input or external dependency",
-  },
-  completed: {
-    label: "Completed",
-    tone: "emerald",
-    subtitle: "Shipped this quarter",
-  },
-};
-
-const PILE_ORDER: ProjectsPile[] = ["active", "blocked", "completed"];
-
-const COLUMNS: Column<ProjectPileItem>[] = [
-  {
-    key: "title",
-    header: "Project",
-    render: (r) => <span className="font-medium">{r.title}</span>,
-  },
-  { key: "owner", header: "Owner", render: (r) => r.owner },
-  { key: "context", header: "Context", render: (r) => r.context },
-  { key: "next", header: "Next step", render: (r) => r.nextStep },
-  {
-    key: "status",
-    header: "Status",
-    render: (r) => <StatusChip status={r.status} />,
-  },
-  {
-    key: "due",
-    header: "Due",
-    render: (r) => <span className="text-muted">{r.dueAt}</span>,
-  },
-];
+import { PileRow } from "@/components/PileRow";
+import { Card } from "@/components/Card";
+import { useProjectsData } from "@/lib/hooks/useProjectsData";
 
 export default function ProjectsPage() {
-  const piles: PileDef[] = PILE_ORDER.map((key) => {
-    const def = PILE_DEF[key];
-    return {
-      key,
-      label: def.label,
-      tone: def.tone,
-      subtitle: def.subtitle,
-      items: projectsItems
-        .filter((i) => i.pile === key)
-        .map((p) => ({
-          id: p.id,
-          kind: p.kind,
-          title: p.title,
-          status: p.status,
-          agent: p.owner,
-          detail: `${p.context} · ${p.nextStep}`,
-          when: `Due ${p.dueAt}`,
-          sourceLinkLabel: p.sourceLinkLabel,
-        })),
-    };
-  });
+  const { piles, stats, tableRows, loading, error } = useProjectsData();
 
   return (
     <SurfaceFrame
       title="Projects"
-      description="Active projects, blockers, and next steps."
+      description="Active work, milestones, and project-linked artifacts."
       action={
         <Link
           href="/meetings/projects"
@@ -91,17 +23,58 @@ export default function ProjectsPage() {
         </Link>
       }
     >
-      <SurfaceSection title="Stats">
-        <StatStrip stats={projectsStats} />
-      </SurfaceSection>
+      {error ? (
+        <p className="rounded-md bg-rose-50 px-4 py-3 text-sm text-rose-800">{error}</p>
+      ) : loading ? (
+        <p className="text-sm text-muted">Loading projects…</p>
+      ) : (
+        <>
+          <SurfaceSection title="Stats">
+            <StatStrip stats={stats} />
+          </SurfaceSection>
 
-      <SurfaceSection title="Piles">
-        <PileRow piles={piles} />
-      </SurfaceSection>
+          <SurfaceSection title="Piles">
+            {piles.every((p) => p.items.length === 0) ? (
+              <p className="text-sm text-muted">
+                No project items yet — work will appear after the first provider sync.
+              </p>
+            ) : (
+              <PileRow piles={piles} />
+            )}
+          </SurfaceSection>
 
-      <SurfaceSection title="Tasks list">
-        <DataTable columns={COLUMNS} rows={projectsItems} />
-      </SurfaceSection>
+          <SurfaceSection title="Active projects">
+            <Card>
+              {tableRows.length === 0 ? (
+                <p className="text-sm text-muted">No project rows from sync yet.</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-sm">
+                    <thead>
+                      <tr className="border-b border-border text-xs text-muted">
+                        <th className="pb-2 font-medium">Project</th>
+                        <th className="pb-2 font-medium">Status</th>
+                        <th className="pb-2 font-medium">Due</th>
+                        <th className="pb-2 font-medium">Owner</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {tableRows.map((row) => (
+                        <tr key={row.id} className="border-b border-border last:border-0">
+                          <td className="py-2.5 font-medium">{row.title}</td>
+                          <td className="py-2.5 text-muted">{row.status}</td>
+                          <td className="py-2.5 text-muted">{row.dueAt}</td>
+                          <td className="py-2.5 text-muted">{row.owner}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </Card>
+          </SurfaceSection>
+        </>
+      )}
     </SurfaceFrame>
   );
 }
