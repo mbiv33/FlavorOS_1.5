@@ -58,8 +58,8 @@ Canonical repo homes:
 | Agent runtime and artifact flow | MVP plan | `partial` | Good API/doc coverage, but orchestrator remains stubbed |
 | Approval packet flow | MVP plan | `partial` | Models and routes exist; full execution flow remains incomplete |
 | Outbound sync to source systems | MVP plan | `missing_implementation` | Captured in `current_build_plan.md` and planned feature catalog; not implemented end-to-end |
-| Visible client app surface | MVP plan | `implemented` | `apps/client` shell exists with named MVP surfaces |
-| Visible admin/operator surface | MVP plan | `implemented` | `apps/admin` shell exists with diagnostics surfaces |
+| Visible client app surface | MVP plan | `implemented` | `apps/flavoros` contains the active client route tree |
+| Visible admin/operator surface | MVP plan | `implemented` | `apps/flavoros` contains the active `/admin` diagnostics route tree |
 | Finance foundation | MVP plan | `skill_protocol_only` | Strong skills/protocols, but not end-to-end connector-backed finance execution |
 | Multi-client OAuth maturity | MVP plan | `missing_implementation` | Retained as beyond-MVP scope; only partially represented through models and client envelope docs |
 | Future voice front door | MVP plan | `canonical_doc` | Explicitly deferred but retained in docs/UI future-state material |

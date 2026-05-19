@@ -80,6 +80,30 @@ class StubOrchestratorAdapter:
 
     _CATALOG: list[WorkflowDefinition] = [
         WorkflowDefinition(
+            workflow_type="client_onboarding",
+            label="Client Onboarding",
+            description="Create a governed Client Universe and provider readiness plan.",
+            owner_agent="khadijah",
+        ),
+        WorkflowDefinition(
+            workflow_type="provider_first_sync",
+            label="Provider First Sync",
+            description="Verify a connected provider and queue tenant-scoped review work.",
+            owner_agent="sinclair",
+        ),
+        WorkflowDefinition(
+            workflow_type="morning_standup_seed",
+            label="Morning Standup Seed",
+            description="Prepare first briefing state from onboarding context.",
+            owner_agent="khadijah",
+        ),
+        WorkflowDefinition(
+            workflow_type="travel_research_seed",
+            label="Travel Research Seed",
+            description="Prepare Regine's initial travel and research context.",
+            owner_agent="regine",
+        ),
+        WorkflowDefinition(
             workflow_type="morning_standup",
             label="Morning Standup",
             description="Daily briefing with prioritized agenda and pending approvals.",

@@ -12,7 +12,16 @@ from sqlalchemy.orm import Session
 
 from app.adapters import ComposioAdapter
 from app.deps import get_composio, get_db, require_tenant_match
-from app.models import AuditEvent, ProviderConnection, Tenant, User
+from app.models import (
+    AgentTask,
+    AuditEvent,
+    NormalizedItem,
+    ProviderConnection,
+    ProviderEvent,
+    Tenant,
+    User,
+    WorkflowRun,
+)
 from app.onboarding import composio_user_id, provider_catalog
 from app.schemas import (
     ProviderCallbackRead,
@@ -44,6 +53,20 @@ def _get_connection(db: Session, tenant: Tenant, provider_connection_id: uuid.UU
             status_code=status.HTTP_404_NOT_FOUND, detail="Provider connection not found"
         )
     return conn
+
+
+def _agent_for_provider(provider: str) -> str:
+    if provider in {"gmail", "googlecalendar"}:
+        return "sinclair"
+    return "khadijah"
+
+
+def _item_type_for_provider(provider: str) -> str:
+    return {
+        "gmail": "email_sync_receipt",
+        "googlecalendar": "calendar_sync_receipt",
+        "googledrive": "drive_sync_receipt",
+    }.get(provider, "provider_sync_receipt")
 
 
 @router.get("/catalog", response_model=list[ProviderCatalogItem])
@@ -220,6 +243,69 @@ async def sync_provider(
     conn.status_reason = "; ".join(result.errors) if result.errors else "First sync verified."
     conn.last_sync_at = datetime.now(timezone.utc)
     conn.last_checked_at = conn.last_sync_at
+    provider_event = ProviderEvent(
+        client_id=tenant.id,
+        provider_connection_id=conn.id,
+        provider=conn.provider,
+        event_type="provider_first_sync",
+        idempotency_key=f"{conn.id}:sync:{conn.last_sync_at.isoformat()}",
+        status="received",
+        payload={
+            "records_synced": result.records_synced,
+            "errors": result.errors,
+            "source": "providers.sync",
+        },
+    )
+    db.add(provider_event)
+    db.flush()
+    normalized_item = NormalizedItem(
+        client_id=tenant.id,
+        provider_event_id=provider_event.id,
+        item_type=_item_type_for_provider(conn.provider),
+        title=f"{conn.provider} first sync",
+        data={
+            "provider_connection_id": str(conn.id),
+            "records_synced": result.records_synced,
+            "status": conn.status,
+        },
+    )
+    db.add(normalized_item)
+    db.flush()
+    workflow_run = WorkflowRun(
+        client_id=tenant.id,
+        workflow_type="provider_first_sync",
+        agent=_agent_for_provider(conn.provider),
+        status="queued",
+        input_data={
+            "provider_connection_id": str(conn.id),
+            "provider_event_id": str(provider_event.id),
+            "normalized_item_id": str(normalized_item.id),
+            "provider": conn.provider,
+        },
+    )
+    db.add(workflow_run)
+    db.flush()
+    db.add(
+        AgentTask(
+            client_id=tenant.id,
+            workflow_run_id=workflow_run.id,
+            agent=workflow_run.agent or "khadijah",
+            task_type="provider_first_sync_review",
+            status="queued",
+            payload={
+                "schema_version": "flavoros.agent_task.v1",
+                "workflow_run_id": str(workflow_run.id),
+                "client_id": str(tenant.id),
+                "target_agent": workflow_run.agent,
+                "task_type": "provider_first_sync_review",
+                "source_refs": {
+                    "provider_event_id": str(provider_event.id),
+                    "normalized_item_id": str(normalized_item.id),
+                },
+                "inputs": workflow_run.input_data,
+            },
+        )
+    )
     db.add(
         AuditEvent(
             client_id=tenant.id,
@@ -231,17 +317,23 @@ async def sync_provider(
                 "provider": conn.provider,
                 "records_synced": result.records_synced,
                 "errors": result.errors,
+                "provider_event_id": str(provider_event.id),
+                "workflow_run_id": str(workflow_run.id),
             },
         )
     )
     db.commit()
     db.refresh(conn)
+    db.refresh(provider_event)
+    db.refresh(workflow_run)
     return {
         "provider_connection_id": conn.id,
         "provider": conn.provider,
         "status": conn.status,
         "records_synced": result.records_synced,
         "errors": result.errors,
+        "provider_event_id": provider_event.id,
+        "workflow_run_id": workflow_run.id,
     }
 
 

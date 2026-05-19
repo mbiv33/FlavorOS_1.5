@@ -7,13 +7,14 @@ Swap in real implementations via ``deps.py`` dependency overrides.
 """
 
 from app.adapters.composio import ComposioAdapter, StubComposioAdapter
-from app.adapters.gbrain import GBrainAdapter, StubGBrainAdapter
+from app.adapters.gbrain import GBrainAdapter, LocalFileGBrainAdapter, StubGBrainAdapter
 from app.adapters.orchestrator import OrchestratorAdapter, StubOrchestratorAdapter
 
 __all__ = [
     "ComposioAdapter",
     "StubComposioAdapter",
     "GBrainAdapter",
+    "LocalFileGBrainAdapter",
     "StubGBrainAdapter",
     "OrchestratorAdapter",
     "StubOrchestratorAdapter",

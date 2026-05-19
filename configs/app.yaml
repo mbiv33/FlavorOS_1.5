@@ -6,6 +6,6 @@ version: "0.1.0-mvp"
 description: Multi-tenant client operating system — MVP slice
 
 surfaces:
-  client_app: apps/client
-  admin_app: apps/admin
+  client_app: apps/flavoros
+  admin_app: apps/flavoros
   api_service: services/api

@@ -257,6 +257,41 @@ class WorkflowRun(Base):
     )
 
 
+class AgentTask(Base):
+    """Durable unit of work assigned to an agent for a workflow run."""
+
+    __tablename__ = "agent_tasks"
+    __table_args__ = (
+        Index("ix_agent_tasks_client_status", "client_id", "status"),
+        Index("ix_agent_tasks_client_agent", "client_id", "agent"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    client_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False
+    )
+    workflow_run_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("workflow_runs.id", ondelete="CASCADE"), nullable=False
+    )
+    agent: Mapped[str] = mapped_column(String(64), nullable=False)
+    task_type: Mapped[str] = mapped_column(String(128), nullable=False)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="queued")
+    payload: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    result: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        server_onupdate=func.now(),
+        nullable=False,
+    )
+
+
 # ---------------------------------------------------------------------------
 # Provider Connection — Composio / external provider link per tenant
 # ---------------------------------------------------------------------------
@@ -312,6 +347,61 @@ class ProviderConnection(Base):
         server_default=func.now(),
         server_onupdate=func.now(),
         nullable=False,
+    )
+
+
+class ProviderEvent(Base):
+    """Durable provider ingress/sync event before normalization or agent work."""
+
+    __tablename__ = "provider_events"
+    __table_args__ = (
+        Index("ix_provider_events_client_provider", "client_id", "provider"),
+        UniqueConstraint("client_id", "idempotency_key", name="uq_provider_events_idempotency"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    client_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False
+    )
+    provider_connection_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("provider_connections.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    provider: Mapped[str] = mapped_column(String(64), nullable=False)
+    event_type: Mapped[str] = mapped_column(String(128), nullable=False)
+    idempotency_key: Mapped[str] = mapped_column(String(255), nullable=False)
+    payload: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="received")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class NormalizedItem(Base):
+    """Provider-native event normalized into a FlavorOS-native item envelope."""
+
+    __tablename__ = "normalized_items"
+    __table_args__ = (
+        Index("ix_normalized_items_client_type", "client_id", "item_type"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    client_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False
+    )
+    provider_event_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("provider_events.id", ondelete="CASCADE"), nullable=False
+    )
+    item_type: Mapped[str] = mapped_column(String(64), nullable=False)
+    title: Mapped[str] = mapped_column(String(512), nullable=False)
+    data: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
     )
 
 

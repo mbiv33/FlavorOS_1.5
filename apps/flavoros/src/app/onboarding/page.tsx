@@ -1,17 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
-type AccountStatus =
-  | "not_started"
-  | "pending_consent"
-  | "connected"
-  | "syncing"
-  | "ready"
-  | "blocked"
-  | "failed"
-  | "revoked";
+import {
+  apiRequest,
+  loadSession,
+  OnboardingSaveResponse,
+  ProviderConnection,
+  ProviderConnectLinkResponse,
+  ProviderSyncResponse,
+  FlavorOSSession,
+} from "@/lib/api";
 
 type ContextAccount = {
   contextId: string;
@@ -22,11 +22,6 @@ type ContextAccount = {
   purpose: string;
   accountAlias: string;
   authScheme: "oauth" | "manual";
-};
-
-type PlannedConnection = ContextAccount & {
-  status: AccountStatus;
-  composioUserId: string;
 };
 
 const CONTEXT_ACCOUNTS: ContextAccount[] = [
@@ -72,12 +67,15 @@ const CONTEXT_ACCOUNTS: ContextAccount[] = [
   },
 ];
 
-const STATUS_LABELS: Record<AccountStatus, string> = {
+const STATUS_LABELS: Record<ProviderConnection["status"] | "not_planned", string> = {
+  not_planned: "Not planned",
   not_started: "Not started",
   pending_consent: "Pending consent",
+  initiated: "Initiated",
   connected: "Connected",
   syncing: "Syncing",
   ready: "Ready",
+  degraded: "Degraded",
   blocked: "Blocked",
   failed: "Failed",
   revoked: "Revoked",
@@ -90,9 +88,9 @@ const PROVIDER_LABELS: Record<ContextAccount["provider"], string> = {
   manual: "Manual",
 };
 
-function statusClasses(status: AccountStatus) {
+function statusClasses(status: ProviderConnection["status"] | "not_planned") {
   if (status === "ready") return "border-emerald-700 bg-emerald-50 text-emerald-800";
-  if (status === "connected" || status === "syncing") {
+  if (status === "connected" || status === "syncing" || status === "degraded") {
     return "border-sky-700 bg-sky-50 text-sky-800";
   }
   if (status === "failed" || status === "blocked" || status === "revoked") {
@@ -101,50 +99,205 @@ function statusClasses(status: AccountStatus) {
   return "border-border-strong bg-surface text-muted";
 }
 
-function nextStatus(status: AccountStatus): AccountStatus {
-  if (status === "not_started") return "pending_consent";
-  if (status === "pending_consent") return "connected";
-  if (status === "connected") return "ready";
-  return status;
+function onboardingPayload() {
+  return {
+    identity: {
+      display_name: "Marcus Bivines",
+      legal_name: "Marcus Bivines",
+      preferred_name: "Marcus",
+      timezone: "America/New_York",
+      locale: "en-US",
+    },
+    authority_defaults: {
+      outbound_comms: "draft_only",
+      calendar_commits: "approval_required",
+      travel_booking: "approval_required",
+      money_movement: "blocked_without_explicit_approval",
+    },
+    onboarding: { status: "pending" },
+    contexts: [
+      {
+        context_id: "business",
+        context_type: "business",
+        display_name: "Business",
+        status: "active",
+        context_accounts: CONTEXT_ACCOUNTS.filter((account) => account.contextId === "business").map(
+          (account) => ({
+            context_account_id: account.contextAccountId,
+            provider: account.provider,
+            context_account_purpose: account.purpose,
+            account_alias: account.accountAlias,
+            auth_scheme: account.authScheme,
+          }),
+        ),
+      },
+      {
+        context_id: "personal",
+        context_type: "personal",
+        display_name: "Personal",
+        status: "active",
+        context_accounts: CONTEXT_ACCOUNTS.filter((account) => account.contextId === "personal").map(
+          (account) => ({
+            context_account_id: account.contextAccountId,
+            provider: account.provider,
+            context_account_purpose: account.purpose,
+            account_alias: account.accountAlias,
+            auth_scheme: account.authScheme,
+          }),
+        ),
+      },
+    ],
+  };
 }
 
 export default function OnboardingPage() {
-  const [intakeSaved, setIntakeSaved] = useState(false);
-  const [connections, setConnections] = useState<PlannedConnection[]>([]);
+  const [session, setSession] = useState<FlavorOSSession | null>(null);
+  const [intake, setIntake] = useState<OnboardingSaveResponse | null>(null);
+  const [connections, setConnections] = useState<ProviderConnection[]>([]);
+  const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  useEffect(() => {
+    setSession(loadSession());
+  }, []);
 
   const eligibleAccounts = useMemo(
     () => CONTEXT_ACCOUNTS.filter((account) => account.authScheme === "oauth"),
     [],
   );
-  const displayedConnections: PlannedConnection[] = intakeSaved
-    ? connections
-    : eligibleAccounts.map((account) => ({
-        ...account,
-        status: "not_started",
-        composioUserId: "tenant:demo:user:current",
-      }));
-
   const readyCount = connections.filter((conn) => conn.status === "ready").length;
-  const canFinish = intakeSaved && readyCount === eligibleAccounts.length;
+  const canFinish = Boolean(intake) && readyCount === eligibleAccounts.length;
 
-  function saveIntake() {
-    setIntakeSaved(true);
-    setConnections(
-      eligibleAccounts.map((account) => ({
-        ...account,
-        status: "not_started",
-        composioUserId: "tenant:demo:user:current",
-      })),
-    );
+  async function saveIntake() {
+    if (!session) return;
+    setBusyId("intake");
+    setError(null);
+    setMessage(null);
+    try {
+      const result = await apiRequest<OnboardingSaveResponse>(
+        "/onboarding/save",
+        session,
+        {
+          method: "POST",
+          body: JSON.stringify(onboardingPayload()),
+        },
+      );
+      setIntake(result);
+      setConnections(result.provider_connections);
+      setMessage("Intake saved. Provider connections are planned in Postgres.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to save onboarding.");
+    } finally {
+      setBusyId(null);
+    }
   }
 
-  function advanceConnection(contextAccountId: string) {
-    setConnections((current) =>
-      current.map((conn) =>
-        conn.contextAccountId === contextAccountId
-          ? { ...conn, status: nextStatus(conn.status) }
-          : conn,
-      ),
+  async function createConnectLink(conn: ProviderConnection) {
+    if (!session) return;
+    setBusyId(conn.id);
+    setError(null);
+    setMessage(null);
+    try {
+      const result = await apiRequest<ProviderConnectLinkResponse>(
+        `/providers/${conn.provider}/connect-link`,
+        session,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            provider_connection_id: conn.id,
+            redirect_uri: `${window.location.origin}/onboarding`,
+          }),
+        },
+      );
+      setConnections((current) =>
+        current.map((item) =>
+          item.id === conn.id ? { ...item, status: result.status } : item,
+        ),
+      );
+      setMessage(`Connect link created for ${PROVIDER_LABELS[conn.provider]}.`);
+      if (!result.url.includes("stub=true")) {
+        window.location.href = result.url;
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to create connect link.");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function recordCallback(conn: ProviderConnection) {
+    if (!session) return;
+    setBusyId(conn.id);
+    setError(null);
+    setMessage(null);
+    try {
+      const result = await apiRequest<{ status: ProviderConnection["status"] }>(
+        `/providers/callback?provider_connection_id=${conn.id}&status=ACTIVE&connected_account_id=dev_${conn.context_account_id}`,
+        session,
+      );
+      setConnections((current) =>
+        current.map((item) => (item.id === conn.id ? { ...item, status: result.status } : item)),
+      );
+      setMessage(`${PROVIDER_LABELS[conn.provider]} callback recorded.`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to record callback.");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function verifySync(conn: ProviderConnection) {
+    if (!session) return;
+    setBusyId(conn.id);
+    setError(null);
+    setMessage(null);
+    try {
+      const result = await apiRequest<ProviderSyncResponse>(
+        `/providers/${conn.provider}/sync`,
+        session,
+        {
+          method: "POST",
+          body: JSON.stringify({ provider_connection_id: conn.id }),
+        },
+      );
+      setConnections((current) =>
+        current.map((item) => (item.id === conn.id ? { ...item, status: result.status } : item)),
+      );
+      setMessage(
+        `${PROVIDER_LABELS[conn.provider]} sync verified; workflow ${result.workflow_run_id} queued.`,
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to verify first sync.");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  function actionFor(conn: ProviderConnection) {
+    if (conn.status === "not_started") return () => createConnectLink(conn);
+    if (conn.status === "pending_consent" || conn.status === "initiated") {
+      return () => recordCallback(conn);
+    }
+    if (conn.status === "connected" || conn.status === "degraded") return () => verifySync(conn);
+    return undefined;
+  }
+
+  if (!session) {
+    return (
+      <main className="mx-auto min-h-screen max-w-xl bg-background px-6 py-10">
+        <h1 className="text-2xl font-semibold tracking-tight">Client onboarding</h1>
+        <p className="mt-3 text-sm text-muted">
+          Sign in first so onboarding can write tenant-scoped profile, provider, workflow,
+          and memory records.
+        </p>
+        <Link
+          href="/login"
+          className="mt-6 inline-flex rounded-md bg-accent px-4 py-2 text-sm font-medium text-accent-foreground"
+        >
+          Log in
+        </Link>
+      </main>
     );
   }
 
@@ -155,8 +308,8 @@ export default function OnboardingPage() {
           <p className="text-xs uppercase tracking-widest text-muted">FlavorOS</p>
           <h1 className="text-2xl font-semibold tracking-tight">Client onboarding</h1>
           <p className="max-w-2xl text-sm text-muted">
-            Intake creates the client profile, contexts, authority defaults, and
-            context accounts before provider auth begins.
+            Intake creates the client profile, contexts, authority defaults, provider
+            expectations, GBrain memory, and initial agent workflow tasks.
           </p>
         </div>
         <Link href="/" className="text-sm text-muted hover:text-foreground">
@@ -164,13 +317,15 @@ export default function OnboardingPage() {
         </Link>
       </div>
 
+      {message ? <p className="mt-5 rounded-md bg-emerald-50 p-3 text-sm text-emerald-800">{message}</p> : null}
+      {error ? <p className="mt-5 rounded-md bg-rose-50 p-3 text-sm text-rose-800">{error}</p> : null}
+
       <section className="mt-8 grid gap-4 md:grid-cols-[1fr_1.1fr]">
         <div className="rounded-lg border border-border bg-surface p-4">
           <div className="space-y-1">
-            <h2 className="text-sm font-medium">Saved intake</h2>
+            <h2 className="text-sm font-medium">Dev client intake</h2>
             <p className="text-xs text-muted">
-              Marcus Bivines · America/New_York · outbound communications are
-              draft-only.
+              Marcus Bivines · America/New_York · outbound communications are draft-only.
             </p>
           </div>
           <div className="mt-4 space-y-2">
@@ -195,9 +350,10 @@ export default function OnboardingPage() {
           <button
             type="button"
             onClick={saveIntake}
-            className="mt-4 w-full rounded-md bg-accent px-4 py-2 text-sm font-medium text-accent-foreground hover:opacity-90"
+            disabled={busyId === "intake"}
+            className="mt-4 w-full rounded-md bg-accent px-4 py-2 text-sm font-medium text-accent-foreground hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            Save intake
+            {busyId === "intake" ? "Saving..." : "Save intake"}
           </button>
         </div>
 
@@ -206,7 +362,7 @@ export default function OnboardingPage() {
             <div className="space-y-1">
               <h2 className="text-sm font-medium">Provider readiness</h2>
               <p className="text-xs text-muted">
-                {intakeSaved
+                {intake
                   ? `${connections.length} OAuth-backed context accounts planned`
                   : "Provider planning starts after intake is saved"}
               </p>
@@ -217,19 +373,23 @@ export default function OnboardingPage() {
           </div>
 
           <div className="mt-4 space-y-3">
-            {displayedConnections.map((conn) => {
-              const status = conn.status;
+            {eligibleAccounts.map((account) => {
+              const conn = connections.find(
+                (item) => item.context_account_id === account.contextAccountId,
+              );
+              const status = conn?.status ?? "not_planned";
+              const action = conn ? actionFor(conn) : undefined;
               return (
                 <div
-                  key={conn.contextAccountId}
+                  key={account.contextAccountId}
                   className="rounded-lg border border-border bg-background p-3"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <h3 className="text-sm font-medium">{conn.label}</h3>
+                      <h3 className="text-sm font-medium">{account.label}</h3>
                       <p className="text-xs text-muted">
-                        {conn.contextId} · {conn.contextAccountId} ·{" "}
-                        {PROVIDER_LABELS[conn.provider]}
+                        {account.contextId} · {account.contextAccountId} ·{" "}
+                        {PROVIDER_LABELS[account.provider]}
                       </p>
                     </div>
                     <span
@@ -243,15 +403,17 @@ export default function OnboardingPage() {
                   <div className="mt-3 flex flex-wrap gap-2">
                     <button
                       type="button"
-                      disabled={!intakeSaved || status === "ready"}
-                      onClick={() => advanceConnection(conn.contextAccountId)}
+                      disabled={!action || busyId === conn?.id}
+                      onClick={action}
                       className="rounded-md border border-border-strong px-3 py-1.5 text-xs font-medium text-foreground disabled:cursor-not-allowed disabled:opacity-40"
                     >
                       {status === "not_started"
                         ? "Create Connect Link"
-                        : status === "pending_consent"
+                        : status === "pending_consent" || status === "initiated"
                           ? "Record callback"
-                          : "Verify first sync"}
+                          : status === "connected" || status === "degraded"
+                            ? "Verify first sync"
+                            : "No action"}
                     </button>
                   </div>
                 </div>

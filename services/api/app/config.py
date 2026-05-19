@@ -35,6 +35,8 @@ class Settings(BaseSettings):
     dev_admin_password: str = "devadmin"
     # When True, skip lifespan DB seed (API starts; tenant routes need DB).
     api_skip_startup_seed: bool = False
+    gbrain_adapter: str = "stub"
+    gbrain_store_dir: str = ".gbrain/flavoros-ingest"
 
     @field_validator("database_url")
     @classmethod

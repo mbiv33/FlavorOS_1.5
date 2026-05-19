@@ -183,6 +183,22 @@ class WorkflowRunCreate(BaseModel):
     input_data: Optional[dict] = None
 
 
+class AgentTaskRead(BaseModel):
+    id: uuid.UUID
+    client_id: uuid.UUID
+    workflow_run_id: uuid.UUID
+    agent: str
+    task_type: str
+    status: str
+    payload: Optional[dict]
+    result: Optional[dict]
+    error: Optional[str]
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
 # ---------------------------------------------------------------------------
 # Provider Connection
 # ---------------------------------------------------------------------------
@@ -286,6 +302,34 @@ class ProviderSyncRead(BaseModel):
     status: str
     records_synced: int = 0
     errors: list[str] = Field(default_factory=list)
+    provider_event_id: Optional[uuid.UUID] = None
+    workflow_run_id: Optional[uuid.UUID] = None
+
+
+class ProviderEventRead(BaseModel):
+    id: uuid.UUID
+    client_id: uuid.UUID
+    provider_connection_id: Optional[uuid.UUID]
+    provider: str
+    event_type: str
+    idempotency_key: str
+    payload: Optional[dict]
+    status: str
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class NormalizedItemRead(BaseModel):
+    id: uuid.UUID
+    client_id: uuid.UUID
+    provider_event_id: uuid.UUID
+    item_type: str
+    title: str
+    data: Optional[dict]
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
 
 
 # ---------------------------------------------------------------------------

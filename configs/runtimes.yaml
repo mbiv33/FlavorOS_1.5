@@ -1,6 +1,6 @@
 runtimes:
   local_next:
-    description: apps/client + apps/admin on localhost
+    description: apps/flavoros on localhost
   api:
     description: services/api
 

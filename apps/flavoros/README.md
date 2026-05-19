@@ -1,15 +1,25 @@
-# FlavorOS (InstantDB Experiment)
+# FlavorOS App
 
-**Status: Experimental — not part of the MVP client/admin/API slice.**
+**Status: Active client/admin app surface.**
 
-This app is an InstantDB-backed scaffold used for early prototyping. It is separate from the canonical FlavorOS MVP path defined in `apps/client`, `apps/admin`, and `services/api`.
+This is the canonical Next.js application for the FlavorOS MVP. It contains the
+client Command Center, onboarding, channel surfaces, meeting/briefing routes,
+and the operator/admin diagnostic surfaces.
+
+FastAPI/Postgres is the canonical system of record for onboarding, provider
+connections, workflow runs, artifacts, approvals, and audit records. GBrain is
+the memory/retrieval layer. Composio/provider adapters handle external provider
+access. InstantDB remains optional for future realtime UI projection and is not
+part of the canonical onboarding path.
 
 ## Running
 
 ```bash
-pnpm dev:flavoros    # http://localhost:3002 (or next available port)
+pnpm dev    # from repo root, runs this app
 ```
 
-## Relationship to MVP
+The app reads the API location from:
 
-The MVP architecture uses FastAPI + PostgreSQL as the backend (see root [README](../../README.md)). This app may be used for isolated InstantDB experiments but should not be confused with the production client surface.
+```bash
+NEXT_PUBLIC_FLAVOROS_API_URL=http://localhost:8000
+```

@@ -4,7 +4,42 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import ProviderConnection
+from app.adapters.gbrain import IngestResult, SigmaResult
+from app.deps import get_gbrain
+from app.models import AgentTask, Artifact, AuditEvent, ProviderConnection, WorkflowRun
+
+
+class RecordingGBrain:
+    def __init__(self):
+        self.ingests = []
+        self.sigmas = []
+
+    async def ingest(self, client_id, category, content, metadata=None):
+        self.ingests.append(
+            {
+                "client_id": client_id,
+                "category": category,
+                "content": content,
+                "metadata": metadata or {},
+            }
+        )
+        return IngestResult(accepted=True, record_id="ingest_1")
+
+    async def retrieve(self, client_id, query, top_k=5, filters=None):
+        return []
+
+    async def build_context(self, client_id, query, token_budget=4000, filters=None):
+        raise NotImplementedError
+
+    async def store_sigma(self, client_id, sigma_type, payload):
+        self.sigmas.append(
+            {
+                "client_id": client_id,
+                "sigma_type": sigma_type,
+                "payload": payload,
+            }
+        )
+        return SigmaResult(success=True, sigma_id="sigma_1")
 
 
 def _payload(accounts):
@@ -75,6 +110,20 @@ def test_onboarding_save_plans_oauth_provider_connections(
 
     saved = db.execute(select(ProviderConnection)).scalars().all()
     assert len(saved) == 2
+
+    workflows = db.execute(select(WorkflowRun)).scalars().all()
+    workflow_types = {run.workflow_type for run in workflows}
+    assert {"client_onboarding", "morning_standup_seed", "travel_research_seed"}.issubset(
+        workflow_types
+    )
+
+    tasks = db.execute(select(AgentTask)).scalars().all()
+    assert {task.agent for task in tasks} >= {"khadijah", "regine"}
+    assert all(str(tenant_id := tasks[0].client_id) == str(task.client_id) for task in tasks)
+
+    sigma = db.execute(select(Artifact).where(Artifact.kind == "sigma")).scalar_one()
+    assert sigma.meta["sigma_type"] == "client_onboarding_readiness"
+    assert sigma.client_id == tenant_id
 
 
 def test_onboarding_save_without_oauth_does_not_plan_composio(
@@ -193,3 +242,35 @@ def test_connect_link_and_callback_are_tenant_scoped(
     )
     assert sync.status_code == 200
     assert sync.json()["status"] == "ready"
+    assert sync.json()["provider_event_id"]
+    assert sync.json()["workflow_run_id"]
+
+
+def test_onboarding_calls_gbrain_with_tenant_scope(
+    client: TestClient,
+    auth_headers_a: dict,
+):
+    recorder = RecordingGBrain()
+    client.app.dependency_overrides[get_gbrain] = lambda: recorder
+
+    resp = client.post(
+        "/onboarding/save",
+        json=_payload(
+            [
+                {
+                    "context_account_id": "business_gmail",
+                    "provider": "gmail",
+                    "context_account_purpose": "email",
+                    "account_alias": "business_email",
+                    "auth_scheme": "oauth",
+                }
+            ]
+        ),
+        headers=auth_headers_a,
+    )
+
+    assert resp.status_code == 200
+    assert len(recorder.ingests) == 1
+    assert recorder.ingests[0]["category"] == "onboarding"
+    assert len(recorder.sigmas) == 1
+    assert recorder.sigmas[0]["sigma_type"] == "client_onboarding_readiness"

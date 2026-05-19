@@ -12,7 +12,17 @@ from datetime import datetime, timezone
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import AuditEvent, ClientUniverseEntry, Profile, ProviderConnection, Tenant, User
+from app.models import (
+    AgentTask,
+    Artifact,
+    AuditEvent,
+    ClientUniverseEntry,
+    Profile,
+    ProviderConnection,
+    Tenant,
+    User,
+    WorkflowRun,
+)
 from app.schemas import OnboardingContextAccount, OnboardingSaveRequest
 
 ONBOARDING_TRIGGER = "client_onboarding.profile_saved"
@@ -100,6 +110,70 @@ def _account_payload(account: OnboardingContextAccount) -> dict:
     return account.model_dump()
 
 
+def _queue_agent_task(
+    db: Session,
+    *,
+    tenant: Tenant,
+    workflow_type: str,
+    agent: str,
+    task_type: str,
+    payload: dict,
+) -> WorkflowRun:
+    run = WorkflowRun(
+        client_id=tenant.id,
+        workflow_type=workflow_type,
+        agent=agent,
+        status="queued",
+        input_data=payload,
+    )
+    db.add(run)
+    db.flush()
+    db.add(
+        AgentTask(
+            client_id=tenant.id,
+            workflow_run_id=run.id,
+            agent=agent,
+            task_type=task_type,
+            status="queued",
+            payload={
+                "schema_version": "flavoros.agent_task.v1",
+                "workflow_run_id": str(run.id),
+                "client_id": str(tenant.id),
+                "target_agent": agent,
+                "task_type": task_type,
+                "inputs": payload,
+            },
+        )
+    )
+    return run
+
+
+def _create_onboarding_sigma(
+    db: Session,
+    *,
+    tenant: Tenant,
+    workflow_run: WorkflowRun,
+    provider_connections: list[ProviderConnection],
+    status: str,
+) -> Artifact:
+    artifact = Artifact(
+        client_id=tenant.id,
+        kind="sigma",
+        title="Onboarding readiness state",
+        body="Client onboarding profile, contexts, authority defaults, and provider readiness.",
+        status="ready",
+        created_by="system:onboarding",
+        workflow_run_id=workflow_run.id,
+        meta={
+            "sigma_type": "client_onboarding_readiness",
+            "onboarding_status": status,
+            "provider_connection_ids": [str(conn.id) for conn in provider_connections],
+        },
+    )
+    db.add(artifact)
+    return artifact
+
+
 def _upsert_provider_connection(
     db: Session,
     *,
@@ -176,7 +250,7 @@ def save_onboarding(
     tenant: Tenant,
     user: User,
     body: OnboardingSaveRequest,
-) -> tuple[Profile, list[ProviderConnection], str]:
+) -> tuple[Profile, list[ProviderConnection], str, WorkflowRun, Artifact]:
     """Persist onboarding state and trigger tenant-scoped provider planning."""
 
     profile = db.execute(select(Profile).where(Profile.user_id == user.id)).scalar_one_or_none()
@@ -259,6 +333,51 @@ def save_onboarding(
             "provider_connections": len(provider_connections),
         },
     )
+    workflow_run = _queue_agent_task(
+        db,
+        tenant=tenant,
+        workflow_type="client_onboarding",
+        agent="khadijah",
+        task_type="onboarding_readiness_review",
+        payload={
+            "trigger": ONBOARDING_TRIGGER,
+            "onboarding_status": next_status,
+            "contexts": [context.context_id for context in body.contexts],
+            "provider_connections": len(provider_connections),
+        },
+    )
+    _queue_agent_task(
+        db,
+        tenant=tenant,
+        workflow_type="morning_standup_seed",
+        agent="khadijah",
+        task_type="briefing_seed_from_onboarding",
+        payload={
+            "trigger": ONBOARDING_TRIGGER,
+            "profile_display_name": body.identity.display_name,
+            "onboarding_status": next_status,
+        },
+    )
+    if any(context.context_id in {"travel", "business"} for context in body.contexts):
+        _queue_agent_task(
+            db,
+            tenant=tenant,
+            workflow_type="travel_research_seed",
+            agent="regine",
+            task_type="travel_research_context_seed",
+            payload={
+                "trigger": ONBOARDING_TRIGGER,
+                "contexts": [context.context_id for context in body.contexts],
+            },
+        )
+
+    sigma = _create_onboarding_sigma(
+        db,
+        tenant=tenant,
+        workflow_run=workflow_run,
+        provider_connections=provider_connections,
+        status=next_status,
+    )
     db.add(
         AuditEvent(
             client_id=tenant.id,
@@ -276,6 +395,8 @@ def save_onboarding(
 
     db.commit()
     db.refresh(profile)
+    db.refresh(workflow_run)
+    db.refresh(sigma)
     for conn in provider_connections:
         db.refresh(conn)
-    return profile, provider_connections, next_status
+    return profile, provider_connections, next_status, workflow_run, sigma

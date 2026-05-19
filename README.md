@@ -1,6 +1,6 @@
 # FlavorOS
 
-Multi-tenant executive assistant platform — MVP vertical slice (Next.js client/admin + FastAPI + PostgreSQL).
+Multi-tenant executive assistant platform — MVP vertical slice (Next.js FlavorOS app + FastAPI + PostgreSQL).
 
 - **Docs:** see [`docs/README.md`](docs/README.md) for product and architecture intent.
 - **Repo layout:** [`docs/architecture/repo_structure.md`](docs/architecture/repo_structure.md).
@@ -9,15 +9,13 @@ Multi-tenant executive assistant platform — MVP vertical slice (Next.js client
 
 | Area | Path | Notes |
 |------|------|--------|
-| Client shell | [`apps/client`](apps/client) | MVP surfaces / navigation placeholders |
-| Admin shell | [`apps/admin`](apps/admin) | Diagnostics placeholders (port **3001**) |
+| FlavorOS app | [`apps/flavoros`](apps/flavoros) | Client onboarding, Command Center, channel surfaces, and admin diagnostics |
 | API | [`services/api`](services/api) | FastAPI: `/health`, JWT `/auth/*`, tenant-scoped `/profiles/*` |
 | Postgres | Docker Compose | Local database |
 
 ```mermaid
 flowchart LR
-  Client[apps_client] -->|"NEXT_PUBLIC_API_URL"| API[services_api]
-  Admin[apps_admin] -->|"NEXT_PUBLIC_API_URL"| API
+  App[apps_flavoros] -->|"NEXT_PUBLIC_FLAVOROS_API_URL"| API[services_api]
   API --> PG[(PostgreSQL)]
 ```
 
@@ -42,18 +40,13 @@ Edit `.env` if needed. The API defaults match [`docker-compose.yml`](docker-comp
 
 The API uses **SQLAlchemy + psycopg (v3)**. If you use a bare `postgresql://` or `postgres://` URL, settings normalize it to `postgresql+psycopg://` automatically so you do not need a separate `psycopg2` driver.
 
-Next.js does **not** load the repo-root `.env` when you run apps from subfolders. Create per-app local env files:
+Next.js does **not** load the repo-root `.env` when you run apps from subfolders. Create the app local env file:
 
 ```bash
 printf '%s\n' \
-  'NEXT_PUBLIC_API_URL=http://localhost:8000' \
+  'NEXT_PUBLIC_FLAVOROS_API_URL=http://localhost:8000' \
   'NEXT_PUBLIC_DEFAULT_TENANT_SLUG=demo' \
-  > apps/client/.env.local
-
-printf '%s\n' \
-  'NEXT_PUBLIC_API_URL=http://localhost:8000' \
-  'NEXT_PUBLIC_DEFAULT_TENANT_SLUG=demo' \
-  > apps/admin/.env.local
+  > apps/flavoros/.env.local
 ```
 
 ### 2. Database
@@ -87,17 +80,17 @@ From repo root:
 
 ```bash
 pnpm install
-pnpm dev:client    # http://localhost:3000
-pnpm dev:admin     # http://localhost:3001
+pnpm dev    # http://localhost:3000
 ```
 
-The client **Command Center** home polls **`GET /health`** using `NEXT_PUBLIC_API_URL`.
+The onboarding flow signs into the FastAPI service and writes tenant-scoped
+records using `NEXT_PUBLIC_FLAVOROS_API_URL`.
 
 ## MVP scope vs roadmap
 
-**In this repo slice:** repository skeleton aligned with docs, `pnpm` workspaces, FastAPI with `X-Client-ID` tenant resolution, JWT login with `client` / `developer_admin` roles, `tenants` / `users` / `profiles` tables, Alembic migrations, Dockerized Postgres, Next.js shells with MVP route maps.
+**In this repo slice:** repository skeleton aligned with docs, `pnpm` workspaces, FastAPI with `X-Client-ID` tenant resolution, JWT login with `client` / `developer_admin` roles, tenant/client/profile/provider/workflow/artifact tables, Alembic migrations, Dockerized Postgres, and the unified FlavorOS Next.js app.
 
-**Explicitly deferred:** Composio OAuth, in-repo GBrain subsystem, orchestrator, briefing/meeting engines, voice, mobile shell — see [`docs/planning/mvp_build_notes.md`](docs/planning/mvp_build_notes.md).
+**Explicitly deferred:** production Composio OAuth credentials, full orchestrator execution, voice, mobile shell, and InstantDB realtime projection — see [`docs/planning/mvp_build_notes.md`](docs/planning/mvp_build_notes.md).
 
 ## Canonical Planning Policy
 
@@ -129,7 +122,6 @@ The API **still boots** when the DB is unreachable: you’ll see a warning in th
 
 | Script | Description |
 |--------|-------------|
-| `pnpm dev:client` | Next.js client on port 3000 |
-| `pnpm dev:admin` | Next.js admin on port 3001 |
-| `pnpm build` | Build all workspace packages |
-| `pnpm lint` | ESLint across apps |
+| `pnpm dev` | Next.js FlavorOS app on port 3000 |
+| `pnpm build` | Build the FlavorOS app |
+| `pnpm lint` | ESLint for the FlavorOS app |
