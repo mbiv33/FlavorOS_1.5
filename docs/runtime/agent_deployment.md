@@ -76,6 +76,26 @@ bash scripts/install-agents-current-host.sh
 
 This installs the same runner and systemd services without SSHing back into the server.
 
+If Hermes/OpenClaw are already running as Hostinger-managed Docker containers, the host may not have `hermes` or `openclaw` binaries in `PATH`. In that case, sync the repo agent bundles into the container data roots instead of installing host-level systemd services:
+
+```bash
+cd /srv/flavoros
+bash deploy/hostinger-agents/sync-cloud-agent-bundles.sh --restart
+```
+
+Defaults:
+
+- Khadijah Hermes data root: `/docker/hermes-agent-kxed/data`
+- Regine OpenClaw data root: `/docker/openclaw-pn8l/data`
+
+Override the roots if Hostinger generated different container ids:
+
+```bash
+KHADIJAH_DATA_ROOT=/docker/<hermes-container>/data \
+REGINE_DATA_ROOT=/docker/<openclaw-container>/data \
+bash deploy/hostinger-agents/sync-cloud-agent-bundles.sh --restart
+```
+
 ## Local Sinclair
 
 Run Sinclair locally:
