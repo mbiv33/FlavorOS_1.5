@@ -9,7 +9,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
-from app.models import Profile, Tenant, User
+from app.models import Approval, Artifact, Profile, ProviderConnection, Tenant, User
+from app.workflows.communications_outbound import COMMUNICATIONS_SEND_GOVERNED_ACTION
 
 _pwd = CryptContext(schemes=["bcrypt"], deprecated="auto")
 _settings = get_settings()
@@ -65,6 +66,43 @@ def seed_if_empty(db: Session) -> None:
             display_name="Demo Admin",
             timezone="UTC",
             preferences={},
+        )
+    )
+
+    gmail = ProviderConnection(
+        client_id=demo_id,
+        provider="gmail",
+        context_account_id="demo-gmail-primary",
+        status="connected",
+        enabled=True,
+        composio_user_id="demo-composio-user",
+    )
+    db.add(gmail)
+    db.flush()
+
+    draft = Artifact(
+        client_id=demo_id,
+        kind="client",
+        title="Quarterly check-in draft",
+        body="Hi — following up on our last conversation.",
+        meta={
+            "artifact_type": "draft_email",
+            "channel": "email",
+            "to": "client@example.com",
+            "subject": "Quarterly check-in",
+        },
+        status="ready",
+    )
+    db.add(draft)
+    db.flush()
+
+    db.add(
+        Approval(
+            client_id=demo_id,
+            artifact_id=draft.id,
+            governed_action=COMMUNICATIONS_SEND_GOVERNED_ACTION,
+            reason="Review and approve sending this email draft.",
+            decision="pending",
         )
     )
     db.commit()

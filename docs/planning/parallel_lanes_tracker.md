@@ -47,7 +47,7 @@
 | D — Env + smoke | Was slice step 1 | `done` | `scripts/smoke-vertical-slice.sh` |
 | F — Settings | Was slice step 3 | `done` | `useSettingsData` |
 | I — Channel surfaces | Was slice step 3 | `done` | I0–I6: `useChannelData`, all channel pages + CC widgets on API |
-| J — Write-back | Slice step 5 + stable decide | `blocked` | MVP step 7 |
+| J — Write-back | Session | `done` | outbound_actions migration, communications_outbound, decide hook, client + admin UX, smoke + CI | — | Lane J: Communications approval-gated write-back (MVP step 7) |
 
 ## Lane I sub-lanes (complete)
 
@@ -65,6 +65,8 @@
 
 | Date | Agent | Lane | Action |
 |---|---|---|---|
+| 2026-05-19 | Session | J | Lane J done: outbound_actions + approve send_communication_draft; pytest 45; tsc clean; smoke Lane J |
+| 2026-05-19 | Session | J | Lane J in_progress: outbound_actions + communications write-back slice |
 | 2026-05-19 | Session | I (I0–I6) | Channel surfaces: useChannelData + hooks/configs; pytest 22 pass; tsc clean; smoke OK |
 | 2026-05-19 | Parallel plan | E, H, D, tracker | Plan implementation: freeze zone in tracker, CI workflow, gbrain integration doc, smoke script |
 | 2026-05-19 | Subagent | I | Briefings wired: useBriefingsData, mappers, briefings-config |

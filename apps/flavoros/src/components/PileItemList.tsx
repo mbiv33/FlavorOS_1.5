@@ -21,9 +21,11 @@ export type PileListItem = {
 export function PileItemList({
   items,
   emptyLabel = "Nothing here right now.",
+  onAfterDecide,
 }: {
   items: PileListItem[];
   emptyLabel?: string;
+  onAfterDecide?: () => void;
 }) {
   const [decidedIds, setDecidedIds] = useState<Set<string>>(new Set());
   const [pendingId, setPendingId] = useState<string | null>(null);
@@ -36,6 +38,7 @@ export function PileItemList({
     try {
       await decideApproval(session, item.approvalId, decision);
       setDecidedIds((prev) => new Set([...prev, item.id]));
+      onAfterDecide?.();
     } finally {
       setPendingId(null);
     }

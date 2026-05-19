@@ -5,10 +5,13 @@ import { SurfaceFrame, SurfaceSection } from "@/components/SurfaceFrame";
 import { StatStrip } from "@/components/StatStrip";
 import { PileRow } from "@/components/PileRow";
 import { Card } from "@/components/Card";
+import { StatusChip } from "@/components/StatusChip";
+import { mapOutboundStatusToChip } from "@/lib/mappers";
 import { useCommunicationsData } from "@/lib/hooks/useCommunicationsData";
 
 export default function CommunicationsPage() {
-  const { piles, stats, contactGroups, loading, error } = useCommunicationsData();
+  const { piles, stats, contactGroups, outboundActions, loading, error, refresh } =
+    useCommunicationsData();
 
   return (
     <SurfaceFrame
@@ -40,9 +43,33 @@ export default function CommunicationsPage() {
                 provider sync.
               </p>
             ) : (
-              <PileRow piles={piles} />
+              <PileRow piles={piles} onAfterDecide={refresh} />
             )}
           </SurfaceSection>
+
+          {outboundActions.length > 0 ? (
+            <SurfaceSection title="Outbound queue">
+              <Card>
+                <ul className="divide-y divide-border">
+                  {outboundActions.slice(0, 8).map((o) => (
+                    <li
+                      key={o.id}
+                      className="flex items-center justify-between gap-3 px-4 py-3"
+                    >
+                      <div>
+                        <p className="text-sm font-medium">{o.action_type}</p>
+                        <p className="text-xs text-muted">
+                          {o.provider}
+                          {o.last_error_summary ? ` · ${o.last_error_summary}` : ""}
+                        </p>
+                      </div>
+                      <StatusChip status={mapOutboundStatusToChip(o.status)} />
+                    </li>
+                  ))}
+                </ul>
+              </Card>
+            </SurfaceSection>
+          ) : null}
 
           <div className="grid gap-6 lg:grid-cols-[280px_1fr]">
             <SurfaceSection title="Contacts">

@@ -3,6 +3,7 @@ export type {
   ApprovalRead,
   ArtifactRead,
   FlavorOSSession,
+  OutboundActionRead,
   ProviderConnection,
 } from "@/lib/api";
 
@@ -11,6 +12,7 @@ import {
   type ApprovalRead,
   type ArtifactRead,
   type FlavorOSSession,
+  type OutboundActionRead,
   type ProviderConnection,
 } from "@/lib/api";
 
@@ -111,6 +113,16 @@ export async function listApprovals(
 ): Promise<ApprovalRead[]> {
   const path = decision ? `/approvals?decision=${decision}` : "/approvals";
   return adminRequest<ApprovalRead[]>(path, session);
+}
+
+export async function listOutboundActions(
+  session: FlavorOSSession,
+  status?: string,
+): Promise<OutboundActionRead[]> {
+  const path = status
+    ? `/outbound-actions?status=${encodeURIComponent(status)}`
+    : "/outbound-actions";
+  return adminRequest<OutboundActionRead[]>(path, session);
 }
 
 export async function listAuditEvents(

@@ -220,6 +220,62 @@ class Approval(Base):
 
 
 # ---------------------------------------------------------------------------
+# Outbound Action — approval-gated provider write-back
+# ---------------------------------------------------------------------------
+
+
+class OutboundAction(Base):
+    """
+    status: queued | executed | failed | pulled_back.
+    One outbound row per approval (unique approval_id).
+    """
+
+    __tablename__ = "outbound_actions"
+    __table_args__ = (
+        Index("ix_outbound_actions_client_status_created", "client_id", "status", "created_at"),
+        UniqueConstraint("approval_id", name="uq_outbound_actions_approval_id"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    client_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False
+    )
+    approval_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("approvals.id", ondelete="CASCADE"), nullable=False
+    )
+    artifact_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("artifacts.id", ondelete="SET NULL"), nullable=True
+    )
+    provider_connection_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("provider_connections.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    provider: Mapped[str] = mapped_column(String(64), nullable=False)
+    action_type: Mapped[str] = mapped_column(String(128), nullable=False)
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="queued")
+    target_reference_json: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    payload_json: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    idempotency_key: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    last_error_summary: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    executed_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    execution_result_json: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        server_onupdate=func.now(),
+        nullable=False,
+    )
+
+
+# ---------------------------------------------------------------------------
 # Workflow Run — tracks orchestrator / agent workflow executions
 # ---------------------------------------------------------------------------
 

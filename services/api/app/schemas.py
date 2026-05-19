@@ -155,6 +155,38 @@ class ApprovalDecide(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Outbound Action
+# ---------------------------------------------------------------------------
+
+OUTBOUND_STATUSES = frozenset({"queued", "executed", "failed", "pulled_back"})
+
+
+class OutboundActionRead(BaseModel):
+    id: uuid.UUID
+    client_id: uuid.UUID
+    approval_id: uuid.UUID
+    artifact_id: Optional[uuid.UUID]
+    provider_connection_id: Optional[uuid.UUID]
+    provider: str
+    action_type: str
+    status: str
+    target_reference_json: Optional[dict]
+    payload_json: Optional[dict]
+    idempotency_key: Optional[str]
+    last_error_summary: Optional[str]
+    executed_at: Optional[datetime]
+    execution_result_json: Optional[dict]
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class ApprovalDecideRead(ApprovalRead):
+    outbound_action: Optional[OutboundActionRead] = None
+
+
+# ---------------------------------------------------------------------------
 # Workflow Run
 # ---------------------------------------------------------------------------
 

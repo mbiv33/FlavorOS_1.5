@@ -65,7 +65,13 @@ export type PileDef = {
  *
  * Server components can compose this by passing plain data (no functions).
  */
-export function PileRow({ piles }: { piles: PileDef[] }) {
+export function PileRow({
+  piles,
+  onAfterDecide,
+}: {
+  piles: PileDef[];
+  onAfterDecide?: () => void;
+}) {
   const [openKey, setOpenKey] = useState<string | null>(null);
 
   useEffect(() => {
@@ -109,7 +115,7 @@ export function PileRow({ piles }: { piles: PileDef[] }) {
           tone={active.tone}
           onClose={() => setOpenKey(null)}
         >
-          <PileItemList items={active.items} />
+          <PileItemList items={active.items} onAfterDecide={onAfterDecide} />
         </Overlay>
       ) : null}
     </>

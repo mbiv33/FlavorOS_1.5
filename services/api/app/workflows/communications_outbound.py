@@ -1,0 +1,204 @@
+"""Approval-gated communications outbound write-back (Lane J)."""
+
+from __future__ import annotations
+
+import os
+import uuid
+from datetime import datetime, timezone
+
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from app.models import Approval, Artifact, AuditEvent, OutboundAction, ProviderConnection, User
+
+COMMUNICATIONS_SEND_GOVERNED_ACTION = "send_communication_draft"
+COMMUNICATIONS_PROVIDER = "gmail"
+COMMUNICATIONS_ACTION_TYPE = "gmail_send_draft"
+
+OUTBOUND_STATUSES = frozenset({"queued", "executed", "failed", "pulled_back"})
+
+CONNECTED_STATUSES = frozenset({"connected", "syncing", "ready"})
+
+
+def is_communications_send(approval: Approval) -> bool:
+    return approval.governed_action == COMMUNICATIONS_SEND_GOVERNED_ACTION
+
+
+def is_communications_draft_artifact(artifact: Artifact) -> bool:
+    meta = artifact.meta or {}
+    if meta.get("artifact_type") == "draft_email":
+        return True
+    if meta.get("channel") == "email":
+        return True
+    return False
+
+
+def resolve_gmail_connection(db: Session, client_id: uuid.UUID) -> ProviderConnection | None:
+    rows = db.execute(
+        select(ProviderConnection)
+        .where(
+            ProviderConnection.client_id == client_id,
+            ProviderConnection.provider == COMMUNICATIONS_PROVIDER,
+            ProviderConnection.enabled.is_(True),
+        )
+        .order_by(ProviderConnection.created_at.desc())
+    ).scalars()
+    for conn in rows:
+        if conn.status in CONNECTED_STATUSES:
+            return conn
+    return None
+
+
+def get_outbound_for_approval(db: Session, approval_id: uuid.UUID) -> OutboundAction | None:
+    return db.execute(
+        select(OutboundAction).where(OutboundAction.approval_id == approval_id)
+    ).scalar_one_or_none()
+
+
+def _audit_outbound(
+    db: Session,
+    *,
+    client_id: uuid.UUID,
+    actor_id: uuid.UUID | None,
+    action: str,
+    outbound: OutboundAction,
+    extra: dict | None = None,
+) -> None:
+    detail: dict = {
+        "outbound_action_id": str(outbound.id),
+        "approval_id": str(outbound.approval_id),
+        "artifact_id": str(outbound.artifact_id) if outbound.artifact_id else None,
+        "provider": outbound.provider,
+        "status": outbound.status,
+    }
+    if extra:
+        detail.update(extra)
+    db.add(
+        AuditEvent(
+            client_id=client_id,
+            actor_id=actor_id,
+            action=action,
+            resource_type="outbound_action",
+            resource_id=outbound.id,
+            detail=detail,
+        )
+    )
+
+
+def create_outbound_for_approval(
+    db: Session,
+    *,
+    approval: Approval,
+    artifact: Artifact,
+    connection: ProviderConnection,
+) -> OutboundAction:
+    meta = artifact.meta or {}
+    target = {
+        "to": meta.get("to") or meta.get("recipient"),
+        "subject": meta.get("subject") or artifact.title,
+        "thread_id": meta.get("thread_id"),
+    }
+    payload = {
+        "body": artifact.body,
+        "subject": target.get("subject"),
+        "to": target.get("to"),
+    }
+    if meta.get("_force_failure"):
+        payload["_force_failure"] = True
+    outbound = OutboundAction(
+        client_id=approval.client_id,
+        approval_id=approval.id,
+        artifact_id=artifact.id,
+        provider_connection_id=connection.id,
+        provider=COMMUNICATIONS_PROVIDER,
+        action_type=COMMUNICATIONS_ACTION_TYPE,
+        status="queued",
+        target_reference_json=target,
+        payload_json=payload,
+        idempotency_key=f"approval:{approval.id}",
+    )
+    db.add(outbound)
+    db.flush()
+    return outbound
+
+
+def _should_defer_execution() -> bool:
+    return os.environ.get("OUTBOUND_DEFER_EXECUTION", "").lower() in ("1", "true", "yes")
+
+
+def _stub_should_fail(outbound: OutboundAction) -> bool:
+    payload = outbound.payload_json or {}
+    return bool(payload.get("_force_failure"))
+
+
+def execute_outbound(db: Session, outbound: OutboundAction) -> None:
+    if outbound.status != "queued":
+        return
+    if _stub_should_fail(outbound):
+        outbound.status = "failed"
+        outbound.last_error_summary = "Stub provider execution failed (test hook)"
+        outbound.updated_at = datetime.now(timezone.utc)
+        return
+    outbound.status = "executed"
+    outbound.executed_at = datetime.now(timezone.utc)
+    outbound.execution_result_json = {
+        "provider": outbound.provider,
+        "external_result_id": f"stub-{outbound.id}",
+        "receipt_status": "success",
+        "response_summary": "Stub gmail send completed",
+    }
+    outbound.updated_at = datetime.now(timezone.utc)
+
+
+def maybe_enqueue_and_execute(
+    db: Session,
+    *,
+    approval: Approval,
+    user: User,
+) -> OutboundAction:
+    existing = get_outbound_for_approval(db, approval.id)
+    if existing is not None:
+        return existing
+
+    if approval.artifact_id is None:
+        raise ValueError("Communication draft approval requires a linked artifact")
+
+    artifact = db.execute(
+        select(Artifact).where(
+            Artifact.id == approval.artifact_id,
+            Artifact.client_id == approval.client_id,
+        )
+    ).scalar_one_or_none()
+    if artifact is None:
+        raise ValueError("Linked artifact not found")
+
+    if not is_communications_draft_artifact(artifact):
+        raise ValueError("Artifact is not a communication email draft")
+
+    connection = resolve_gmail_connection(db, approval.client_id)
+    if connection is None:
+        raise ValueError("No connected Gmail provider for this client")
+
+    outbound = create_outbound_for_approval(
+        db, approval=approval, artifact=artifact, connection=connection
+    )
+    _audit_outbound(
+        db,
+        client_id=approval.client_id,
+        actor_id=user.id,
+        action="outbound.queued",
+        outbound=outbound,
+    )
+
+    if not _should_defer_execution():
+        execute_outbound(db, outbound)
+        action = "outbound.executed" if outbound.status == "executed" else "outbound.failed"
+        _audit_outbound(
+            db,
+            client_id=approval.client_id,
+            actor_id=user.id,
+            action=action,
+            outbound=outbound,
+        )
+
+    return outbound

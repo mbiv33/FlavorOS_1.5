@@ -9,8 +9,10 @@ import {
   listApprovals,
   listArtifacts,
   listAuditEvents,
+  listOutboundActions,
   listProviders,
   listWorkflows,
+  type OutboundActionRead,
   type AuditEventRead,
   type WorkflowRunRead,
 } from "@/lib/admin-api";
@@ -84,6 +86,24 @@ async function fetchLiveRows(surface: string): Promise<LiveRow[]> {
         createdAt: a.created_at,
         detail: a.reason ?? undefined,
       }));
+    }
+    case "outbound": {
+      const rows = await listOutboundActions(session);
+      return rows.map((o: OutboundActionRead) => {
+        const parts = [
+          o.provider,
+          o.approval_id ? `approval ${truncateId(o.approval_id)}` : null,
+          o.artifact_id ? `artifact ${truncateId(o.artifact_id)}` : null,
+          o.last_error_summary ?? null,
+        ].filter(Boolean);
+        return {
+          id: o.id,
+          primary: o.action_type,
+          status: o.status,
+          createdAt: o.executed_at ?? o.created_at,
+          detail: parts.join(" · ") || undefined,
+        };
+      });
     }
     case "logs": {
       const rows = await listAuditEvents(session);

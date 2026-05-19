@@ -12,7 +12,14 @@ from sqlalchemy.orm import Session
 
 from app.deps import get_db, require_tenant_match
 from app.models import Approval, AuditEvent, Tenant, User
-from app.schemas import ApprovalCreate, ApprovalDecide, ApprovalRead
+from app.schemas import (
+    ApprovalCreate,
+    ApprovalDecide,
+    ApprovalDecideRead,
+    ApprovalRead,
+    OutboundActionRead,
+)
+from app.workflows import communications_outbound
 
 router = APIRouter(prefix="/approvals", tags=["approvals"])
 
@@ -55,7 +62,7 @@ def get_approval(approval_id: uuid.UUID, tu: TenantUser, db: DB):
     return approval
 
 
-@router.post("/{approval_id}/decide", response_model=ApprovalRead)
+@router.post("/{approval_id}/decide", response_model=ApprovalDecideRead)
 def decide_approval(approval_id: uuid.UUID, body: ApprovalDecide, tu: TenantUser, db: DB):
     tenant, user = tu
     approval = db.execute(
@@ -85,6 +92,22 @@ def decide_approval(approval_id: uuid.UUID, body: ApprovalDecide, tu: TenantUser
             },
         )
     )
+
+    outbound_action = None
+    if body.decision == "approved" and communications_outbound.is_communications_send(approval):
+        try:
+            outbound_action = communications_outbound.maybe_enqueue_and_execute(
+                db, approval=approval, user=user
+            )
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=str(exc),
+            ) from exc
+
     db.commit()
     db.refresh(approval)
-    return approval
+    base = ApprovalRead.model_validate(approval).model_dump()
+    if outbound_action is not None:
+        base["outbound_action"] = OutboundActionRead.model_validate(outbound_action)
+    return ApprovalDecideRead(**base)

@@ -2,7 +2,7 @@ import type { PileListItem } from "@/components/PileItemList";
 import type { PileDef, PileTone } from "@/components/PileRow";
 import type { Stat, StatTone } from "@/components/StatStrip";
 
-import type { ArtifactRead, ApprovalRead } from "./api";
+import type { ArtifactRead, ApprovalRead, OutboundActionRead, OutboundStatus } from "./api";
 import type {
   BriefingDefinition,
   BriefingPreparedStatus,
@@ -25,6 +25,41 @@ function humanizeAction(action: string): string {
   return action
     .replace(/_/g, " ")
     .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+export function mapOutboundStatusToChip(status: OutboundStatus): CardStatus {
+  switch (status) {
+    case "queued":
+      return "Queued";
+    case "executed":
+      return "Sent";
+    case "failed":
+      return "Failed";
+    case "pulled_back":
+      return "Pulled back";
+    default:
+      return "In progress";
+  }
+}
+
+export function enrichInboxItemsWithOutbound(
+  items: InboxItem[],
+  outboundByApprovalId: Map<string, OutboundActionRead>,
+): InboxItem[] {
+  return items.map((item) => {
+    if (!item.approvalId) return item;
+    const outbound = outboundByApprovalId.get(item.approvalId);
+    if (!outbound) return item;
+    return {
+      ...item,
+      status: mapOutboundStatusToChip(outbound.status),
+      detail:
+        outbound.last_error_summary ??
+        item.detail ??
+        `Outbound ${outbound.status}`,
+      when: relativeTime(outbound.updated_at),
+    };
+  });
 }
 
 export function approvalToInboxItem(approval: ApprovalRead): InboxItem {

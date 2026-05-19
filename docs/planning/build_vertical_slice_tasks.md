@@ -308,8 +308,11 @@ Tracked in [parallel_lanes_tracker.md](./parallel_lanes_tracker.md). Summary:
 | C — Admin console | ✅ Done | `admin-api.ts`, `admin-surfaces.ts`, `AdminSurfacePanel`, live `/admin` |
 | F — Settings | ✅ Done | `useSettingsData`, settings page wired |
 | G — Docs | ✅ Done | `local_dev_runbook.md`, tracker |
+| H — GBrain | ✅ Done | integration doc + subsystem landing zone |
+| I — Channel surfaces | ✅ Done | all major client surfaces + CC widgets on API data |
+| J — Write-back | ✅ Done | communications-first outbound actions + client/admin visibility + smoke/CI |
 
-**Still open:** D (smoke), I (channels), E (CI), H (GBrain), J (write-back, blocked).
+**Still open:** none in the original post-slice queue.
 
 ---
 
@@ -320,10 +323,10 @@ These were intentionally excluded from the slice checklist. Status as of 2026-05
 | Item | Slice scope | Current status |
 |---|---|---|
 | `apps/flavoros/src/app/admin/*` API wiring | Out of slice | ✅ Done (Lane C) |
-| Channel pages off fixtures | Out of slice | ⏳ Lane I |
+| Channel pages off fixtures | Out of slice | ✅ Done (Lane I) |
 | InstantDB realtime | Out of slice | Not started |
 | Full Composio production OAuth | Out of slice | Not started |
-| GBrain ingestion, voice, write-back | Out of slice | H / J not started |
+| GBrain ingestion, voice, write-back | Out of slice | H foundation done; J communications-first slice done |
 
 ---
 

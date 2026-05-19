@@ -16,20 +16,23 @@ It does **not** replace the canonical development plan. If anything here conflic
 
 ## Executive Summary
 
-*Updated 2026-05-19 after vertical slice + post-slice lanes B, C, F, G.*
+*Updated 2026-05-19 after vertical slice + post-slice lanes A through J.*
 
 FlavorOS has crossed the **first integration milestone**:
 
 - **Demo vertical slice is complete:** login → onboarding → sync → Command Center artifact + approval → client decide with audit.
 - **Operator console (admin)** reads live list data from the API (`/admin`).
 - **Settings** shows profile and provider connections from the API.
-- **API regression tests** cover first-sync processor and approval decide paths (22 tests).
+- **API regression tests** now cover first-sync, approval decide, and outbound actions (45 tests).
+- **Client channel surfaces** now read API-backed state instead of fixture display rows.
+- **Smoke + CI scaffolding** exist for the post-slice loop.
+- **Communications write-back** is live as a narrow approval-gated slice: approve draft -> `outbound_actions` -> queued/executed/failed/pulled-back state -> admin diagnostics.
 
-The bottleneck has shifted from “no end-to-end loop” to **breadth and depth**:
+The bottleneck has shifted from “can FlavorOS take an approved action back out into the world safely?” to **can we harden and generalize the new outbound path without losing trust?**
 
-- Remaining **client channel surfaces** still use `fixtures.ts` (calendar, briefings, travel, etc.).
+- **Write-back** (MVP step 7) is now proven for a communications-first slice.
 - **Agent runtime** remains stub + inline processor (not durable multi-step workflows).
-- **Write-back** (MVP step 7) is not started and remains the highest-trust integration.
+- **Provider hardening** still needs production-grade OAuth and execution trust boundaries.
 
 **Next agents:** read [`next_session_handoff.md`](./next_session_handoff.md) before claiming work.
 
@@ -45,23 +48,23 @@ The bottleneck has shifted from “no end-to-end loop” to **breadth and depth*
 | **API + Postgres** | Substantial | Auth, onboarding, profiles, universe, artifacts, approvals, workflows, providers, audit |
 | **UI → API (hero path)** | Done (slice) | Login, onboarding, Command Center, LeftNav, Settings use `api.ts` |
 | **UI → API (admin)** | Done (Lane C) | `/admin` via `admin-api.ts` + list endpoints; `SessionGuard` on admin layout |
-| **UI → API (channels)** | Partial | Other `(client)` surfaces still fixture-driven — **Lane I** |
+| **UI → API (channels)** | Done (Lane I) | Client channel surfaces + Command Center widgets use shared channel loaders/mappers |
 | **Onboarding** | Done (gate) | SessionGuard, readiness routing, sync on onboarding |
 | **Provider ingestion** | Done (demo) | Inline `process_provider_first_sync` → artifact + pending approval |
 | **Agent runtime** | Stub + inline | `StubOrchestratorAdapter`; demo loop in `provider_first_sync.py` |
-| **Write-back** | Not started | Lane J blocked until decide path stable in prod/CI |
+| **Write-back** | Done (narrow slice) | Lane J shipped communications-first outbound actions + admin/client visibility |
 
 ### Phase Alignment (`current_build_plan.md`)
 
 | Phase | Plan status | Assessment |
 |---|---|---|
-| 1 — Visualization & surfaces | Partial | Command Center + admin + settings wired; channel pages on fixtures |
+| 1 — Visualization & surfaces | Done (MVP breadth) | Command Center, admin, settings, and client channel pages are live on API data |
 | 2 — Database & storage | Done (demo scope) | Models + CRUD; hero surfaces consume API |
 | 3 — Integrations | Partial | Composio boundary + provider routes; prod OAuth matrix deferred |
 | 4 — Onboarding | Done (demo scope) | Gate + sync path complete |
 | 5 — Provider ingestion | Done (demo scope) | First-sync → inbox loop closed |
 | 6 — Agent workflows | Partial | Inline processor only; real orchestration deferred |
-| 7 — Write-back | Not started | Highest complexity remaining for full MVP |
+| 7 — Write-back | Done (demo scope) | Communications-first proof exists; broader channel/provider depth deferred |
 
 ---
 
@@ -69,15 +72,15 @@ The bottleneck has shifted from “no end-to-end loop” to **breadth and depth*
 
 From `current_build_plan.md`, the MVP must prove:
 
-1. Useful client and admin surfaces render. — **Partial:** admin live; channels mostly fixtures
+1. Useful client and admin surfaces render. — **Yes**
 2. Client, provider, workflow, artifact, approval, and audit state persist durably. — **Yes (demo path)**
 3. Google Workspace (and boundaries) connect through approved adapters. — **Partial (demo OAuth)**
 4. A client is onboarded into a governed Client Universe. — **Yes (demo scope)**
 5. Provider events are captured, normalized, and routed. — **Partial (first sync)**
 6. Agents produce workflow runs, artifacts, approvals, and completion summaries. — **Yes (inline demo loop)**
-7. Approved actions can write back channel-correctly. — **No (Lane J)**
+7. Approved actions can write back channel-correctly. — **Yes (communications-first demo path)**
 
-**Achieved:** steps 1–6 for **one demo tenant** on the hero path. **Next proof:** broaden surfaces (step 1 depth) then write-back (step 7).
+**Achieved:** steps 1–7 for **one demo tenant** on the hero path. **Next proof:** harden the outbound execution path and broaden it deliberately.
 
 ---
 
@@ -94,69 +97,79 @@ From `current_build_plan.md`, the MVP must prove:
 - Admin console list surfaces + overview counts (Lane C)
 - Settings profile + provider connections (Lane F)
 - API tests for processor and decide (Lane B)
+- Communications write-back: `outbound_actions`, decide hook, client/admin status surfaces, smoke + CI coverage (Lane J)
 
-### Remaining: channel surfaces on fixtures
+### Closed: channel surfaces off fixtures
 
-**Still fixture-driven (Lane I):**
+**Lane I completed:**
 
 - `(client)/calendar`, `communications`, `travel`, `briefings/*`, `meetings/*`
 - `apps/flavoros/src/components/GoalsStrip.tsx`, `MiniCalendar.tsx`
-
-**Pattern:** reuse `mappers.ts` + hooks pattern from Command Center.
+- shared `useChannelData` + per-surface config/hook pattern
 
 ### Remaining: production hardening
 
-- Async/worker processing for workflows (inline sync acceptable for demo only)
+- Extract outbound execution from the inline demo loop
 - Full Composio OAuth matrix
-- CI running pytest (Lane E)
-- Optional smoke script (Lane D)
+- Local/dev restart + migration hygiene so smoke hits the new outbound routes consistently
+- Keep CI + smoke green as the trust gate for outbound work
 
 ### Remaining: platform depth
 
-- GBrain ingestion (Lane H)
 - Real orchestrator / multi-agent tasks (not stub-only)
-- Write-back (Lane J)
+- Broader write-back coverage beyond communications-first slice
+
+### What is now done but should not be re-done
+
+- Lane D: `scripts/smoke-vertical-slice.sh`
+- Lane E: `.github/workflows/api-integration-tests.yml`
+- Lane H: GBrain integration doc/subsystem landing zone
+- Lane I: channel surfaces on API data
+- Lane J: communications-first outbound write-back slice
 
 ---
 
 ## Recommended Build Order (Next 2–4 Weeks)
 
-*Supersedes the pre-slice ordering below for **new** work. Steps 1–5 and post-slice lanes A–G are complete.*
+*Supersedes the pre-slice ordering below for **new** work. Steps 1–5 and post-slice lanes A–J are complete.*
 
-### 1. Stabilize verification (~0.5 day) — Lane D optional
+### 1. Re-verify and freeze the current proof slice (~0.5 day)
 
-- Document or script: health, login, artifacts, approvals, admin lists
-- See [local_dev_runbook.md](./local_dev_runbook.md)
+- Run pytest, `tsc --noEmit`, and `scripts/smoke-vertical-slice.sh`
+- Manual sweep: login → onboarding/sync → Command Center → approve/reject → outbound queue/status → `/admin` → `/settings` → communications/calendar
+- Restart API + run migrations locally so smoke and manual E2E use the outbound routes
 
-### 2. Channel surfaces off fixtures (1–2 weeks) — Lane I
+### 2. Harden Lane J into a trustworthy default (2–4 days)
 
-**Goal:** Extend API wiring surface-by-surface (do not big-bang).
+**Goal:** Make the new outbound path boring to operate.
 
-- Start with one channel (e.g. calendar or briefings)
-- `GET /artifacts`, `GET /approvals`, `mappers.ts`, session from `api.ts`
-- Keep fixtures only as optional empty-state fallback if desired
+- tighten migration/reseed/runbook flow
+- expand failure diagnostics and receipt visibility
+- verify pull-back and deferred execution behavior under local + CI paths
 
-### 3. CI for API (1–2 days) — Lane E
+### 3. Extract execution from the inline demo loop (2–4 days)
 
-- Postgres service job + `alembic upgrade head` + `pytest` on PR
-- Use `services/api/.venv` or documented Python 3.11+ in workflow
+- Move outbound execution off the inline first-sync path
+- Introduce durable execution lifecycle/state transitions before adding breadth
+- Preserve the current demo flow while isolating write-back concerns
 
-### 4. Operator / internal alpha polish (ongoing)
+### 4. Publish the vocabulary layer (1–2 days)
 
-- Admin is live; improve empty states, errors, pagination as needed
-- Do not expand `api.ts` for admin — stay on `admin-api.ts`
+- Add `docs/FLAVOROS_TAXONOMY.md`
+- Lock outbound/status/workflow vocabulary now that Lane J terms are real
+- Point humans and agents at it before they descend into domain docs
 
-### 5. GBrain (when prioritized) — Lane H
+### 5. Harden provider execution trust boundaries (2–3 days)
 
-- `subsystems/gbrain/**` per architecture docs
-- Not blocking demo or operator read path
+- Production OAuth/credential handling for the chosen outbound lane
+- Idempotency, retry, and pull-back semantics
+- Failure diagnostics visible in admin
 
-### 6. Write-back (when unblocked) — Lane J
+### 6. Only then expand breadth again
 
-**Goal:** Approval-gated outbound stub with audit.
-
-- Unblock after decide path trusted in CI/production
-- Highest product + security complexity
+- Calendar write-back
+- richer orchestrator/runtime behavior
+- GBrain follow-on work that directly improves execution context
 
 ### Explicitly defer
 
@@ -186,8 +199,71 @@ Plus post-slice: **admin** live lists, **settings** wired, **API tests** for cor
 |---|---|
 | Something you can **show** this month | Steps 1–5 — **done** |
 | **Internal operator alpha** | Admin read path — **done** (Lane C); polish optional |
-| **Broader client UX** | Lane I (channel surfaces) |
-| **Full MVP** per `current_build_plan.md` | Lane I → CI (E) → GBrain (H) → write-back (J) |
+| **Broader client UX** | Lane I — **done** |
+| **Full MVP demo loop** | Steps 1–7 — **done** |
+| **Production-ready outbound trust path** | Verification pass → Lane J hardening → runtime extraction |
+
+---
+
+## Implementation Plan (Recommended)
+
+### Primary objective
+
+Harden the new **approval-gated, channel-correct write-back** path and make it the stable base for future outbound coverage.
+
+### What just shipped
+
+- `outbound_actions` durable table + model
+- communications-first enqueue + execution path
+- approval decide hook returning outbound action context
+- client status chips/outbound queue
+- admin outbound diagnostics
+- smoke + CI coverage for outbound actions
+
+### Next implementation focus
+
+1. Extract execution from the inline processor.
+2. Strengthen restart/reseed/migration ergonomics for local smoke.
+3. Tighten provider-side trust boundaries and retry semantics.
+4. Expand only after the communications path is operationally calm.
+
+### Exit criteria for the hardening phase
+
+- local smoke reliably exercises outbound routes after documented restart/migrate flow
+- deferred execution + pull-back paths are easy to verify
+- outbound failure states are obvious in admin and client surfaces
+- runtime extraction plan is clear enough to implement without changing UX vocabulary
+
+---
+
+## Parallel Development Opportunities
+
+These can be done in parallel **if ownership boundaries stay clean**.
+
+### P1 — Lane J hardening backend
+
+- Paths: `services/api/app/**`, `services/api/tests/**`
+- Scope: execution extraction, retry/idempotency hardening, receipts, tests
+
+### P2 — Client outbound UX polish
+
+- Paths: `apps/flavoros/src/app/(client)/communications/**`, relevant shared components/hooks
+- Scope: queued/executed/failed states, pull-back affordance polish, error messaging
+
+### P3 — Admin outbound diagnostics polish
+
+- Paths: `apps/flavoros/src/app/admin/**`, `admin-api.ts`, `admin-surfaces.ts`, `components/admin/**`
+- Scope: failure diagnostics, filters by provider/state, receipt visibility
+
+### P4 — Verification and rollout guardrails
+
+- Paths: `scripts/**`, `.github/workflows/**`, docs/runbooks
+- Scope: smoke expansion for outbound flow, CI coverage additions, post-deploy verification checklist
+
+### P5 — Taxonomy guide
+
+- Paths: `docs/**`
+- Scope: `docs/FLAVOROS_TAXONOMY.md`, docs index wiring, vocabulary lock for post-Lane-J terms
 
 ---
 
@@ -201,7 +277,8 @@ Plus post-slice: **admin** live lists, **settings** wired, **API tests** for cor
 | Local dev | `docs/planning/local_dev_runbook.md` |
 | Client app | `apps/flavoros/` |
 | API | `services/api/` |
-| Fixtures (remaining) | `apps/flavoros/src/lib/fixtures.ts` |
+| Shared channel loader | `apps/flavoros/src/lib/hooks/useChannelData.ts` |
+| Fixtures (types only) | `apps/flavoros/src/lib/fixtures.ts` |
 | API client | `apps/flavoros/src/lib/api.ts` |
 | Admin API client | `apps/flavoros/src/lib/admin-api.ts` |
 | Mappers | `apps/flavoros/src/lib/mappers.ts` |
@@ -215,7 +292,7 @@ Plus post-slice: **admin** live lists, **settings** wired, **API tests** for cor
 ## Follow-Up: File-Level Task List
 
 - **Slice (historical):** [`build_vertical_slice_tasks.md`](./build_vertical_slice_tasks.md) — steps 1–5 complete
-- **Next work:** [`next_session_handoff.md`](./next_session_handoff.md) — lanes I, D, E, H, J
+- **Next work:** [`next_session_handoff.md`](./next_session_handoff.md) — Lane J hardening + taxonomy + runtime follow-ons
 
 When starting implementation in a new agent session, point the agent at:
 
@@ -229,5 +306,5 @@ When starting implementation in a new agent session, point the agent at:
 ## Assessment Provenance
 
 - Initial capture: product review + repo inspection (May 2026).
-- **2026-05-19:** Updated after vertical slice steps 1–5 and parallel lanes A, B, C, F, G.
+- **2026-05-19:** Updated after vertical slice steps 1–5 and post-slice lanes A through J.
 - Intended as a durable handoff for humans and coding agents.

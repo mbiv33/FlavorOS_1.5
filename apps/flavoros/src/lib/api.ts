@@ -72,6 +72,31 @@ export type ApprovalRead = {
   created_at: string;
 };
 
+export type OutboundStatus = "queued" | "executed" | "failed" | "pulled_back";
+
+export type OutboundActionRead = {
+  id: string;
+  client_id: string;
+  approval_id: string;
+  artifact_id: string | null;
+  provider_connection_id: string | null;
+  provider: string;
+  action_type: string;
+  status: OutboundStatus;
+  target_reference_json: Record<string, unknown> | null;
+  payload_json: Record<string, unknown> | null;
+  idempotency_key: string | null;
+  last_error_summary: string | null;
+  executed_at: string | null;
+  execution_result_json: Record<string, unknown> | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ApprovalDecideRead = ApprovalRead & {
+  outbound_action: OutboundActionRead | null;
+};
+
 export type OnboardingSaveResponse = {
   trigger: string;
   onboarding_status: string;
@@ -158,10 +183,41 @@ export async function decideApproval(
   session: FlavorOSSession,
   approvalId: string,
   decision: "approved" | "rejected",
-): Promise<ApprovalRead> {
-  return apiRequest<ApprovalRead>(`/approvals/${approvalId}/decide`, session, {
+): Promise<ApprovalDecideRead> {
+  return apiRequest<ApprovalDecideRead>(`/approvals/${approvalId}/decide`, session, {
     method: "POST",
     body: JSON.stringify({ decision }),
+  });
+}
+
+export async function listOutboundActions(
+  session: FlavorOSSession,
+  filters?: { status?: OutboundStatus; provider?: string; artifact_id?: string },
+): Promise<OutboundActionRead[]> {
+  const params = new URLSearchParams();
+  if (filters?.status) params.set("status", filters.status);
+  if (filters?.provider) params.set("provider", filters.provider);
+  if (filters?.artifact_id) params.set("artifact_id", filters.artifact_id);
+  const qs = params.toString();
+  return apiRequest<OutboundActionRead[]>(
+    qs ? `/outbound-actions?${qs}` : "/outbound-actions",
+    session,
+  );
+}
+
+export async function getOutboundAction(
+  session: FlavorOSSession,
+  outboundId: string,
+): Promise<OutboundActionRead> {
+  return apiRequest<OutboundActionRead>(`/outbound-actions/${outboundId}`, session);
+}
+
+export async function pullBackOutboundAction(
+  session: FlavorOSSession,
+  outboundId: string,
+): Promise<OutboundActionRead> {
+  return apiRequest<OutboundActionRead>(`/outbound-actions/${outboundId}/pull-back`, session, {
+    method: "POST",
   });
 }
 

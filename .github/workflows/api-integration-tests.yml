@@ -44,4 +44,5 @@ jobs:
           .venv/bin/python -m pytest \
             tests/test_provider_first_sync.py \
             tests/test_approvals_decide.py \
+            tests/test_outbound_actions.py \
             -v --tb=short

@@ -15,6 +15,7 @@ export const ADMIN_TILES = [
   { slug: "gbrain", title: "GBrain" },
   { slug: "artifacts", title: "Artifact queue" },
   { slug: "approvals", title: "Approval queue" },
+  { slug: "outbound", title: "Outbound actions" },
   { slug: "logs", title: "Logs" },
   { slug: "config", title: "Config" },
 ] as const;
@@ -88,6 +89,15 @@ export const ADMIN_SURFACES: Record<string, AdminSurfaceSpec> = {
       "Observability only — admin does not override client approvals here.",
     ],
   },
+  outbound: {
+    title: "Outbound actions",
+    subtitle: "Approval-gated communications write-back",
+    liveData: true,
+    notes: [
+      "Gmail send lifecycle: queued, executed, failed, pulled_back.",
+      "Linked approval, artifact, provider connection, and audit events.",
+    ],
+  },
   logs: {
     title: "Logs",
     subtitle: "Audit-safe runtime events",
@@ -138,6 +148,8 @@ export function formatTileMeta(
       return `${overview.artifactsPending} pending review`;
     case "approvals":
       return `${overview.approvalsPending} needs approval`;
+    case "outbound":
+      return "Gmail outbound queue";
     case "logs":
       return `${overview.auditRecent} recent audit events`;
     case "config":
