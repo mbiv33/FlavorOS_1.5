@@ -35,6 +35,43 @@ export type ProviderConnection = {
   enabled: boolean;
 };
 
+export type ProfileRead = {
+  id: string;
+  client_id: string;
+  user_id: string;
+  display_name: string;
+  timezone: string | null;
+  preferences: Record<string, unknown> | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ArtifactRead = {
+  id: string;
+  client_id: string;
+  kind: string;
+  title: string;
+  body: string | null;
+  meta: Record<string, unknown> | null;
+  status: "draft" | "ready" | "approved" | "rejected" | "archived";
+  created_by: string | null;
+  workflow_run_id: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ApprovalRead = {
+  id: string;
+  client_id: string;
+  artifact_id: string | null;
+  governed_action: string;
+  reason: string | null;
+  decision: "pending" | "approved" | "rejected" | "expired";
+  decided_by: string | null;
+  decided_at: string | null;
+  created_at: string;
+};
+
 export type OnboardingSaveResponse = {
   trigger: string;
   onboarding_status: string;
@@ -99,6 +136,39 @@ export async function apiRequest<T>(
     throw new Error(detail || `Request failed: ${response.status}`);
   }
   return (await response.json()) as T;
+}
+
+export async function getProfile(session: FlavorOSSession): Promise<ProfileRead> {
+  return apiRequest<ProfileRead>("/profiles/me", session);
+}
+
+export async function listArtifacts(session: FlavorOSSession): Promise<ArtifactRead[]> {
+  return apiRequest<ArtifactRead[]>("/artifacts", session);
+}
+
+export async function listApprovals(
+  session: FlavorOSSession,
+  decision?: string,
+): Promise<ApprovalRead[]> {
+  const path = decision ? `/approvals?decision=${decision}` : "/approvals";
+  return apiRequest<ApprovalRead[]>(path, session);
+}
+
+export async function decideApproval(
+  session: FlavorOSSession,
+  approvalId: string,
+  decision: "approved" | "rejected",
+): Promise<ApprovalRead> {
+  return apiRequest<ApprovalRead>(`/approvals/${approvalId}/decide`, session, {
+    method: "POST",
+    body: JSON.stringify({ decision }),
+  });
+}
+
+export async function listProviderConnections(
+  session: FlavorOSSession,
+): Promise<ProviderConnection[]> {
+  return apiRequest<ProviderConnection[]>("/providers", session);
 }
 
 export async function login(input: {

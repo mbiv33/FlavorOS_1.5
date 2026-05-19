@@ -25,6 +25,7 @@ Rules:
 - External planning workspaces are allowed as historical inputs, but they are not the source of truth once a concept is promoted into the FlavorOS 1.5 repo.
 - The current priority guide for build sequencing is [`planning/current_build_plan.md`](planning/current_build_plan.md).
 - The broader migration status across MVP and future features is tracked in [`planning/feature_migration_inventory.md`](planning/feature_migration_inventory.md).
+- **Coding agents starting a new session:** read [`planning/next_session_handoff.md`](planning/next_session_handoff.md) first (demo slice + post-slice lanes complete; pick up Lane I/D/E/H/J).
 
 ## Canon Order
 

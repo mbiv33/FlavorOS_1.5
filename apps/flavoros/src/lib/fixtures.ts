@@ -75,6 +75,7 @@ export type InboxItem = {
   when: string;
   canDefer?: boolean;
   sourceLinkLabel?: string;
+  approvalId?: string;
 };
 
 export const inboxItems: InboxItem[] = [

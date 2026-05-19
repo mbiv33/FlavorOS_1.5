@@ -1,19 +1,25 @@
+"use client";
+
 import Link from "next/link";
+
 import { SurfaceFrame, SurfaceSection } from "@/components/SurfaceFrame";
 import { ClientInbox } from "@/components/ClientInbox";
 import { GoalsStrip } from "@/components/GoalsStrip";
 import { MiniCalendar } from "@/components/MiniCalendar";
 import { Card, CardMeta, CardTitle } from "@/components/Card";
-import {
-  inboxItems,
-  todayOperatingPicture,
-} from "@/lib/fixtures";
+import { useCommandCenterData } from "@/lib/hooks/useCommandCenterData";
+import { buildGreeting, todayDateLine } from "@/lib/mappers";
 
 export default function CommandCenterPage() {
+  const { profile, inboxItems, loading, error } = useCommandCenterData();
+
+  const greeting = profile ? buildGreeting(profile.display_name) : "Good day.";
+  const dateLine = todayDateLine();
+
   return (
     <SurfaceFrame
-      title={todayOperatingPicture.greeting}
-      description={`${todayOperatingPicture.date} · ${todayOperatingPicture.dayStatus} · ${todayOperatingPicture.nextFocus}`}
+      title={greeting}
+      description={dateLine}
       action={
         <Link
           href="/meetings"
@@ -26,10 +32,7 @@ export default function CommandCenterPage() {
       <SurfaceSection
         title="Goals & Milestones"
         action={
-          <Link
-            href="/projects"
-            className="text-xs text-muted hover:text-foreground"
-          >
+          <Link href="/projects" className="text-xs text-muted hover:text-foreground">
             Open Projects →
           </Link>
         }
@@ -37,15 +40,27 @@ export default function CommandCenterPage() {
         <GoalsStrip />
       </SurfaceSection>
 
-      <ClientInbox items={inboxItems} />
+      {error ? (
+        <p className="rounded-md bg-rose-50 px-4 py-3 text-sm text-rose-800">{error}</p>
+      ) : loading ? (
+        <p className="text-sm text-muted">Loading inbox…</p>
+      ) : inboxItems.length === 0 ? (
+        <section className="space-y-3">
+          <header className="flex items-baseline justify-between">
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-strong">
+              Client Inbox
+            </h2>
+          </header>
+          <p className="text-sm text-muted">No items yet — your inbox will populate after the first provider sync.</p>
+        </section>
+      ) : (
+        <ClientInbox items={inboxItems} />
+      )}
 
       <SurfaceSection
         title="Events & Happenings"
         action={
-          <Link
-            href="/calendar"
-            className="text-xs text-muted hover:text-foreground"
-          >
+          <Link href="/calendar" className="text-xs text-muted hover:text-foreground">
             Open Calendar →
           </Link>
         }

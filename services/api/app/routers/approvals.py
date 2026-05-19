@@ -11,7 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.deps import get_db, require_tenant_match
-from app.models import Approval, Tenant, User
+from app.models import Approval, AuditEvent, Tenant, User
 from app.schemas import ApprovalCreate, ApprovalDecide, ApprovalRead
 
 router = APIRouter(prefix="/approvals", tags=["approvals"])
@@ -71,6 +71,20 @@ def decide_approval(approval_id: uuid.UUID, body: ApprovalDecide, tu: TenantUser
     approval.decision = body.decision
     approval.decided_by = user.id
     approval.decided_at = datetime.now(timezone.utc)
+    db.add(
+        AuditEvent(
+            client_id=tenant.id,
+            actor_id=user.id,
+            action="approval.decided",
+            resource_type="approval",
+            resource_id=approval.id,
+            detail={
+                "governed_action": approval.governed_action,
+                "decision": approval.decision,
+                "artifact_id": str(approval.artifact_id) if approval.artifact_id else None,
+            },
+        )
+    )
     db.commit()
     db.refresh(approval)
     return approval

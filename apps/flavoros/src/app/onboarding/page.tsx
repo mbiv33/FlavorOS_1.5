@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
 import {
@@ -12,6 +13,7 @@ import {
   ProviderSyncResponse,
   FlavorOSSession,
 } from "@/lib/api";
+import { isClientReadyForCommandCenter } from "@/lib/onboarding-gate";
 
 type ContextAccount = {
   contextId: string;
@@ -151,6 +153,7 @@ function onboardingPayload() {
 }
 
 export default function OnboardingPage() {
+  const router = useRouter();
   const [session, setSession] = useState<FlavorOSSession | null>(null);
   const [intake, setIntake] = useState<OnboardingSaveResponse | null>(null);
   const [connections, setConnections] = useState<ProviderConnection[]>([]);
@@ -159,8 +162,16 @@ export default function OnboardingPage() {
   const [busyId, setBusyId] = useState<string | null>(null);
 
   useEffect(() => {
-    setSession(loadSession());
-  }, []);
+    const s = loadSession();
+    if (!s) {
+      router.replace("/login");
+      return;
+    }
+    setSession(s);
+    isClientReadyForCommandCenter(s).then((ready) => {
+      if (ready) router.replace("/command-center");
+    });
+  }, [router]);
 
   const eligibleAccounts = useMemo(
     () => CONTEXT_ACCOUNTS.filter((account) => account.authScheme === "oauth"),

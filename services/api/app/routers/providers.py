@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from app.adapters import ComposioAdapter
 from app.deps import get_composio, get_db, require_tenant_match
+from app.workflows.provider_first_sync import process_provider_first_sync
 from app.models import (
     AgentTask,
     AuditEvent,
@@ -326,6 +327,9 @@ async def sync_provider(
     db.refresh(conn)
     db.refresh(provider_event)
     db.refresh(workflow_run)
+
+    process_provider_first_sync(db, workflow_run.id)
+
     return {
         "provider_connection_id": conn.id,
         "provider": conn.provider,

@@ -1,0 +1,321 @@
+"""Tests for the provider_first_sync workflow processor.
+
+Covers:
+- sync → process → artifact + approval created
+- WorkflowRun moves queued → completed
+- AgentTask reaches completed status
+- Idempotency: calling processor twice on a completed run is a no-op
+- process_run endpoint: 200 for known type, 422 for unknown type
+"""
+
+from __future__ import annotations
+
+import uuid
+
+from fastapi.testclient import TestClient
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from app.models import AgentTask, Approval, Artifact, Tenant, User, WorkflowRun
+from app.workflows.provider_first_sync import process_provider_first_sync
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+
+def _make_workflow_run(db: Session, tenant: Tenant, provider: str = "gmail") -> WorkflowRun:
+    run = WorkflowRun(
+        client_id=tenant.id,
+        workflow_type="provider_first_sync",
+        agent="sinclair",
+        status="queued",
+        input_data={
+            "provider": provider,
+            "provider_connection_id": str(uuid.uuid4()),
+            "normalized_item_id": str(uuid.uuid4()),
+        },
+    )
+    db.add(run)
+    db.flush()
+    db.add(
+        AgentTask(
+            client_id=tenant.id,
+            workflow_run_id=run.id,
+            agent="sinclair",
+            task_type="provider_first_sync_review",
+            status="queued",
+            payload={},
+        )
+    )
+    db.commit()
+    db.refresh(run)
+    return run
+
+
+# ---------------------------------------------------------------------------
+# Unit tests — processor called directly
+# ---------------------------------------------------------------------------
+
+
+def test_processor_creates_artifact(db: Session, tenant_a: Tenant):
+    run = _make_workflow_run(db, tenant_a)
+    process_provider_first_sync(db, run.id)
+
+    artifacts = db.execute(
+        select(Artifact).where(Artifact.client_id == tenant_a.id)
+    ).scalars().all()
+    assert len(artifacts) == 1
+    art = artifacts[0]
+    assert art.kind == "report"
+    assert art.title == "First inbox sweep"
+    assert art.status == "ready"
+    assert art.workflow_run_id == run.id
+    assert art.created_by == "system:provider_first_sync"
+
+
+def test_processor_creates_pending_approval(db: Session, tenant_a: Tenant):
+    run = _make_workflow_run(db, tenant_a)
+    process_provider_first_sync(db, run.id)
+
+    approvals = db.execute(
+        select(Approval).where(Approval.client_id == tenant_a.id)
+    ).scalars().all()
+    assert len(approvals) == 1
+    appr = approvals[0]
+    assert appr.decision == "pending"
+    assert appr.governed_action == "provider_first_sync_review"
+    assert appr.artifact_id is not None
+
+
+def test_processor_approval_linked_to_artifact(db: Session, tenant_a: Tenant):
+    run = _make_workflow_run(db, tenant_a)
+    process_provider_first_sync(db, run.id)
+
+    artifact = db.execute(
+        select(Artifact).where(Artifact.client_id == tenant_a.id)
+    ).scalar_one()
+    approval = db.execute(
+        select(Approval).where(Approval.client_id == tenant_a.id)
+    ).scalar_one()
+    assert approval.artifact_id == artifact.id
+
+
+def test_processor_completes_workflow_run(db: Session, tenant_a: Tenant):
+    run = _make_workflow_run(db, tenant_a)
+    process_provider_first_sync(db, run.id)
+
+    db.refresh(run)
+    assert run.status == "completed"
+    assert run.completed_at is not None
+    assert run.output_data is not None
+    assert "artifact_id" in run.output_data
+
+
+def test_processor_completes_agent_task(db: Session, tenant_a: Tenant):
+    run = _make_workflow_run(db, tenant_a)
+    process_provider_first_sync(db, run.id)
+
+    task = db.execute(
+        select(AgentTask).where(
+            AgentTask.workflow_run_id == run.id,
+            AgentTask.task_type == "provider_first_sync_review",
+        )
+    ).scalar_one()
+    assert task.status == "completed"
+    assert task.result is not None
+    assert "artifact_id" in task.result
+    assert "approval_id" in task.result
+
+
+def test_processor_idempotent_on_completed_run(db: Session, tenant_a: Tenant):
+    run = _make_workflow_run(db, tenant_a)
+    process_provider_first_sync(db, run.id)
+    process_provider_first_sync(db, run.id)  # second call — should be a no-op
+
+    artifacts = db.execute(
+        select(Artifact).where(Artifact.client_id == tenant_a.id)
+    ).scalars().all()
+    assert len(artifacts) == 1
+
+    approvals = db.execute(
+        select(Approval).where(Approval.client_id == tenant_a.id)
+    ).scalars().all()
+    assert len(approvals) == 1
+
+
+def test_processor_noop_on_missing_run(db: Session, tenant_a: Tenant):
+    process_provider_first_sync(db, uuid.uuid4())  # should not raise
+
+    artifacts = db.execute(
+        select(Artifact).where(Artifact.client_id == tenant_a.id)
+    ).scalars().all()
+    assert len(artifacts) == 0
+
+
+# ---------------------------------------------------------------------------
+# HTTP endpoint tests — POST /workflows/{id}/process
+# ---------------------------------------------------------------------------
+
+
+def test_process_endpoint_creates_artifact_and_approval(
+    client: TestClient,
+    db: Session,
+    tenant_a: Tenant,
+    auth_headers_a: dict,
+):
+    run = _make_workflow_run(db, tenant_a)
+
+    resp = client.post(f"/workflows/{run.id}/process", headers=auth_headers_a)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["status"] == "completed"
+    assert data["output_data"]["artifact_id"]
+
+    artifacts = db.execute(
+        select(Artifact).where(Artifact.client_id == tenant_a.id)
+    ).scalars().all()
+    assert len(artifacts) == 1
+
+    approvals = db.execute(
+        select(Approval).where(Approval.client_id == tenant_a.id)
+    ).scalars().all()
+    assert len(approvals) == 1
+
+
+def test_process_endpoint_unknown_workflow_type(
+    client: TestClient,
+    db: Session,
+    tenant_a: Tenant,
+    auth_headers_a: dict,
+):
+    run = WorkflowRun(
+        client_id=tenant_a.id,
+        workflow_type="unsupported_type",
+        status="queued",
+    )
+    db.add(run)
+    db.commit()
+
+    resp = client.post(f"/workflows/{run.id}/process", headers=auth_headers_a)
+    assert resp.status_code == 422
+
+
+def test_process_endpoint_not_found(
+    client: TestClient,
+    auth_headers_a: dict,
+):
+    resp = client.post(f"/workflows/{uuid.uuid4()}/process", headers=auth_headers_a)
+    assert resp.status_code == 404
+
+
+def test_process_endpoint_tenant_isolation(
+    client: TestClient,
+    db: Session,
+    tenant_a: Tenant,
+    auth_headers_b: dict,
+):
+    run = _make_workflow_run(db, tenant_a)
+    resp = client.post(f"/workflows/{run.id}/process", headers=auth_headers_b)
+    assert resp.status_code == 404
+
+
+def test_processor_populates_artifact_meta(db: Session, tenant_a: Tenant):
+    provider_connection_id = uuid.uuid4()
+    normalized_item_id = uuid.uuid4()
+    run = WorkflowRun(
+        client_id=tenant_a.id,
+        workflow_type="provider_first_sync",
+        agent="sinclair",
+        status="queued",
+        input_data={
+            "provider": "gmail",
+            "provider_connection_id": str(provider_connection_id),
+            "normalized_item_id": str(normalized_item_id),
+        },
+    )
+    db.add(run)
+    db.commit()
+
+    process_provider_first_sync(db, run.id)
+
+    artifact = db.execute(
+        select(Artifact).where(Artifact.client_id == tenant_a.id)
+    ).scalar_one()
+    assert artifact.meta["provider"] == "gmail"
+    assert artifact.meta["provider_connection_id"] == str(provider_connection_id)
+    assert artifact.meta["normalized_item_id"] == str(normalized_item_id)
+    assert "Gmail" in artifact.body
+
+
+def test_sync_endpoint_materializes_artifact_and_approval(
+    client: TestClient,
+    db: Session,
+    tenant_a: Tenant,
+    auth_headers_a: dict,
+):
+    """Full sync path: POST /providers/gmail/sync creates artifact + pending approval."""
+    save = client.post(
+        "/onboarding/save",
+        json={
+            "identity": {"display_name": "Alice", "timezone": "UTC", "locale": "en-US"},
+            "authority_defaults": {},
+            "onboarding": {"status": "pending"},
+            "contexts": [
+                {
+                    "context_id": "business",
+                    "context_type": "business",
+                    "display_name": "Business",
+                    "status": "active",
+                    "context_accounts": [
+                        {
+                            "context_account_id": "business_gmail",
+                            "provider": "gmail",
+                            "context_account_purpose": "email",
+                            "account_alias": "business_email",
+                            "auth_scheme": "oauth",
+                        }
+                    ],
+                }
+            ],
+        },
+        headers=auth_headers_a,
+    )
+    assert save.status_code == 200
+    provider_connection_id = save.json()["provider_connections"][0]["id"]
+
+    callback = client.get(
+        "/providers/callback",
+        params={
+            "provider_connection_id": provider_connection_id,
+            "status": "ACTIVE",
+            "connected_account_id": "ca_sync_test",
+        },
+        headers=auth_headers_a,
+    )
+    assert callback.status_code == 200
+
+    sync = client.post(
+        "/providers/gmail/sync",
+        json={"provider_connection_id": provider_connection_id},
+        headers=auth_headers_a,
+    )
+    assert sync.status_code == 200
+    assert sync.json()["workflow_run_id"]
+
+    artifacts = db.execute(
+        select(Artifact).where(Artifact.client_id == tenant_a.id)
+    ).scalars().all()
+    approvals = db.execute(
+        select(Approval).where(Approval.client_id == tenant_a.id)
+    ).scalars().all()
+    assert len(artifacts) >= 1
+    report = next(a for a in artifacts if a.kind == "report")
+    assert report.title == "First inbox sweep"
+    assert report.status == "ready"
+
+    assert len(approvals) == 1
+    assert approvals[0].decision == "pending"
+    assert approvals[0].artifact_id == report.id
+    assert approvals[0].governed_action == "provider_first_sync_review"

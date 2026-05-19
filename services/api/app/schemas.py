@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, Field
 
 
 class HealthResponse(BaseModel):
@@ -14,7 +14,7 @@ class HealthResponse(BaseModel):
 
 class LoginRequest(BaseModel):
     tenant_slug: str = Field(..., min_length=1, max_length=64)
-    email: EmailStr
+    email: str
     password: str
 
 
@@ -32,7 +32,7 @@ class TokenPayload(BaseModel):
 
 class UserPublic(BaseModel):
     id: uuid.UUID
-    email: EmailStr
+    email: str
     tenant_id: uuid.UUID
     tenant_slug: str
     role: str

@@ -47,16 +47,16 @@ Canonical repo homes:
 | Feature | Source | Repo status | Notes |
 |---|---|---|---|
 | Delivery control plane | MVP plan | `partial` | Repo-native planning docs and project-management skills exist; implementation support remains partial |
-| Visualization and surfaces | MVP plan | `partial` | Client/admin shells exist; real data and interaction depth are still partial |
+| Visualization and surfaces | MVP plan | `partial` | Command Center, admin, settings on API; channel/briefing pages still largely fixture-driven (Lane I) |
 | Storage and data-flow architecture | MVP plan | `canonical_doc` | Covered in `docs/architecture/storage_data_flow_model.md` and related docs |
 | Normalization configuration/model | MVP plan | `canonical_doc` | Strong doc coverage, but not yet a full working normalization subsystem |
 | Google Workspace ingestion | MVP plan | `partial` | Tier 1 provider target covering Gmail, Calendar, Docs, Sheets, and Slides; no complete ingestion path yet |
 | Project management / contacts / files ingestion | MVP plan | `missing_implementation` | Tier 2 provider target; retained but not complete |
 | Selected social DM ingestion | MVP plan | `missing_implementation` | Tier 2 provider target; retained but not complete |
 | Finance / Twilio integrations | MVP plan | `canonical_doc` | Tier 3 future/adjacent unless promoted |
-| Onboarding | MVP plan | `canonical_doc` | Docs/envelope fixtures exist; app/script implementation is missing |
-| Agent runtime and artifact flow | MVP plan | `partial` | Good API/doc coverage, but orchestrator remains stubbed |
-| Approval packet flow | MVP plan | `partial` | Models and routes exist; full execution flow remains incomplete |
+| Onboarding | MVP plan | `partial` | App wired: login gate, onboarding UI, first sync; docs/envelope fixtures still canonical for some flows |
+| Agent runtime and artifact flow | MVP plan | `partial` | Demo loop via inline `provider_first_sync`; orchestrator remains stubbed |
+| Approval packet flow | MVP plan | `partial` | Decide UI + audit on demo path; write-back (step 7) not implemented |
 | Outbound sync to source systems | MVP plan | `missing_implementation` | Captured in `current_build_plan.md` and planned feature catalog; not implemented end-to-end |
 | Visible client app surface | MVP plan | `implemented` | `apps/flavoros` contains the active client route tree |
 | Visible admin/operator surface | MVP plan | `implemented` | `apps/flavoros` contains the active `/admin` diagnostics route tree |

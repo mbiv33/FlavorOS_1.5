@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 
 import { login, saveSession } from "@/lib/api";
+import { isClientReadyForCommandCenter } from "@/lib/onboarding-gate";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -21,7 +22,8 @@ export default function LoginPage() {
     try {
       const session = await login({ tenantSlug, email, password });
       saveSession(session);
-      router.push("/onboarding");
+      const ready = await isClientReadyForCommandCenter(session);
+      router.push(ready ? "/command-center" : "/onboarding");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed");
     } finally {
@@ -75,7 +77,7 @@ export default function LoginPage() {
           disabled={isSubmitting}
           className="w-full rounded-md bg-accent px-4 py-2.5 text-sm font-medium text-accent-foreground hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {isSubmitting ? "Signing in..." : "Continue to onboarding"}
+          {isSubmitting ? "Signing in..." : "Sign in"}
         </button>
         <p className="text-center text-xs text-muted">
           <Link href="/" className="underline hover:text-foreground">

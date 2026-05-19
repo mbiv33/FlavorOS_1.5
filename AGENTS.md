@@ -24,7 +24,7 @@ Prefer gbrain when:
 - "What did we decide last time?" / past plans, retros, learnings:
     `gbrain search "<terms>"`
 
-Grep is still right for known exact strings, regex, multiline patterns, and file globs. Run `/sync-gbrain` to refresh, `/sync-gbrain --full` for full reindex.
+Grep is still right for exact string matches, regular expressions, multiline patterns, and file globs. Run `/sync-gbrain` to refresh, `/sync-gbrain --full` for full reindex.
 
 <!-- gstack-gbrain-search-guidance:end -->
 
@@ -33,7 +33,7 @@ Grep is still right for known exact strings, regex, multiline patterns, and file
 **Before doing ANY work, verify gstack is installed:**
 
 ```bash
-test -d ~/.Codex/skills/gstack/bin && echo "GSTACK_OK" || echo "GSTACK_MISSING"
+test -d ~/.claude/skills/gstack/bin && echo "GSTACK_OK" || echo "GSTACK_MISSING"
 ```
 
 If GSTACK_MISSING: STOP. Do not proceed. Tell the user:
@@ -41,8 +41,8 @@ If GSTACK_MISSING: STOP. Do not proceed. Tell the user:
 > gstack is required for all AI-assisted work in this repo.
 > Install it:
 > ```bash
-> git clone --depth 1 https://github.com/garrytan/gstack.git ~/.Codex/skills/gstack
-> cd ~/.Codex/skills/gstack && ./setup --team
+> git clone --depth 1 https://github.com/garrytan/gstack.git ~/.claude/skills/gstack
+> cd ~/.claude/skills/gstack && ./setup --team
 > ```
 > Then restart your AI coding tool.
 
@@ -50,7 +50,7 @@ Do not skip skills, ignore gstack errors, or work around missing gstack.
 
 Using gstack skills: After install, skills like /qa, /ship, /review, /investigate,
 and /browse are available. Use /browse for all web browsing.
-Use ~/.Codex/skills/gstack/... for gstack file paths (the global path).
+Use ~/.claude/skills/gstack/... for gstack file paths (the global path).
 
 ## Deploy Configuration (Vercel)
 

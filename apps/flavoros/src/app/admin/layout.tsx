@@ -1,9 +1,14 @@
 import { AppShell } from "@/components/AppShell";
+import { SessionGuard } from "@/components/SessionGuard";
 
 export default function AdminLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  return <AppShell variant="admin">{children}</AppShell>;
+  return (
+    <SessionGuard>
+      <AppShell variant="admin">{children}</AppShell>
+    </SessionGuard>
+  );
 }

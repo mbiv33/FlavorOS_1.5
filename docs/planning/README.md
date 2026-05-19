@@ -32,12 +32,17 @@ Use `../README.md` as the main docs index.
 | 4 | `feature_migration_inventory.md` | Migration/status tracker |
 | 5 | `mvp_build_notes.md` | Supporting context only |
 | — | `build_roadmap_assessment.md` | Point-in-time execution snapshot; defers to rank 1 if conflict |
+| — | `next_session_handoff.md` | **Agent session entry point** after slice + post-slice lanes A–G |
 
 ## Current Planning Notes
 
 | File | Purpose |
 |---|---|
 | `current_build_plan.md` | Canonical development plan and current priority order |
-| `build_roadmap_assessment.md` | Where-we-are assessment, gap diagnosis, and recommended build order toward first vertical slice |
+| **`next_session_handoff.md`** | **Start here in a new chat** — done work, ready lanes (I/D/E/H/J), constraints, verification |
+| `parallel_lanes_tracker.md` | Lane ownership, status, session log |
+| `local_dev_runbook.md` | Local API + Next + Postgres setup and smoke paths |
+| `build_roadmap_assessment.md` | Where-we-are assessment, gaps, recommended order (updated 2026-05-19) |
+| `build_vertical_slice_tasks.md` | File-level checklist for demo vertical slice (steps 1–5, complete) |
 | `mvp_build_notes.md` | Supporting MVP context and implementation notes |
 | `feature_migration_inventory.md` | Canonical inventory of MVP and future feature coverage in this repo |

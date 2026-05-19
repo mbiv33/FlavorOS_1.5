@@ -9,47 +9,59 @@ It does **not** replace the canonical development plan. If anything here conflic
 | Canon | Role |
 |---|---|
 | `current_build_plan.md` | Phases, proof loop, non-negotiables |
-| **This file** | Snapshot assessment + practical sequencing toward first vertical slice |
-| *(planned)* `build_vertical_slice_tasks.md` | File-level implementation checklist (follow-up to this assessment) |
+| **This file** | Snapshot assessment + practical sequencing |
+| [`build_vertical_slice_tasks.md`](./build_vertical_slice_tasks.md) | File-level checklist for demo vertical slice (steps 1–5) |
+| [`next_session_handoff.md`](./next_session_handoff.md) | **Start here** in a new agent session — done work, ready lanes, constraints |
+| [`parallel_lanes_tracker.md`](./parallel_lanes_tracker.md) | Parallel lane ownership and session log |
 
 ## Executive Summary
 
-FlavorOS is **not** at “start from zero.” The repo has:
+*Updated 2026-05-19 after vertical slice + post-slice lanes B, C, F, G.*
 
-- A navigable client app and operator console (mostly fixture-driven UI)
-- A substantive FastAPI + Postgres substrate (auth, onboarding, providers, artifacts, approvals, workflows, universe, audit)
-- A working login + onboarding path wired to the API
+FlavorOS has crossed the **first integration milestone**:
 
-The bottleneck is **integration**, not vision or surface count: client surfaces still read `apps/flavoros/src/lib/fixtures.ts`, and the sync path stops at a **queued** workflow run without producing inbox-visible artifacts or approvals.
+- **Demo vertical slice is complete:** login → onboarding → sync → Command Center artifact + approval → client decide with audit.
+- **Operator console (admin)** reads live list data from the API (`/admin`).
+- **Settings** shows profile and provider connections from the API.
+- **API regression tests** cover first-sync processor and approval decide paths (22 tests).
 
-The highest-leverage next milestone:
+The bottleneck has shifted from “no end-to-end loop” to **breadth and depth**:
 
-> **Demo vertical slice:** Login → onboarding (Gmail connect + sync) → Command Center shows one real artifact and one real approval from the API → client approves it.
+- Remaining **client channel surfaces** still use `fixtures.ts` (calendar, briefings, travel, etc.).
+- **Agent runtime** remains stub + inline processor (not durable multi-step workflows).
+- **Write-back** (MVP step 7) is not started and remains the highest-trust integration.
+
+**Next agents:** read [`next_session_handoff.md`](./next_session_handoff.md) before claiming work.
 
 ---
 
 ## Where The Repo Stands
 
+*Updated 2026-05-19.*
+
 | Layer | Status | Notes |
 |---|---|---|
-| **Client UI shells** | Strong | Command Center, briefings, meetings, channels, admin console exist and match MVP IA intent |
-| **API + Postgres** | Substantial | Routers: auth, onboarding, profiles, universe, artifacts, approvals, workflows, providers, audit. Alembic migrations through agent/ingest models |
-| **UI → API** | Thin | Only **login** and **onboarding** use `apiRequest`; all `(client)` surfaces import fixtures |
-| **Onboarding** | Partial | OAuth connect-link + sync endpoints exist; no gate routing “ready” clients to Command Center |
-| **Provider ingestion** | Partial | `POST /providers/{provider}/sync` creates `ProviderEvent`, `NormalizedItem`, queued `WorkflowRun`, `AgentTask`, audit — does not complete into Client Artifacts |
-| **Agent runtime** | Stub | `StubOrchestratorAdapter` completes immediately in isolation; sync path does not drive artifact/approval creation for the UI |
-| **Admin console** | Shell | Static tiles and copy; not wired to API lists |
+| **Client UI shells** | Strong | Command Center, briefings, meetings, channels, admin exist; match MVP IA |
+| **API + Postgres** | Substantial | Auth, onboarding, profiles, universe, artifacts, approvals, workflows, providers, audit |
+| **UI → API (hero path)** | Done (slice) | Login, onboarding, Command Center, LeftNav, Settings use `api.ts` |
+| **UI → API (admin)** | Done (Lane C) | `/admin` via `admin-api.ts` + list endpoints; `SessionGuard` on admin layout |
+| **UI → API (channels)** | Partial | Other `(client)` surfaces still fixture-driven — **Lane I** |
+| **Onboarding** | Done (gate) | SessionGuard, readiness routing, sync on onboarding |
+| **Provider ingestion** | Done (demo) | Inline `process_provider_first_sync` → artifact + pending approval |
+| **Agent runtime** | Stub + inline | `StubOrchestratorAdapter`; demo loop in `provider_first_sync.py` |
+| **Write-back** | Not started | Lane J blocked until decide path stable in prod/CI |
 
 ### Phase Alignment (`current_build_plan.md`)
 
 | Phase | Plan status | Assessment |
 |---|---|---|
-| 1 — Visualization & surfaces | Partial | Shells done; durable data binding not |
-| 2 — Database & storage | Partial | Models and CRUD exist; UI does not consume them |
-| 3 — Integrations | Partial | Composio adapter boundary + provider routes; one Google account enough for demo |
-| 4 — Onboarding | Partial | UI + API exist; completion gate and Client Universe envelope flow incomplete |
-| 5 — Provider ingestion | Partial | First-sync path writes events; end-to-end normalization → inbox not visible |
-| 6 — Agent workflows | Partial | Skills/docs strong; runtime execution does not close the loop |
+| 1 — Visualization & surfaces | Partial | Command Center + admin + settings wired; channel pages on fixtures |
+| 2 — Database & storage | Done (demo scope) | Models + CRUD; hero surfaces consume API |
+| 3 — Integrations | Partial | Composio boundary + provider routes; prod OAuth matrix deferred |
+| 4 — Onboarding | Done (demo scope) | Gate + sync path complete |
+| 5 — Provider ingestion | Done (demo scope) | First-sync → inbox loop closed |
+| 6 — Agent workflows | Partial | Inline processor only; real orchestration deferred |
+| 7 — Write-back | Not started | Highest complexity remaining for full MVP |
 
 ---
 
@@ -57,125 +69,114 @@ The highest-leverage next milestone:
 
 From `current_build_plan.md`, the MVP must prove:
 
-1. Useful client and admin surfaces render.
-2. Client, provider, workflow, artifact, approval, and audit state persist durably.
-3. Google Workspace (and boundaries) connect through approved adapters.
-4. A client is onboarded into a governed Client Universe.
-5. Provider events are captured, normalized, and routed.
-6. Agents produce workflow runs, artifacts, approvals, and completion summaries.
-7. Approved actions can write back channel-correctly (approval-gated, audit-safe).
+1. Useful client and admin surfaces render. — **Partial:** admin live; channels mostly fixtures
+2. Client, provider, workflow, artifact, approval, and audit state persist durably. — **Yes (demo path)**
+3. Google Workspace (and boundaries) connect through approved adapters. — **Partial (demo OAuth)**
+4. A client is onboarded into a governed Client Universe. — **Yes (demo scope)**
+5. Provider events are captured, normalized, and routed. — **Partial (first sync)**
+6. Agents produce workflow runs, artifacts, approvals, and completion summaries. — **Yes (inline demo loop)**
+7. Approved actions can write back channel-correctly. — **No (Lane J)**
 
-**First proof target:** demonstrate steps 1–6 once for one demo tenant; step 7 can start as audited stub write-back.
+**Achieved:** steps 1–6 for **one demo tenant** on the hero path. **Next proof:** broaden surfaces (step 1 depth) then write-back (step 7).
 
 ---
 
 ## Gap Diagnosis
 
-### Primary gap: fixtures vs API
+*Updated 2026-05-19.*
 
-`apps/flavoros/src/lib/fixtures.ts` explicitly states surfaces are scaffolded and will wire to durable storage as Phase 2 lands. That wiring is now the critical path.
+### Closed (vertical slice + post-slice)
 
-**Files still on fixtures (representative):**
+- Sync → artifact + approval → Command Center inbox
+- Onboarding gate and SessionGuard
+- Command Center / LeftNav off fixtures
+- Approvals decide UI + audit on decide
+- Admin console list surfaces + overview counts (Lane C)
+- Settings profile + provider connections (Lane F)
+- API tests for processor and decide (Lane B)
 
-- `apps/flavoros/src/app/(client)/command-center/page.tsx`
-- All other `(client)/*` channel and briefing pages
-- `apps/flavoros/src/components/LeftNav.tsx`, `GoalsStrip.tsx`, `MiniCalendar.tsx`
-- `apps/flavoros/src/app/admin/page.tsx` (static tile metadata)
+### Remaining: channel surfaces on fixtures
 
-**Files already on API:**
+**Still fixture-driven (Lane I):**
 
-- `apps/flavoros/src/app/login/page.tsx`
-- `apps/flavoros/src/app/onboarding/page.tsx`
+- `(client)/calendar`, `communications`, `travel`, `briefings/*`, `meetings/*`
+- `apps/flavoros/src/components/GoalsStrip.tsx`, `MiniCalendar.tsx`
 
-### Secondary gap: sync does not populate the inbox
+**Pattern:** reuse `mappers.ts` + hooks pattern from Command Center.
 
-`services/api/app/routers/providers.py` — `sync_provider` creates durable rows and queues `provider_first_sync` / `provider_first_sync_review`, but nothing promotes results into `artifacts` and `approvals` that the Command Center can list.
+### Remaining: production hardening
 
-Until that promotion exists, API wiring on the frontend will show **empty** states even when sync succeeds.
+- Async/worker processing for workflows (inline sync acceptable for demo only)
+- Full Composio OAuth matrix
+- CI running pytest (Lane E)
+- Optional smoke script (Lane D)
 
-### Tertiary gap: onboarding is not a gate
+### Remaining: platform depth
 
-Login always routes to `/onboarding`. Ready clients should land on `/command-center` with provider status reflected in settings/admin.
+- GBrain ingestion (Lane H)
+- Real orchestrator / multi-agent tasks (not stub-only)
+- Write-back (Lane J)
 
 ---
 
 ## Recommended Build Order (Next 2–4 Weeks)
 
-### 1. Stabilize local dev (~0.5 day)
+*Supersedes the pre-slice ordering below for **new** work. Steps 1–5 and post-slice lanes A–G are complete.*
 
-**Goal:** Repeatable login → onboarding → API calls.
+### 1. Stabilize verification (~0.5 day) — Lane D optional
 
-- Postgres up (`docker compose` or local)
-- `services/api`: `alembic upgrade head`, run API
-- `apps/flavoros`: `pnpm dev` with `NEXT_PUBLIC_FLAVOROS_API_URL=http://localhost:8000`
-- Verify seed tenant: `demo` / `client@demo.local` / `devclient`
+- Document or script: health, login, artifacts, approvals, admin lists
+- See [local_dev_runbook.md](./local_dev_runbook.md)
 
-### 2. Onboarding gate (1–2 days)
+### 2. Channel surfaces off fixtures (1–2 weeks) — Lane I
 
-**Goal:** Onboarding is entry governance, not a permanent home.
+**Goal:** Extend API wiring surface-by-surface (do not big-bang).
 
-- After login, evaluate provider connection status (`ready` / connected set)
-- Not ready → `/onboarding`
-- Ready → `/command-center`
-- Persist onboarding completion signal if not already on profile or provider metadata
+- Start with one channel (e.g. calendar or briefings)
+- `GET /artifacts`, `GET /approvals`, `mappers.ts`, session from `api.ts`
+- Keep fixtures only as optional empty-state fallback if desired
 
-### 3. Wire Command Center to API (3–5 days) — **highest leverage**
+### 3. CI for API (1–2 days) — Lane E
 
-**Goal:** One hero surface on real data.
+- Postgres service job + `alembic upgrade head` + `pytest` on PR
+- Use `services/api/.venv` or documented Python 3.11+ in workflow
 
-- `GET /profiles/me` — greeting, display name, timezone
-- `GET /artifacts` — map to inbox piles (urgent / needs attention / updates)
-- `GET /approvals` — “ready to approve” strip
-- Optional: keep fixtures only as **empty-state** fallback when API returns `[]`
-- Update `LeftNav` profile from API, not `clientProfile` fixture
+### 4. Operator / internal alpha polish (ongoing)
 
-### 4. Close sync → artifact loop (3–5 days, backend)
+- Admin is live; improve empty states, errors, pagination as needed
+- Do not expand `api.ts` for admin — stay on `admin-api.ts`
 
-**Goal:** First sync produces inbox-visible work.
+### 5. GBrain (when prioritized) — Lane H
 
-- When `provider_first_sync` workflow is queued, process it (inline after sync, worker, or explicit “process queue” endpoint)
-- Complete `WorkflowRun` via orchestrator (stub acceptable if it creates real rows)
-- Create **Client Artifact** (e.g. first-sweep summary) and **Approval** when the workflow requires sign-off
-- Existing `artifacts` and `approvals` routers then feed step 3
+- `subsystems/gbrain/**` per architecture docs
+- Not blocking demo or operator read path
 
-### 5. Approvals in the UI (2–3 days)
+### 6. Write-back (when unblocked) — Lane J
 
-**Goal:** Client can act on prepared work.
+**Goal:** Approval-gated outbound stub with audit.
 
-- Wire `ApprovalCard` to `GET /approvals` and `POST /approvals/{id}/decide`
-- Surface on Command Center and/or Reports
-- Audit events already modeled — ensure decide path writes them
+- Unblock after decide path trusted in CI/production
+- Highest product + security complexity
 
-### 6. Operator console read path (2–3 days)
+### Explicitly defer
 
-**Goal:** Developer/admin can see the same truth as the client.
-
-- Wire `/admin/*` surfaces to list: provider connections, workflow runs, artifacts, approvals, audit
-- Replace static tile counts on admin home with API-derived summaries where cheap
-
-### 7. Explicitly defer
-
-Do not block the vertical slice on:
-
-- Rewiring calendar, travel, communications, meetings to API (pattern comes from Command Center)
 - InstantDB as primary realtime path
-- Full Composio prod OAuth matrix (one Google account suffices)
-- GBrain ingestion, voice, Twilio, finance connector execution
-- Travel / Logistics and Finance as proof-loop dependencies
+- Voice, Twilio, finance connector execution
+- Rewriting entire fixture tree in one PR
 
 ---
 
-## Demo Vertical Slice (One-Milestone Definition)
+## Demo Vertical Slice (Definition — Achieved)
 
-Ship when a single demo tenant can:
+Shipped for demo tenant:
 
 1. Log in
 2. Complete onboarding and connect Gmail (or one Google provider)
 3. Run first sync
-4. See **at least one** real artifact and **one** real approval on Command Center
-5. Approve (or reject) from the UI with audit trail
+4. See at least one real artifact and one real approval on Command Center
+5. Approve or reject from the UI with audit trail
 
-This proves FlavorOS is a **client operating system** (artifact-first, approval-gated), not a UI mock.
+Plus post-slice: **admin** live lists, **settings** wired, **API tests** for core mutations.
 
 ---
 
@@ -183,9 +184,10 @@ This proves FlavorOS is a **client operating system** (artifact-first, approval-
 
 | If your goal is… | Build through… |
 |---|---|
-| Something you can **show** this month | Steps 1–5 |
-| **Internal operator alpha** | Add step 6 |
-| **Full MVP** per `current_build_plan.md` | Then broaden surfaces, briefing workflows, then write-back |
+| Something you can **show** this month | Steps 1–5 — **done** |
+| **Internal operator alpha** | Admin read path — **done** (Lane C); polish optional |
+| **Broader client UX** | Lane I (channel surfaces) |
+| **Full MVP** per `current_build_plan.md` | Lane I → CI (E) → GBrain (H) → write-back (J) |
 
 ---
 
@@ -193,30 +195,39 @@ This proves FlavorOS is a **client operating system** (artifact-first, approval-
 
 | Area | Path |
 |---|---|
+| **New session start** | `docs/planning/next_session_handoff.md` |
 | Canonical dev plan | `docs/planning/current_build_plan.md` |
+| Parallel lanes | `docs/planning/parallel_lanes_tracker.md` |
+| Local dev | `docs/planning/local_dev_runbook.md` |
 | Client app | `apps/flavoros/` |
 | API | `services/api/` |
-| Fixtures (to replace) | `apps/flavoros/src/lib/fixtures.ts` |
+| Fixtures (remaining) | `apps/flavoros/src/lib/fixtures.ts` |
 | API client | `apps/flavoros/src/lib/api.ts` |
+| Admin API client | `apps/flavoros/src/lib/admin-api.ts` |
+| Mappers | `apps/flavoros/src/lib/mappers.ts` |
 | Provider sync | `services/api/app/routers/providers.py` |
+| Sync processor | `services/api/app/workflows/provider_first_sync.py` |
 | Orchestrator stub | `services/api/app/adapters/orchestrator.py` |
-| Models | `services/api/app/models.py` |
-| Production deploy | `https://flavoros.vercel.app` (see root `CLAUDE.md` / `AGENTS.md`) |
+| Production deploy | `https://flavoros.vercel.app` (see root `AGENTS.md`) |
 
 ---
 
 ## Follow-Up: File-Level Task List
 
-The next planning artifact should be **`build_vertical_slice_tasks.md`** (or equivalent): concrete file touch points for Command Center wiring, onboarding gate, and sync → artifact promotion — derived from this assessment.
+- **Slice (historical):** [`build_vertical_slice_tasks.md`](./build_vertical_slice_tasks.md) — steps 1–5 complete
+- **Next work:** [`next_session_handoff.md`](./next_session_handoff.md) — lanes I, D, E, H, J
 
-When starting that work in a new agent session, point the agent at:
+When starting implementation in a new agent session, point the agent at:
 
-1. This file
-2. `docs/planning/current_build_plan.md`
-3. The instruction: “Produce file-level tasks for demo vertical slice (steps 1–5).”
+1. [`next_session_handoff.md`](./next_session_handoff.md)
+2. This assessment
+3. [`current_build_plan.md`](./current_build_plan.md)
+4. [`parallel_lanes_tracker.md`](./parallel_lanes_tracker.md) — claim a lane
 
 ---
 
 ## Assessment Provenance
 
-Captured from product comprehension review and repo inspection: docs canon, `apps/flavoros` surface inventory, `services/api` routers/models, and `fixtures.ts` / `api.ts` usage patterns. Intended as a durable handoff for humans and coding agents.
+- Initial capture: product review + repo inspection (May 2026).
+- **2026-05-19:** Updated after vertical slice steps 1–5 and parallel lanes A, B, C, F, G.
+- Intended as a durable handoff for humans and coding agents.

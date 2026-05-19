@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { clientProfile } from "@/lib/fixtures";
+import { useEffect, useState } from "react";
+import { getProfile, loadSession, type ProfileRead } from "@/lib/api";
 
 const CLIENT_NAV: Array<{ href: string; label: string }> = [
   { href: "/command-center", label: "Command Center" },
@@ -28,9 +29,31 @@ const ADMIN_NAV: Array<{ href: string; label: string }> = [
   { href: "/admin/config", label: "Config Editor" },
 ];
 
+function initials(name: string): string {
+  return name
+    .split(" ")
+    .slice(0, 2)
+    .map((w) => w[0])
+    .join("")
+    .toUpperCase();
+}
+
 export function LeftNav({ variant }: { variant: "client" | "admin" }) {
   const pathname = usePathname() ?? "";
   const items = variant === "client" ? CLIENT_NAV : ADMIN_NAV;
+  const [profile, setProfile] = useState<ProfileRead | null>(null);
+
+  useEffect(() => {
+    const session = loadSession();
+    if (!session) return;
+    getProfile(session)
+      .then(setProfile)
+      .catch(() => {});
+  }, []);
+
+  const displayName = profile?.display_name ?? "";
+  const userInitials = displayName ? initials(displayName) : "…";
+
   return (
     <nav className="flex h-full w-64 flex-col border-r border-border bg-surface">
       <div className="px-5 pb-3 pt-5">
@@ -47,13 +70,13 @@ export function LeftNav({ variant }: { variant: "client" | "admin" }) {
               className="flex h-10 w-10 items-center justify-center rounded-full bg-stone-200 text-sm font-semibold text-stone-700"
               aria-hidden
             >
-              {clientProfile.initials}
+              {userInitials}
             </div>
             <div className="min-w-0">
               <p className="truncate text-sm font-medium">
-                {clientProfile.displayName}
+                {displayName || <span className="text-muted">Loading…</span>}
               </p>
-              <p className="text-xs text-muted">{clientProfile.role}</p>
+              <p className="text-xs text-muted">Client</p>
             </div>
           </div>
           <div className="mx-5 mb-4">
