@@ -12,7 +12,6 @@ from sqlalchemy.orm import Session
 
 from app.adapters import ComposioAdapter
 from app.deps import get_composio, get_db, require_tenant_match
-from app.workflows.provider_first_sync import process_provider_first_sync
 from app.models import (
     AgentTask,
     AuditEvent,
@@ -34,6 +33,7 @@ from app.schemas import (
     ProviderSyncRead,
     ProviderSyncRequest,
 )
+from app.workflows.provider_first_sync import process_provider_first_sync
 
 router = APIRouter(prefix="/providers", tags=["providers"])
 
