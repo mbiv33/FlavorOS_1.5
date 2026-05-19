@@ -1,4 +1,10 @@
 import type { ArtifactRead, ApprovalRead } from "./api";
+import type {
+  BriefingDefinition,
+  BriefingPreparedStatus,
+  BriefingType,
+} from "./briefings-config";
+import { BRIEFING_DEFINITIONS } from "./briefings-config";
 import type { InboxItem, InboxPile, CardStatus } from "./fixtures";
 
 function relativeTime(iso: string): string {
@@ -71,4 +77,56 @@ export function todayDateLine(): string {
     month: "long",
     day: "numeric",
   });
+}
+
+export type BriefingSummary = BriefingDefinition & {
+  type: BriefingType;
+  preparedStatus: BriefingPreparedStatus;
+  topicCount: number;
+  approvalCount: number;
+};
+
+function deriveBriefingPreparedStatus(
+  artifacts: ArtifactRead[],
+  pendingApprovalCount: number,
+): BriefingPreparedStatus {
+  if (pendingApprovalCount > 0) return "ready";
+  if (artifacts.some((a) => a.status === "ready")) return "ready";
+  if (artifacts.some((a) => a.status === "draft")) return "in_progress";
+  if (artifacts.some((a) => a.status === "approved")) return "completed";
+  return "not_prepared";
+}
+
+export function buildBriefingSummaries(
+  artifacts: ArtifactRead[],
+  approvals: ApprovalRead[],
+): BriefingSummary[] {
+  const pendingApprovalCount = approvals.length;
+  const preparedStatus = deriveBriefingPreparedStatus(
+    artifacts,
+    pendingApprovalCount,
+  );
+  const topicCount = artifacts.length;
+
+  return (Object.keys(BRIEFING_DEFINITIONS) as BriefingType[]).map((type) => ({
+    type,
+    ...BRIEFING_DEFINITIONS[type],
+    preparedStatus,
+    topicCount,
+    approvalCount: pendingApprovalCount,
+  }));
+}
+
+/** Items for briefing detail: pending approvals first, then actionable artifacts. */
+export function briefingAttentionItems(
+  artifacts: ArtifactRead[],
+  approvals: ApprovalRead[],
+): InboxItem[] {
+  const items: InboxItem[] = [
+    ...approvals.map(approvalToInboxItem),
+    ...artifacts
+      .filter((a) => a.status === "ready" || a.status === "draft")
+      .map(artifactToInboxItem),
+  ];
+  return items.slice(0, 6);
 }

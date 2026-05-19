@@ -1,0 +1,47 @@
+# Additive CI: vertical-slice integration tests (Lane E).
+# Does not modify jobs in ci.yml.
+
+name: API integration tests
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "services/api/**"
+      - ".github/workflows/api-integration-tests.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "services/api/**"
+
+jobs:
+  vertical-slice-integration:
+    name: Provider sync + approvals decide
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/api
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: services/api/pyproject.toml
+
+      - name: Install API package
+        run: |
+          python -m venv .venv
+          .venv/bin/pip install -e ".[dev]"
+
+      - name: Pytest (slice integration)
+        env:
+          DATABASE_URL: "sqlite://"
+          API_SKIP_STARTUP_SEED: "true"
+          JWT_SECRET: "ci-test-secret"
+        run: |
+          .venv/bin/python -m pytest \
+            tests/test_provider_first_sync.py \
+            tests/test_approvals_decide.py \
+            -v --tb=short

@@ -137,6 +137,22 @@ cd services/api
 
 Expect **22 passed**. Use `.venv` — system Python 3.9 may fail on modern typing in dependencies.
 
+CI runs the same tests in [`.github/workflows/api-integration-tests.yml`](../../.github/workflows/api-integration-tests.yml) (additive job; does not change `ci.yml`).
+
+## Quick smoke script (Lane D)
+
+From repo root (API must be running on `127.0.0.1:8001`):
+
+```bash
+./scripts/smoke-vertical-slice.sh
+```
+
+Checks `GET /health` and `GET /docs`. Full demo path still requires manual login → onboarding → Command Center (see [build_vertical_slice_tasks.md](./build_vertical_slice_tasks.md) verification checklist).
+
+## Parallel agent coordination
+
+When multiple agents work the repo, use [parallel_lanes_tracker.md](./parallel_lanes_tracker.md) for slice lock, allowed paths per lane, and session log. GBrain-only work stays under `subsystems/gbrain/` — see `subsystems/gbrain/docs/integration/flavoros-monorepo.md`.
+
 ## Troubleshooting
 
 | Symptom | Likely cause | Fix |

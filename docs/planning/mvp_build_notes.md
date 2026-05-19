@@ -6,7 +6,7 @@ This file is supporting context. The canonical development plan and build priori
 
 Use this file for background on MVP purpose, agents, surfaces, and non-negotiables. If this file conflicts with `current_build_plan.md`, the current build plan wins.
 
-**Execution state (2026-05-19):** Demo vertical slice (steps 1–5) and post-slice lanes B/C/F/G are complete. For next work, see [`next_session_handoff.md`](./next_session_handoff.md) and [`build_roadmap_assessment.md`](./build_roadmap_assessment.md).
+**Execution state (2026-05-19):** Demo vertical slice (steps 1–5) and parallel lanes C/G/H/E plus post-slice B/D/F are complete. Lane I (channel surfaces) is in progress. For next work, see [`next_session_handoff.md`](./next_session_handoff.md), [`parallel_lanes_tracker.md`](./parallel_lanes_tracker.md), and [`build_roadmap_assessment.md`](./build_roadmap_assessment.md).
 
 ## MVP Positioning
 

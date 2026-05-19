@@ -1,9 +1,8 @@
 # Parallel Lanes Tracker
 
-> **New session?** Read [next_session_handoff.md](./next_session_handoff.md) first, then update this file when you claim or finish a lane.
-
-Update this file at the **start** and **end** of every parallel agent session.  
-Slice progress checkboxes live in [build_vertical_slice_tasks.md](./build_vertical_slice_tasks.md).
+> Update this file at the **start** and **end** of every parallel agent session.  
+> Slice progress checkboxes live in [build_vertical_slice_tasks.md](./build_vertical_slice_tasks.md).  
+> **New session:** [next_session_handoff.md](./next_session_handoff.md)
 
 ## Slice lock (steps 1–5)
 
@@ -15,55 +14,69 @@ Slice progress checkboxes live in [build_vertical_slice_tasks.md](./build_vertic
 | **Status** | `complete` |
 | **Last updated** | 2026-05-19 |
 
-**Rule:** Slice freeze zone is lifted for **post-slice lanes** below. Prefer isolated paths; avoid drive-by refactors in slice-owned files unless explicitly tasked.
+**Rule:** While status ≠ `complete`, only the slice owner edits paths in the [Slice freeze zone](#slice-freeze-zone-steps-15--do-not-touch). Post-slice: freeze lifted; still respect per-lane allowed paths.
 
-Per [build_vertical_slice_tasks.md](./build_vertical_slice_tasks.md): steps 1–5 done; demo vertical slice verified.
+## Slice freeze zone (steps 1–5 — do not touch while slice in progress)
+
+| Area | Paths |
+|---|---|
+| **Env / dev bootstrap** | `.env.example`, `apps/flavoros/.env.example`, `docker-compose.yml` (unless slice agent requests) |
+| **Client auth & gate** | `apps/flavoros/src/app/login/**`, `onboarding/**`, `SessionGuard.tsx`, `onboarding-gate.ts`, `(client)/layout.tsx` |
+| **API client (shared)** | `apps/flavoros/src/lib/api.ts`, `mappers.ts`, `hooks/useCommandCenterData.ts` |
+| **Command Center & nav** | `command-center/page.tsx`, `LeftNav.tsx`, `ApprovalCard.tsx`, `ClientInbox.tsx` (if slice touches) |
+| **Backend slice** | `services/api/app/routers/providers.py`, `approvals.py`, `onboarding.py`, `adapters/orchestrator.py`, `workflows/provider_first_sync.py` |
+| **Schemas** | `services/api/app/schemas.py` |
+| **Slice tests** | Tests for steps 2–5 owned by slice agent |
+| **Slice planning** | `build_vertical_slice_tasks.md` (checkboxes = slice progress) |
 
 ## Active parallel lanes
 
 | Lane | Owner | Status | Branch | Allowed paths | Open PR | Notes |
 |---|---|---|---|---|---|---|
-| C — Admin console | Parallel agent | `done` | `main` | `apps/flavoros/src/app/admin/**`, `admin-api.ts`, `admin-surfaces.ts`, `components/admin/**`, `hooks/useAdmin*.ts` | — | Live tiles + list surfaces via `admin-api.ts` |
-| G — Docs | Parallel agent | `done` | `main` | `docs/planning/local_dev_runbook.md`, this tracker, handoff docs | — | Runbook + planning sync |
-| H — GBrain | — | `idle` | — | `subsystems/gbrain/**` | — | Not started |
-| E — CI additive | — | `idle` | — | `.github/workflows/*` (new jobs only) | — | Optional; not started |
+| C — Admin console | Parallel agent | `done` | `parallel/lane-c-admin` | `apps/flavoros/src/app/admin/**`, `admin-api.ts`, `admin-surfaces.ts`, `components/admin/**`, `hooks/useAdmin*.ts` | — | Live tiles + lists via `admin-api.ts`; no `api.ts` extensions |
+| G — Docs | Parallel agent | `done` | `parallel/lane-g-docs` | `docs/planning/*` (except slice task checkboxes), `docs/architecture/**`, `docs/workflows/**` | — | Runbook, handoff, tracker, inventory |
+| H — GBrain | Parallel agent | `done` | `parallel/lane-h-gbrain` | `subsystems/gbrain/**` | — | FlavorOS monorepo integration doc |
+| E — CI additive | Parallel agent | `done` | `parallel/lane-e-ci` | `.github/workflows/api-integration-tests.yml` (new file only) | — | Slice integration tests job; did not edit `ci.yml` |
 
-## Post-slice queue (unlocked — slice lock complete)
+## Post-slice queue (unlocked — slice lock = complete)
 
-| Lane | Status | Ready when | Notes |
+| Lane | Blocked by | Status | Notes |
 |---|---|---|---|
-| A — Backend step 4 | `done` | — | Inline `provider_first_sync` processor |
-| B — API tests 4/5 | `done` | — | `test_provider_first_sync.py`, `test_approvals_decide.py` (22 tests pass) |
-| C — Admin console | `done` | — | `admin-api.ts`, `AdminSurfacePanel`, `SessionGuard` on admin layout |
-| F — Settings | `done` | — | `useSettingsData` + `getProfile` / `listProviderConnections` |
-| G — Docs / runbook | `done` | — | `local_dev_runbook.md`; assessment + handoff updated 2026-05-19 |
-| D — Env + smoke | `ready` | Now | Optional `scripts/smoke-vertical-slice.sh` |
-| I — Channel surfaces | `ready` | Now | Fixture → API per surface; use `mappers.ts` |
-| J — Write-back | `blocked` | After B in CI + stable decide in prod | MVP step 7 |
-
-## Next agent pick-up (recommended)
-
-1. Read [next_session_handoff.md](./next_session_handoff.md).
-2. Claim **one** lane: set Status → `in_progress`, add Owner, note branch.
-3. Prefer **Lane I** (one channel page) or **Lane D** (smoke script) for fastest visible progress.
-4. Do **not** start **Lane J** until tracker unblocks it.
-5. On completion: Status → `done`, session log entry, optional PR link.
+| A — Backend step 4 | Was slice step 4 | `done` | Inline `provider_first_sync` processor |
+| B — API tests 4/5 | Was slice steps 4–5 | `done` | `test_provider_first_sync.py`, `test_approvals_decide.py` |
+| D — Env + smoke | Was slice step 1 | `done` | `scripts/smoke-vertical-slice.sh` |
+| F — Settings | Was slice step 3 | `done` | `useSettingsData` |
+| I — Channel surfaces | Was slice step 3 | `in_progress` | Briefings on API; calendar/comms still fixtures |
+| J — Write-back | Slice step 5 + stable decide | `blocked` | MVP step 7 |
 
 ## Session log (last 5 entries)
 
 | Date | Agent | Lane | Action |
 |---|---|---|---|
-| 2026-05-19 | Planning sync | Docs | Updated `build_roadmap_assessment.md`, `next_session_handoff.md`, tracker, runbook for session handoff |
-| 2026-05-19 | Parallel agent | C, B, F | Re-verified: admin stack + settings; pytest 22 passed; `pnpm exec tsc --noEmit` clean |
-| 2026-05-19 | Parallel agent | B | Verified 22 pytest cases via `services/api/.venv` |
-| 2026-05-19 | Parallel agent | C, F | Admin surface JSX fix; API list smoke; settings hook confirmed |
-| 2026-05-19 | Parallel agent | C | Shipped admin-api, admin-surfaces, useAdminOverview, AdminSurfacePanel |
+| 2026-05-19 | Parallel plan | E, H, D, tracker | Plan implementation: freeze zone in tracker, CI workflow, gbrain integration doc, smoke script |
+| 2026-05-19 | Subagent | I | Briefings wired: useBriefingsData, mappers, briefings-config |
+| 2026-05-19 | Planning sync | G | Handoff + assessment + runbook sync |
+| 2026-05-19 | Parallel agent | C, B, F | Admin + settings + pytest 22 pass; tsc clean |
+| 2026-05-19 | Parallel agent | C | Shipped admin-api, AdminSurfacePanel, SessionGuard on admin layout |
 
 ## Coordination checklist (every agent, every session)
 
-1. Read **Slice lock** — post-slice: confirm lane paths do not conflict with another lane `in_progress` on the same files.
-2. Prefer **Lane C** isolation: use `admin-api.ts`, not `api.ts`, for admin-only HTTP helpers.
-3. Update your lane row **before** first commit and **after** merge or session end.
-4. If you need a file another lane owns, set status to `blocked` and note in **Session log**.
-5. Slice step checkboxes live only in `build_vertical_slice_tasks.md`.
-6. Append planning doc updates to session log when you refresh handoff material.
+1. Read **Slice lock** — if not `complete`, confirm your lane is in **Active parallel lanes** and paths are allowed.
+2. Do not edit files in the slice freeze zone unless you are the slice owner.
+3. Update your lane row **before** first commit and **after** PR merge.
+4. If you need a frozen file, set lane to `blocked` and note in **Session log**.
+5. Slice owner updates step checkboxes in `build_vertical_slice_tasks.md`; parallel agents do not.
+6. **Branch naming:** `parallel/lane-c-admin`, `parallel/lane-h-gbrain`, etc.
+7. **Merge order:** Slice branch → `main` first; parallel lanes rebase; then post-slice queue.
+
+## Parallel agent handoff (copy into prompt)
+
+```text
+Read docs/planning/parallel_lanes_tracker.md first.
+Confirm slice lock status and your lane allowed paths.
+You may ONLY edit paths listed for your lane.
+Do NOT touch apps/flavoros/src/lib/api.ts, (client) routes, or services/api/ unless your lane explicitly allows it.
+Admin lane: use admin-api.ts only.
+Context: next_session_handoff.md, build_roadmap_assessment.md, current_build_plan.md.
+When done: update tracker lane row + session log.
+```
