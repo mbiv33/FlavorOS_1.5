@@ -1,13 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { Suspense, useCallback, useEffect, useState } from "react";
 
 import {
   apiRequest,
   ClientContext,
   ContextProviderDef,
+  listContexts,
+  listProviderConnections,
   loadSession,
   OnboardingSaveResponse,
   ProviderConnection,
@@ -15,7 +17,6 @@ import {
   ProviderSyncResponse,
   FlavorOSSession,
 } from "@/lib/api";
-import { isClientReadyForCommandCenter } from "@/lib/onboarding-gate";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -158,7 +159,6 @@ export default function OnboardingPage() {
 
 function OnboardingInner() {
   const router = useRouter();
-  const searchParams = useSearchParams();
 
   const [session, setSession] = useState<FlavorOSSession | null>(null);
   const [step, setStep] = useState<OnboardingStep>(1);
@@ -185,10 +185,7 @@ function OnboardingInner() {
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Track whether we've handled the OAuth callback on this mount
-  const callbackHandled = useRef(false);
-
-  // ── Auth check + readiness check on mount ──────────────────────────────────
+  // ── Auth check + server state hydration on mount ───────────────────────────
   useEffect(() => {
     const s = loadSession();
     if (!s) {
@@ -196,37 +193,43 @@ function OnboardingInner() {
       return;
     }
     setSession(s);
-    isClientReadyForCommandCenter(s).then((ready) => {
-      if (ready) router.replace("/command-center");
-    });
+
+    // Re-hydrate existing contexts and connections from server so state
+    // survives page remounts (back navigation, new-tab OAuth returns, etc.)
+    Promise.all([listContexts(s), listProviderConnections(s)])
+      .then(([ctxs, conns]) => {
+        if (ctxs.length === 0) return; // fresh user — stay on step 1
+
+        const drafts: ContextDraft[] = ctxs.map((c) => ({
+          key: c.id,
+          type: c.type,
+          name: c.name,
+          serverId: c.id,
+        }));
+        setContexts(drafts);
+
+        if (conns.length > 0) {
+          const rebuilt: ProviderSlot[] = conns.map((conn) => {
+            const ctx = drafts.find((d) => d.serverId === conn.client_context_id) ?? drafts[0];
+            const fallback = FALLBACK_PROVIDERS[ctx?.type ?? "personal"] ?? [];
+            const def = fallback.find((p) => p.provider === conn.provider);
+            return {
+              contextKey: ctx?.key ?? "",
+              provider: conn.provider,
+              label: def?.label ?? conn.provider,
+              category: def?.category ?? "",
+              accountEmail: conn.account_alias ?? "",
+              connection: conn,
+            };
+          });
+          setSlots(rebuilt);
+          setStep(3);
+        } else {
+          setStep(2);
+        }
+      })
+      .catch(() => { /* network error — stay on step 1 */ });
   }, [router]);
-
-  // ── OAuth callback handling ─────────────────────────────────────────────────
-  useEffect(() => {
-    if (callbackHandled.current) return;
-    const providerConnectionId = searchParams.get("provider_connection_id");
-    const cbStatus = searchParams.get("status");
-    if (!providerConnectionId || !cbStatus) return;
-    callbackHandled.current = true;
-
-    // Map Composio status string to our enum
-    const mappedStatus: ProviderConnection["status"] =
-      cbStatus.toUpperCase() === "ACTIVE" ? "connected" : "pending_consent";
-
-    setSlots((prev) =>
-      prev.map((slot) =>
-        slot.connection?.id === providerConnectionId
-          ? {
-              ...slot,
-              connection: slot.connection
-                ? { ...slot.connection, status: mappedStatus }
-                : slot.connection,
-            }
-          : slot,
-      ),
-    );
-    setStep(3);
-  }, [searchParams]);
 
   // ── Step 1: save identity ───────────────────────────────────────────────────
   async function handleIdentityContinue() {
@@ -435,7 +438,7 @@ function OnboardingInner() {
           method: "POST",
           body: JSON.stringify({
             provider_connection_id: conn.id,
-            redirect_uri: `${window.location.origin}/onboarding`,
+            redirect_uri: `${window.location.origin}/onboarding/callback`,
           }),
         },
       );
@@ -894,13 +897,36 @@ function OnboardingInner() {
             >
               Back
             </button>
-            <button
-              type="button"
-              onClick={() => setStep(4)}
-              className="rounded-md border border-border-strong px-5 py-2 text-sm font-medium text-foreground hover:bg-surface"
-            >
-              Continue to summary
-            </button>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                disabled={!!busyId}
+                onClick={() => {
+                  if (!session) return;
+                  setBusyId("refresh");
+                  listProviderConnections(session)
+                    .then((conns) => {
+                      setSlots((prev) =>
+                        prev.map((s) => {
+                          const updated = conns.find((c) => c.id === s.connection?.id);
+                          return updated ? { ...s, connection: updated } : s;
+                        }),
+                      );
+                    })
+                    .finally(() => setBusyId(null));
+                }}
+                className="rounded-md border border-border-strong px-3 py-2 text-sm font-medium text-muted hover:text-foreground disabled:opacity-40"
+              >
+                {busyId === "refresh" ? "Refreshing..." : "Refresh status"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setStep(4)}
+                className="rounded-md border border-border-strong px-5 py-2 text-sm font-medium text-foreground hover:bg-surface"
+              >
+                Continue to summary
+              </button>
+            </div>
           </div>
         </section>
       )}

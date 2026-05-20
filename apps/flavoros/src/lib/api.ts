@@ -291,6 +291,12 @@ export async function listProviderConnections(
   return apiRequest<ProviderConnection[]>("/providers", session);
 }
 
+export async function listContexts(
+  session: FlavorOSSession,
+): Promise<ClientContext[]> {
+  return apiRequest<ClientContext[]>("/contexts", session);
+}
+
 export async function login(input: {
   tenantSlug: string;
   email: string;
