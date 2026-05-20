@@ -10,10 +10,13 @@ function CallbackInner() {
   const connected = status.toUpperCase() === "ACTIVE";
 
   useEffect(() => {
-    // Auto-close after a short delay so the user sees the message
+    // Notify the opener (onboarding page) so it can refresh connection status
+    if (window.opener) {
+      window.opener.postMessage({ type: "oauth_complete", connected }, window.location.origin);
+    }
     const t = setTimeout(() => window.close(), 2000);
     return () => clearTimeout(t);
-  }, []);
+  }, [connected]);
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background">

@@ -231,6 +231,25 @@ function OnboardingInner() {
       .catch(() => { /* network error — stay on step 1 */ });
   }, [router]);
 
+  // ── Listen for OAuth callback message from new tab ──────────────────────────
+  useEffect(() => {
+    if (!session) return;
+    function handleMessage(e: MessageEvent) {
+      if (e.origin !== window.location.origin) return;
+      if (e.data?.type !== "oauth_complete") return;
+      listProviderConnections(session!).then((conns) => {
+        setSlots((prev) =>
+          prev.map((s) => {
+            const updated = conns.find((c) => c.id === s.connection?.id);
+            return updated ? { ...s, connection: updated } : s;
+          }),
+        );
+      });
+    }
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
+  }, [session]);
+
   // ── Step 1: save identity ───────────────────────────────────────────────────
   async function handleIdentityContinue() {
     if (!session) return;
@@ -897,36 +916,13 @@ function OnboardingInner() {
             >
               Back
             </button>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                disabled={!!busyId}
-                onClick={() => {
-                  if (!session) return;
-                  setBusyId("refresh");
-                  listProviderConnections(session)
-                    .then((conns) => {
-                      setSlots((prev) =>
-                        prev.map((s) => {
-                          const updated = conns.find((c) => c.id === s.connection?.id);
-                          return updated ? { ...s, connection: updated } : s;
-                        }),
-                      );
-                    })
-                    .finally(() => setBusyId(null));
-                }}
-                className="rounded-md border border-border-strong px-3 py-2 text-sm font-medium text-muted hover:text-foreground disabled:opacity-40"
-              >
-                {busyId === "refresh" ? "Refreshing..." : "Refresh status"}
-              </button>
-              <button
-                type="button"
-                onClick={() => setStep(4)}
-                className="rounded-md border border-border-strong px-5 py-2 text-sm font-medium text-foreground hover:bg-surface"
-              >
-                Continue to summary
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={() => setStep(4)}
+              className="rounded-md border border-border-strong px-5 py-2 text-sm font-medium text-foreground hover:bg-surface"
+            >
+              Continue to summary
+            </button>
           </div>
         </section>
       )}
