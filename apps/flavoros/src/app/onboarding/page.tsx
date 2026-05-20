@@ -255,12 +255,15 @@ function OnboardingInner() {
 
       if (ctxs.length === 0) return; // fresh user — stay on step 1
 
-      const drafts: ContextDraft[] = ctxs.map((c) => ({
-        key: c.id,
-        type: c.type,
-        name: c.name,
-        serverId: c.id,
-      }));
+      const typeOrder = { personal: 0, professional: 1, business: 2 };
+      const drafts: ContextDraft[] = ctxs
+        .map((c) => ({
+          key: c.id,
+          type: c.type,
+          name: c.name,
+          serverId: c.id,
+        }))
+        .sort((a, b) => (typeOrder[a.type] ?? 9) - (typeOrder[b.type] ?? 9));
       setContexts(drafts);
 
       // Build expected slots from contexts
