@@ -240,8 +240,14 @@ function OnboardingInner() {
         try {
           await apiRequest("/onboarding/reset", sess, { method: "DELETE" });
         } catch { /* ignore */ }
+        setContexts([]);
+        setSlots([]);
+        setCurrentSlotIndex(0);
+        setStep(1);
+        setError(null);
+        setMessage(null);
         window.history.replaceState({}, "", "/onboarding");
-        return; // stay on step 1
+        return;
       }
 
       if (oauthConnId) {
@@ -491,19 +497,20 @@ function OnboardingInner() {
         },
       );
 
+      // Mark slot as connected locally and advance to next
+      setSlots((prev) =>
+        prev.map((s) =>
+          slotId(s) === slotId(slot)
+            ? { ...s, connection: { ...conn, status: "connected" } }
+            : s,
+        ),
+      );
+      advanceToNextSlot(currentSlotIndex);
+      setBusy(false);
+
+      // Open OAuth in new tab — user continues on this page
       if (!link.url.includes("stub=true")) {
-        window.location.href = link.url;
-      } else {
-        // Stub mode — simulate success and advance
-        setSlots((prev) =>
-          prev.map((s) =>
-            slotId(s) === slotId(slot)
-              ? { ...s, connection: { ...conn, status: "connected" } }
-              : s,
-          ),
-        );
-        advanceToNextSlot(currentSlotIndex);
-        setBusy(false);
+        window.open(link.url, "_blank", "noopener");
       }
     } catch (err) {
       setError(
