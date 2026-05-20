@@ -73,8 +73,50 @@ def canonical_provider(provider: str) -> str:
     return PROVIDER_ALIASES.get(provider.strip().lower(), provider.strip().lower())
 
 
+def _p(provider: str, toolkit: str, label: str, category: str, enabled: bool) -> dict:
+    return {
+        "provider": provider,
+        "toolkit": toolkit,
+        "label": label,
+        "category": category,
+        "enabled": enabled,
+    }
+
+
+CONTEXT_PROVIDER_CATALOG: dict[str, list[dict]] = {
+    "personal": [
+        _p("gmail", "gmail", "Gmail", "email", True),
+        _p("googlecalendar", "googlecalendar", "Google Calendar", "calendar", True),
+        # Socials (phase 2 — scaffold only, not wired for OAuth yet)
+        _p("x", "twitter", "X / Twitter", "social", False),
+        _p("linkedin", "linkedin", "LinkedIn", "social", False),
+        _p("facebook", "facebook", "Facebook", "social", False),
+        _p("instagram", "instagram", "Instagram", "social", False),
+    ],
+    "professional": [
+        _p("gmail", "gmail", "Work Gmail", "email", True),
+        _p("googlecalendar", "googlecalendar", "Work Calendar", "calendar", True),
+        _p("linkedin", "linkedin", "LinkedIn", "social", False),
+    ],
+    "business": [
+        _p("gmail", "gmail", "Business Gmail", "email", True),
+        _p("googlecalendar", "googlecalendar", "Business Calendar", "calendar", True),
+        _p("googledrive", "googledrive", "Google Drive / Docs", "files", True),
+        # Socials (phase 2)
+        _p("x", "twitter", "X / Twitter", "social", False),
+        _p("linkedin", "linkedin", "LinkedIn", "social", False),
+        _p("instagram", "instagram", "Instagram", "social", False),
+    ],
+}
+
+
 def provider_catalog() -> list[dict]:
     return list(GOOGLE_WORKSPACE_CATALOG.values())
+
+
+def providers_for_context(context_type: str) -> list[dict]:
+    """Return the provider catalog entries for a given context type."""
+    return CONTEXT_PROVIDER_CATALOG.get(context_type, [])
 
 
 def _upsert_universe_entry(
@@ -203,7 +245,10 @@ def _upsert_provider_connection(
         "account_alias": account.account_alias,
         "purpose": account.context_account_purpose,
         "toolkit": catalog_item["toolkit"],
-        "composio_user_id": composio_user_id(tenant.id, user.id),
+        # composio_user_id is intentionally left NULL here.
+        # providers.create_provider_connect_link sets it to f"conn:{conn.id}"
+        # on first OAuth initiation, ensuring each connection maps to a distinct
+        # Composio entity (critical for multi-account same-provider scenarios).
         "enabled": True,
         "config": {
             "external_identifier": account.external_identifier,

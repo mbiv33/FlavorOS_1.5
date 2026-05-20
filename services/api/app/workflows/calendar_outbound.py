@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import Approval, Artifact, AuditEvent, OutboundAction, ProviderConnection, User
+from app.models import Approval, Artifact, OutboundAction, ProviderConnection, User
 from app.workflows.communications_outbound import (
     CONNECTED_STATUSES,
     _audit_outbound,

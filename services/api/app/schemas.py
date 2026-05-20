@@ -2,9 +2,9 @@
 
 import uuid
 from datetime import datetime
-from typing import Optional
+from typing import Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class HealthResponse(BaseModel):
@@ -232,6 +232,34 @@ class AgentTaskRead(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Client Context
+# ---------------------------------------------------------------------------
+
+
+class ClientContextCreate(BaseModel):
+    type: Literal["personal", "professional", "business"]
+    name: str
+
+    @field_validator("type")
+    @classmethod
+    def validate_type(cls, v: str) -> str:
+        allowed = {"personal", "professional", "business"}
+        if v not in allowed:
+            raise ValueError(f"type must be one of {allowed}")
+        return v
+
+
+class ClientContextRead(BaseModel):
+    id: uuid.UUID
+    client_id: uuid.UUID
+    type: str
+    name: str
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+# ---------------------------------------------------------------------------
 # Provider Connection
 # ---------------------------------------------------------------------------
 
@@ -252,6 +280,7 @@ PROVIDER_CONNECTION_STATUSES = {
 class ProviderConnectionRead(BaseModel):
     id: uuid.UUID
     client_id: uuid.UUID
+    client_context_id: Optional[uuid.UUID]
     provider: str
     context_id: Optional[str]
     context_account_id: Optional[str]
@@ -276,6 +305,7 @@ class ProviderConnectionRead(BaseModel):
 
 class ProviderConnectionWrite(BaseModel):
     provider: str = Field(..., min_length=1, max_length=64)
+    client_context_id: Optional[uuid.UUID] = None
     context_id: Optional[str] = Field(None, max_length=128)
     context_account_id: Optional[str] = Field(None, max_length=128)
     account_alias: Optional[str] = Field(None, max_length=128)

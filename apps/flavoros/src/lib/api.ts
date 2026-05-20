@@ -127,6 +127,22 @@ export type ProviderSyncResponse = {
   workflow_run_id: string | null;
 };
 
+export type ClientContext = {
+  id: string;
+  client_id: string;
+  type: "personal" | "professional" | "business";
+  name: string;
+  created_at: string;
+};
+
+export type ContextProviderDef = {
+  provider: string;
+  toolkit: string;
+  label: string;
+  category: string;
+  enabled: boolean;
+};
+
 export function saveSession(session: FlavorOSSession) {
   window.localStorage.setItem("flavoros.session", JSON.stringify(session));
 }

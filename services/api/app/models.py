@@ -97,6 +97,41 @@ class Profile(Base):
 
 
 # ---------------------------------------------------------------------------
+# Client Context — named operational context per client tenant
+# ---------------------------------------------------------------------------
+
+
+class ClientContext(Base):
+    """A named operational context for a client tenant.
+
+    Context type drives agent routing and contact classification:
+    - personal: household/lifestyle providers; no business contact scope
+    - professional: W2 employment; contacts are work colleagues and external customers
+    - business: client-owned businesses; contacts are clients and contractors
+
+    Khadijah (conductor agent) reads context.type to set contact scope and
+    approval authority defaults on workflow tasks.
+    """
+
+    __tablename__ = "client_contexts"
+    __table_args__ = (
+        UniqueConstraint("client_id", "type", "name", name="uq_client_context_type_name"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    client_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False, index=True
+    )
+    type: Mapped[str] = mapped_column(String(32), nullable=False)
+    name: Mapped[str] = mapped_column(String(128), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+# ---------------------------------------------------------------------------
 # Client Universe — extensible key/value context per tenant
 # ---------------------------------------------------------------------------
 
@@ -374,6 +409,12 @@ class ProviderConnection(Base):
     )
     client_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False
+    )
+    client_context_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("client_contexts.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
     )
     provider: Mapped[str] = mapped_column(String(64), nullable=False)
     context_id: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)

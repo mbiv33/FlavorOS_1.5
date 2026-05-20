@@ -105,7 +105,8 @@ def test_onboarding_save_plans_oauth_provider_connections(
     assert providers["gmail"]["status"] == "not_started"
     assert providers["gmail"]["toolkit"] == "gmail"
     assert providers["gmail"]["context_account_id"] == "business_gmail"
-    assert providers["gmail"]["composio_user_id"].startswith("tenant:")
+    # composio_user_id is set lazily on connect-link creation (conn:{id}), not at planning.
+    assert providers["gmail"]["composio_user_id"] is None
     assert providers["googlecalendar"]["toolkit"] == "googlecalendar"
 
     saved = db.execute(select(ProviderConnection)).scalars().all()

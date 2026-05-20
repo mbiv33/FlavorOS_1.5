@@ -22,7 +22,7 @@ from app.models import (
     User,
     WorkflowRun,
 )
-from app.onboarding import composio_user_id, provider_catalog
+from app.onboarding import provider_catalog
 from app.schemas import (
     ProviderCallbackRead,
     ProviderCatalogItem,
@@ -130,7 +130,9 @@ async def create_provider_connect_link(
             status_code=status.HTTP_409_CONFLICT, detail="Provider toolkit is not configured"
         )
 
-    user_ref = conn.composio_user_id or composio_user_id(tenant.id, user.id)
+    # Each connection gets its own Composio entity so multiple accounts of the
+    # same provider (e.g. personal Gmail + business Gmail) map to distinct entities.
+    user_ref = conn.composio_user_id or f"conn:{conn.id}"
     # Embed provider_connection_id in redirect URI so the public callback can
     # identify the connection without requiring auth headers.
     callback_uri = f"{body.redirect_uri}?provider_connection_id={conn.id}"
@@ -185,7 +187,10 @@ def provider_callback(
         select(ProviderConnection).where(ProviderConnection.id == provider_connection_id)
     ).scalar_one_or_none()
     if not conn:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Provider connection not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Provider connection not found",
+        )
 
     status_map = {
         "ACTIVE": "connected",
@@ -251,7 +256,7 @@ async def sync_provider(
 
     conn.status = "syncing"
     db.flush()
-    user_ref = conn.composio_user_id or composio_user_id(tenant.id, user.id)
+    user_ref = conn.composio_user_id or f"conn:{conn.id}"
     result = await composio.trigger_sync(
         client_id=tenant.id,
         provider=conn.provider,
@@ -261,6 +266,48 @@ async def sync_provider(
     conn.status_reason = "; ".join(result.errors) if result.errors else "First sync verified."
     conn.last_sync_at = datetime.now(timezone.utc)
     conn.last_checked_at = conn.last_sync_at
+
+    # Per-item dedup: create one ProviderEvent + NormalizedItem per message/event.
+    # Idempotency key is stable across re-syncs so the same item is never duplicated.
+    new_items: list[dict] = []
+    for item in result.items:
+        item_id = item.get("message_id") or item.get("event_id") or ""
+        ikey = f"{conn.id}:{conn.provider}:{item_id}"
+        already_exists = db.execute(
+            select(ProviderEvent).where(
+                ProviderEvent.client_id == tenant.id,
+                ProviderEvent.idempotency_key == ikey,
+            )
+        ).scalar_one_or_none()
+        if already_exists:
+            continue
+        item_pe = ProviderEvent(
+            client_id=tenant.id,
+            provider_connection_id=conn.id,
+            provider=conn.provider,
+            event_type="item_ingested",
+            idempotency_key=ikey,
+            status="received",
+            payload=item,
+        )
+        db.add(item_pe)
+        db.flush()
+        db.add(
+            NormalizedItem(
+                client_id=tenant.id,
+                provider_event_id=item_pe.id,
+                item_type=_item_type_for_provider(conn.provider),
+                title=(
+                    item.get("subject") or item.get("summary") or conn.provider
+                ),
+                data=item,
+            )
+        )
+        new_items.append(item)
+
+    # Batch sync event records the sync itself (timestamp-keyed, always written).
+    # The batch NormalizedItem passes only new items to the workflow so Sinclair
+    # summarises what's actually new on re-sync.
     provider_event = ProviderEvent(
         client_id=tenant.id,
         provider_connection_id=conn.id,
@@ -270,6 +317,7 @@ async def sync_provider(
         status="received",
         payload={
             "records_synced": result.records_synced,
+            "new_items": len(new_items),
             "errors": result.errors,
             "source": "providers.sync",
         },
@@ -285,7 +333,7 @@ async def sync_provider(
             "provider_connection_id": str(conn.id),
             "records_synced": result.records_synced,
             "status": conn.status,
-            "items": result.items,
+            "items": new_items,
         },
     )
     db.add(normalized_item)
@@ -335,6 +383,7 @@ async def sync_provider(
             detail={
                 "provider": conn.provider,
                 "records_synced": result.records_synced,
+                "new_items": len(new_items),
                 "errors": result.errors,
                 "provider_event_id": str(provider_event.id),
                 "workflow_run_id": str(workflow_run.id),

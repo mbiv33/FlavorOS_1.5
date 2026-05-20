@@ -6,22 +6,27 @@ Covers:
 - AgentTask reaches completed status
 - Idempotency: calling processor twice on a completed run is a no-op
 - process_run endpoint: 200 for known type, 422 for unknown type
+- Per-item dedup: re-sync with same message_id skips existing ProviderEvents
+- Connection-scoped entity_id: new connections use conn:{id}, not tenant:{id}:user:{id}
 """
 
 from __future__ import annotations
 
 import uuid
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.adapters.composio import ConnectLinkResult, SyncResult
+from app.deps import get_composio
 from app.models import (
     AgentTask,
     Approval,
     Artifact,
     NormalizedItem,
+    ProviderConnection,
     ProviderEvent,
     Tenant,
     WorkflowRun,
@@ -448,3 +453,192 @@ def test_processor_llm_fallback_on_anthropic_error(db: Session, tenant_a: Tenant
 
     run_refreshed = db.get(WorkflowRun, run.id)
     assert run_refreshed.status == "completed"
+
+
+# ---------------------------------------------------------------------------
+# Per-item dedup (TODO-5)
+# ---------------------------------------------------------------------------
+
+
+def _make_stub_composio_with_items(items: list[dict]):
+    """Return a mock ComposioAdapter whose trigger_sync returns the given items."""
+    adapter = MagicMock()
+    adapter.trigger_sync = AsyncMock(
+        return_value=SyncResult(
+            provider="gmail",
+            records_synced=len(items),
+            items=items,
+        )
+    )
+    adapter.create_connect_link = AsyncMock(
+        return_value=ConnectLinkResult(
+            provider="gmail",
+            url="https://stub.composio.url",
+            connected_account_id=None,
+        )
+    )
+    return adapter
+
+
+def _onboarding_and_callback(client, auth_headers, context_account_id="personal_gmail"):
+    """Helper: save onboarding + simulate OAuth callback; returns provider_connection_id."""
+    save = client.post(
+        "/onboarding/save",
+        json={
+            "identity": {"display_name": "Alice", "timezone": "UTC", "locale": "en-US"},
+            "authority_defaults": {},
+            "onboarding": {"status": "pending"},
+            "contexts": [
+                {
+                    "context_id": "personal",
+                    "context_type": "personal",
+                    "display_name": "Personal",
+                    "status": "active",
+                    "context_accounts": [
+                        {
+                            "context_account_id": context_account_id,
+                            "provider": "gmail",
+                            "context_account_purpose": "email",
+                            "account_alias": context_account_id,
+                            "auth_scheme": "oauth",
+                        }
+                    ],
+                }
+            ],
+        },
+        headers=auth_headers,
+    )
+    assert save.status_code == 200
+    conn_id = save.json()["provider_connections"][0]["id"]
+    callback = client.get(
+        "/providers/callback",
+        params={
+            "provider_connection_id": conn_id,
+            "status": "ACTIVE",
+            "connected_account_id": "ca_dedup_test",
+        },
+    )
+    assert callback.status_code == 200
+    return conn_id
+
+
+def test_per_item_dedup_skips_duplicate_message_ids(
+    client: TestClient,
+    db: Session,
+    tenant_a: Tenant,
+    auth_headers_a: dict,
+    settings,
+):
+    """Re-syncing with the same message_id must not create duplicate ProviderEvents."""
+    items = [
+        {"subject": "Hello", "snippet": "Hi there", "message_id": "msg_abc"},
+        {"subject": "Meeting", "snippet": "Tomorrow?", "message_id": "msg_def"},
+    ]
+    stub = _make_stub_composio_with_items(items)
+
+    from app.main import create_app
+
+    app = create_app()
+    from app.deps import get_db, get_settings
+
+    app.dependency_overrides[get_db] = lambda: db
+    app.dependency_overrides[get_settings] = lambda: settings
+    app.dependency_overrides[get_composio] = lambda: stub
+    from fastapi.testclient import TestClient as _TC
+
+    c = _TC(app)
+
+    conn_id = _onboarding_and_callback(c, auth_headers_a, "dedup_gmail")
+
+    c.post("/providers/gmail/sync", json={"provider_connection_id": conn_id}, headers=auth_headers_a)
+    c.post("/providers/gmail/sync", json={"provider_connection_id": conn_id}, headers=auth_headers_a)
+
+    item_events = db.execute(
+        select(ProviderEvent).where(
+            ProviderEvent.client_id == tenant_a.id,
+            ProviderEvent.event_type == "item_ingested",
+        )
+    ).scalars().all()
+
+    assert len(item_events) == 2, (
+        f"Expected 2 per-item ProviderEvents (one per message_id), got {len(item_events)}"
+    )
+    keys = {pe.idempotency_key for pe in item_events}
+    assert any("msg_abc" in k for k in keys)
+    assert any("msg_def" in k for k in keys)
+
+
+# ---------------------------------------------------------------------------
+# Connection-scoped entity_id (Task B)
+# ---------------------------------------------------------------------------
+
+
+def test_connect_link_uses_connection_scoped_entity_id(
+    client: TestClient,
+    db: Session,
+    tenant_a: Tenant,
+    auth_headers_a: dict,
+    settings,
+):
+    """A new connection (no composio_user_id set) must use conn:{id} as entity_id."""
+    stub = _make_stub_composio_with_items([])
+
+    from app.main import create_app
+
+    app = create_app()
+    from app.deps import get_db, get_settings
+
+    app.dependency_overrides[get_db] = lambda: db
+    app.dependency_overrides[get_settings] = lambda: settings
+    app.dependency_overrides[get_composio] = lambda: stub
+    from fastapi.testclient import TestClient as _TC
+
+    c = _TC(app)
+
+    save = c.post(
+        "/onboarding/save",
+        json={
+            "identity": {"display_name": "Alice", "timezone": "UTC", "locale": "en-US"},
+            "authority_defaults": {},
+            "onboarding": {"status": "pending"},
+            "contexts": [
+                {
+                    "context_id": "personal",
+                    "context_type": "personal",
+                    "display_name": "Personal",
+                    "status": "active",
+                    "context_accounts": [
+                        {
+                            "context_account_id": "personal_gmail",
+                            "provider": "gmail",
+                            "context_account_purpose": "email",
+                            "account_alias": "personal_email",
+                            "auth_scheme": "oauth",
+                        }
+                    ],
+                }
+            ],
+        },
+        headers=auth_headers_a,
+    )
+    assert save.status_code == 200
+    conn_id = save.json()["provider_connections"][0]["id"]
+
+    link = c.post(
+        "/providers/gmail/connect-link",
+        json={
+            "provider_connection_id": conn_id,
+            "redirect_uri": "https://app.example.com/onboarding",
+        },
+        headers=auth_headers_a,
+    )
+    assert link.status_code == 200
+    returned_entity_id = link.json()["composio_user_id"]
+    assert returned_entity_id == f"conn:{conn_id}", (
+        f"Expected conn-scoped entity_id 'conn:{conn_id}', got '{returned_entity_id}'"
+    )
+
+    conn = db.execute(
+        select(ProviderConnection).where(ProviderConnection.id == uuid.UUID(conn_id))
+    ).scalar_one()
+    assert conn.composio_user_id == f"conn:{conn_id}"

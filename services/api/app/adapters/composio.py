@@ -108,6 +108,7 @@ class ComposioAdapter(Protocol):
         provider: str,
         action: str,
         params: dict[str, Any] | None = None,
+        composio_user_id: str | None = None,
     ) -> ActionResult:
         """Execute a governed action through the provider (e.g. send email)."""
         ...
@@ -170,6 +171,7 @@ class StubComposioAdapter:
         provider: str,
         action: str,
         params: dict[str, Any] | None = None,
+        composio_user_id: str | None = None,
     ) -> ActionResult:
         return ActionResult(
             success=False,
@@ -200,7 +202,7 @@ class RealComposioAdapter:
     def _get_toolset(self) -> Any:
         if self._toolset is None:
             from composio import ComposioToolSet
-            self._toolset = ComposioToolSet(api_key=self._api_key)
+            self._toolset = ComposioToolSet(api_key=self._api_key, timeout=10.0)
         return self._toolset
 
     async def list_toolkits(self) -> list[ProviderToolkit]:
@@ -264,12 +266,14 @@ class RealComposioAdapter:
         provider: str,
         action: str,
         params: dict[str, Any] | None = None,
+        composio_user_id: str | None = None,
     ) -> ActionResult:
         try:
             result = await asyncio.to_thread(
                 self._get_toolset().execute_action,
                 action=action,
                 params=params or {},
+                entity_id=composio_user_id,
             )
             return ActionResult(success=True, data=result if isinstance(result, dict) else {})
         except Exception as exc:
@@ -289,15 +293,47 @@ class RealComposioAdapter:
                 errors=["composio_user_id is required for real sync"],
             )
 
+        import datetime as _dt
+
         from composio import Action  # noqa: PLC0415
 
+        # Provider-to-action dispatch table.
+        # Verify GOOGLECALENDAR_FIND_EVENT against current SDK before first real calendar sync:
+        # python -c "from composio import Action; print([a for a in dir(Action) if 'CAL' in a])"
+        # Verify GMAIL_FETCH_EMAILS against Composio docs if it fails:
+        # https://docs.composio.dev/actions/gmail
+        _PROVIDER_SYNC_CONFIG: dict[str, dict] = {
+            "gmail": {
+                "action": Action.GMAIL_FETCH_EMAILS,
+                "params": {"max_results": 10, "label_ids": ["INBOX"]},
+                "item_key": "messages",
+            },
+            "googlecalendar": {
+                "action": Action.GOOGLECALENDAR_FIND_EVENT,
+                "params": {"time_min": None, "max_results": 20},
+                "item_key": "items",
+            },
+        }
+
+        sync_config = _PROVIDER_SYNC_CONFIG.get(provider)
+        if not sync_config:
+            return SyncResult(
+                provider=provider,
+                records_synced=0,
+                errors=[f"No sync configuration for provider: {provider}"],
+            )
+
+        if provider == "googlecalendar":
+            params: dict[str, Any] = dict(sync_config["params"])
+            params["time_min"] = _dt.datetime.now(_dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        else:
+            params = sync_config["params"]
+
         try:
-            # Verify action name against Composio docs if GMAIL_FETCH_EMAILS fails:
-            # https://docs.composio.dev/actions/gmail
             raw = await asyncio.to_thread(
                 self._get_toolset().execute_action,
-                action=Action.GMAIL_FETCH_EMAILS,
-                params={"max_results": 10, "label_ids": ["INBOX"]},
+                action=sync_config["action"],
+                params=params,
                 entity_id=composio_user_id,
             )
         except Exception as exc:
@@ -306,21 +342,41 @@ class RealComposioAdapter:
 
         # Composio wraps results in {"data": {...}, "successful": bool}
         data = raw if isinstance(raw, dict) else {}
-        messages = (
-            data.get("data", data).get("messages", [])
-            if isinstance(data.get("data", data), dict)
-            else []
-        )
+        if provider == "gmail":
+            messages = (data.get("data", {}).get("messages", []) or data.get("messages", []))
+            items = [
+                {
+                    "subject": (
+                        m.get("subject")
+                        or m.get("payload", {}).get("headers", [{}])[0].get("value", "(no subject)")
+                    ),
+                    "snippet": m.get("snippet", ""),
+                    "message_id": m.get("id") or m.get("messageId", ""),
+                }
+                for m in (messages if isinstance(messages, list) else [])
+                if isinstance(m, dict)
+            ]
+        elif provider == "googlecalendar":
+            events = (data.get("data", {}).get("items", []) or data.get("items", []) or [])
+            items = [
+                {
+                    "summary": e.get("summary", "(no title)"),
+                    "start": (
+                        (e.get("start") or {}).get("dateTime")
+                        or (e.get("start") or {}).get("date", "")
+                    ),
+                    "end": (
+                        (e.get("end") or {}).get("dateTime")
+                        or (e.get("end") or {}).get("date", "")
+                    ),
+                    "event_id": e.get("id") or e.get("eventId", ""),
+                }
+                for e in (events if isinstance(events, list) else [])
+                if isinstance(e, dict)
+            ]
+        else:
+            items = []
 
-        items = [
-            {
-                "subject": _header(msg, "Subject") or "(no subject)",
-                "snippet": msg.get("snippet", ""),
-                "message_id": msg.get("id", ""),
-            }
-            for msg in messages
-            if isinstance(msg, dict)
-        ]
         return SyncResult(provider=provider, records_synced=len(items), items=items)
 
 

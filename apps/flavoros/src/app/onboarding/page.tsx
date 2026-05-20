@@ -1,11 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 
 import {
   apiRequest,
+  ClientContext,
+  ContextProviderDef,
   loadSession,
   OnboardingSaveResponse,
   ProviderConnection,
@@ -15,62 +17,55 @@ import {
 } from "@/lib/api";
 import { isClientReadyForCommandCenter } from "@/lib/onboarding-gate";
 
-type ContextAccount = {
-  contextId: string;
-  contextLabel: string;
-  contextAccountId: string;
-  provider: "gmail" | "googlecalendar" | "googledrive" | "manual";
-  label: string;
-  purpose: string;
-  accountAlias: string;
-  authScheme: "oauth" | "manual";
+// ─── Types ──────────────────────────────────────────────────────────────────
+
+type OnboardingStep = 1 | 2 | 3 | 4;
+
+type IdentityForm = {
+  displayName: string;
+  preferredName: string;
+  timezone: string;
 };
 
-const CONTEXT_ACCOUNTS: ContextAccount[] = [
-  {
-    contextId: "business",
-    contextLabel: "Business",
-    contextAccountId: "business_gmail",
-    provider: "gmail",
-    label: "Business Gmail",
-    purpose: "email",
-    accountAlias: "business_email",
-    authScheme: "oauth",
-  },
-  {
-    contextId: "business",
-    contextLabel: "Business",
-    contextAccountId: "business_calendar",
-    provider: "googlecalendar",
-    label: "Business Calendar",
-    purpose: "calendar",
-    accountAlias: "business_calendar",
-    authScheme: "oauth",
-  },
-  {
-    contextId: "business",
-    contextLabel: "Business",
-    contextAccountId: "business_drive",
-    provider: "googledrive",
-    label: "Business Drive / Docs",
-    purpose: "knowledge_base",
-    accountAlias: "business_docs",
-    authScheme: "oauth",
-  },
-  {
-    contextId: "personal",
-    contextLabel: "Personal",
-    contextAccountId: "personal_notes",
-    provider: "manual",
-    label: "Personal Notes",
-    purpose: "knowledge_base",
-    accountAlias: "personal_notes",
-    authScheme: "manual",
-  },
-];
+type ContextDraft = {
+  /** Stable client-side key (before server ID is known) */
+  key: string;
+  type: "personal" | "professional" | "business";
+  name: string;
+  /** Server-assigned id after POST /contexts */
+  serverId: string | null;
+};
 
-const STATUS_LABELS: Record<ProviderConnection["status"] | "not_planned", string> = {
-  not_planned: "Not planned",
+type ProviderSlot = {
+  contextKey: string;
+  provider: string;
+  label: string;
+  category: string;
+  /** email / account entered by user */
+  accountEmail: string;
+  /** server-side connection once save was called */
+  connection: ProviderConnection | null;
+};
+
+// ─── Constants ───────────────────────────────────────────────────────────────
+
+const FALLBACK_PROVIDERS: Record<string, Omit<ContextProviderDef, "toolkit">[]> = {
+  personal: [
+    { provider: "gmail", label: "Gmail", category: "email", enabled: true },
+    { provider: "googlecalendar", label: "Google Calendar", category: "calendar", enabled: true },
+  ],
+  professional: [
+    { provider: "gmail", label: "Work Gmail", category: "email", enabled: true },
+    { provider: "googlecalendar", label: "Work Calendar", category: "calendar", enabled: true },
+  ],
+  business: [
+    { provider: "gmail", label: "Business Gmail", category: "email", enabled: true },
+    { provider: "googlecalendar", label: "Business Calendar", category: "calendar", enabled: true },
+    { provider: "googledrive", label: "Google Drive / Docs", category: "files", enabled: true },
+  ],
+};
+
+const STATUS_LABELS: Record<ProviderConnection["status"] | "not_started", string> = {
   not_started: "Not started",
   pending_consent: "Pending consent",
   initiated: "Initiated",
@@ -83,84 +78,117 @@ const STATUS_LABELS: Record<ProviderConnection["status"] | "not_planned", string
   revoked: "Revoked",
 };
 
-const PROVIDER_LABELS: Record<ContextAccount["provider"], string> = {
-  gmail: "Gmail",
-  googlecalendar: "Google Calendar",
-  googledrive: "Google Drive / Docs",
-  manual: "Manual",
-};
+const TIMEZONES = [
+  "America/New_York",
+  "America/Chicago",
+  "America/Denver",
+  "America/Los_Angeles",
+  "America/Phoenix",
+  "America/Anchorage",
+  "Pacific/Honolulu",
+  "Europe/London",
+  "Europe/Paris",
+  "Asia/Tokyo",
+  "Asia/Shanghai",
+  "Australia/Sydney",
+  "UTC",
+];
 
-function statusClasses(status: ProviderConnection["status"] | "not_planned") {
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function statusClasses(status: ProviderConnection["status"] | "not_started") {
   if (status === "ready") return "border-emerald-700 bg-emerald-50 text-emerald-800";
-  if (status === "connected" || status === "syncing" || status === "degraded") {
+  if (status === "connected" || status === "syncing" || status === "degraded")
     return "border-sky-700 bg-sky-50 text-sky-800";
-  }
-  if (status === "failed" || status === "blocked" || status === "revoked") {
+  if (status === "failed" || status === "blocked" || status === "revoked")
     return "border-rose-700 bg-rose-50 text-rose-800";
-  }
   return "border-border-strong bg-surface text-muted";
 }
 
-function onboardingPayload() {
-  return {
-    identity: {
-      display_name: "Marcus Bivines",
-      legal_name: "Marcus Bivines",
-      preferred_name: "Marcus",
-      timezone: "America/New_York",
-      locale: "en-US",
-    },
-    authority_defaults: {
-      outbound_comms: "draft_only",
-      calendar_commits: "approval_required",
-      travel_booking: "approval_required",
-      money_movement: "blocked_without_explicit_approval",
-    },
-    onboarding: { status: "pending" },
-    contexts: [
-      {
-        context_id: "business",
-        context_type: "business",
-        display_name: "Business",
-        status: "active",
-        context_accounts: CONTEXT_ACCOUNTS.filter((account) => account.contextId === "business").map(
-          (account) => ({
-            context_account_id: account.contextAccountId,
-            provider: account.provider,
-            context_account_purpose: account.purpose,
-            account_alias: account.accountAlias,
-            auth_scheme: account.authScheme,
-          }),
-        ),
-      },
-      {
-        context_id: "personal",
-        context_type: "personal",
-        display_name: "Personal",
-        status: "active",
-        context_accounts: CONTEXT_ACCOUNTS.filter((account) => account.contextId === "personal").map(
-          (account) => ({
-            context_account_id: account.contextAccountId,
-            provider: account.provider,
-            context_account_purpose: account.purpose,
-            account_alias: account.accountAlias,
-            auth_scheme: account.authScheme,
-          }),
-        ),
-      },
-    ],
-  };
+function typeBadgeClasses(type: ClientContext["type"]) {
+  if (type === "personal") return "bg-violet-100 text-violet-800";
+  if (type === "professional") return "bg-sky-100 text-sky-800";
+  return "bg-amber-100 text-amber-800";
 }
 
+function uid() {
+  return Math.random().toString(36).slice(2, 10);
+}
+
+// ─── Step indicator ──────────────────────────────────────────────────────────
+
+function StepIndicator({ current }: { current: OnboardingStep }) {
+  const steps: { n: OnboardingStep; label: string }[] = [
+    { n: 1, label: "Identity" },
+    { n: 2, label: "Contexts" },
+    { n: 3, label: "Connect" },
+    { n: 4, label: "Ready" },
+  ];
+  return (
+    <nav className="flex items-center gap-1 text-xs" aria-label="Onboarding progress">
+      {steps.map((s, i) => (
+        <span key={s.n} className="flex items-center gap-1">
+          {i > 0 && <span className="text-muted">—</span>}
+          <span
+            className={`font-medium ${
+              s.n === current
+                ? "text-foreground"
+                : s.n < current
+                  ? "text-muted line-through"
+                  : "text-muted"
+            }`}
+          >
+            {s.n}. {s.label}
+          </span>
+        </span>
+      ))}
+    </nav>
+  );
+}
+
+// ─── Main page (wrapped) ─────────────────────────────────────────────────────
+
 export default function OnboardingPage() {
+  return (
+    <Suspense fallback={null}>
+      <OnboardingInner />
+    </Suspense>
+  );
+}
+
+function OnboardingInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+
   const [session, setSession] = useState<FlavorOSSession | null>(null);
-  const [intake, setIntake] = useState<OnboardingSaveResponse | null>(null);
-  const [connections, setConnections] = useState<ProviderConnection[]>([]);
+  const [step, setStep] = useState<OnboardingStep>(1);
+
+  // Step 1 — Identity
+  const [identity, setIdentity] = useState<IdentityForm>({
+    displayName: "",
+    preferredName: "",
+    timezone: "America/New_York",
+  });
+
+  // Step 2 — Contexts
+  const [professionalEnabled, setProfessionalEnabled] = useState(false);
+  const [employerName, setEmployerName] = useState("");
+  const [businesses, setBusinesses] = useState<{ key: string; name: string }[]>([]);
+  const [newBusinessName, setNewBusinessName] = useState("");
+
+  // Step 3 — Provider slots & connections
+  const [contexts, setContexts] = useState<ContextDraft[]>([]);
+  const [slots, setSlots] = useState<ProviderSlot[]>([]);
+
+  // Shared state
+  const [busyId, setBusyId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [busyId, setBusyId] = useState<string | null>(null);
 
+  // Track whether we've handled the OAuth callback on this mount
+  const callbackHandled = useRef(false);
+
+  // ── Auth check + readiness check on mount ──────────────────────────────────
   useEffect(() => {
     const s = loadSession();
     if (!s) {
@@ -173,42 +201,237 @@ export default function OnboardingPage() {
     });
   }, [router]);
 
-  const eligibleAccounts = useMemo(
-    () => CONTEXT_ACCOUNTS.filter((account) => account.authScheme === "oauth"),
-    [],
-  );
-  const readyCount = connections.filter((conn) => conn.status === "ready").length;
-  const canFinish = Boolean(intake) && readyCount === eligibleAccounts.length;
+  // ── OAuth callback handling ─────────────────────────────────────────────────
+  useEffect(() => {
+    if (callbackHandled.current) return;
+    const providerConnectionId = searchParams.get("provider_connection_id");
+    const cbStatus = searchParams.get("status");
+    if (!providerConnectionId || !cbStatus) return;
+    callbackHandled.current = true;
 
-  async function saveIntake() {
+    // Map Composio status string to our enum
+    const mappedStatus: ProviderConnection["status"] =
+      cbStatus.toUpperCase() === "ACTIVE" ? "connected" : "pending_consent";
+
+    setSlots((prev) =>
+      prev.map((slot) =>
+        slot.connection?.id === providerConnectionId
+          ? {
+              ...slot,
+              connection: slot.connection
+                ? { ...slot.connection, status: mappedStatus }
+                : slot.connection,
+            }
+          : slot,
+      ),
+    );
+    setStep(3);
+  }, [searchParams]);
+
+  // ── Step 1: save identity ───────────────────────────────────────────────────
+  async function handleIdentityContinue() {
     if (!session) return;
-    setBusyId("intake");
+    if (!identity.displayName.trim()) {
+      setError("Display name is required.");
+      return;
+    }
+    setBusyId("identity");
     setError(null);
     setMessage(null);
     try {
-      const result = await apiRequest<OnboardingSaveResponse>(
-        "/onboarding/save",
-        session,
-        {
-          method: "POST",
-          body: JSON.stringify(onboardingPayload()),
-        },
-      );
-      setIntake(result);
-      setConnections(result.provider_connections);
-      setMessage("Intake saved. Provider connections are planned in Postgres.");
+      // Light-touch save — we send the identity data; full save happens in step 3
+      await apiRequest<OnboardingSaveResponse>("/onboarding/save", session, {
+        method: "POST",
+        body: JSON.stringify({
+          identity: {
+            display_name: identity.displayName.trim(),
+            legal_name: identity.displayName.trim(),
+            preferred_name: identity.preferredName.trim() || identity.displayName.trim(),
+            timezone: identity.timezone,
+            locale: "en-US",
+          },
+          authority_defaults: {
+            outbound_comms: "draft_only",
+            calendar_commits: "approval_required",
+            travel_booking: "approval_required",
+            money_movement: "blocked_without_explicit_approval",
+          },
+          onboarding: { status: "pending" },
+          contexts: [],
+        }),
+      });
+      setStep(2);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to save onboarding.");
+      setError(err instanceof Error ? err.message : "Unable to save identity.");
     } finally {
       setBusyId(null);
     }
   }
 
-  async function createConnectLink(conn: ProviderConnection) {
+  // ── Step 2: build context list + fetch providers ────────────────────────────
+  async function handleContextsContinue() {
     if (!session) return;
-    setBusyId(conn.id);
     setError(null);
     setMessage(null);
+
+    if (professionalEnabled && !employerName.trim()) {
+      setError("Enter your employer name or disable the Professional context.");
+      return;
+    }
+
+    setBusyId("contexts");
+
+    // Build drafts
+    const drafts: ContextDraft[] = [
+      { key: "personal", type: "personal", name: "Personal", serverId: null },
+    ];
+    if (professionalEnabled) {
+      drafts.push({
+        key: "professional",
+        type: "professional",
+        name: employerName.trim(),
+        serverId: null,
+      });
+    }
+    for (const b of businesses) {
+      if (b.name.trim()) {
+        drafts.push({ key: b.key, type: "business", name: b.name.trim(), serverId: null });
+      }
+    }
+
+    // Try to create each context via POST /contexts; fall back to local-only
+    const resolved: ContextDraft[] = [];
+    for (const draft of drafts) {
+      try {
+        const resp = await apiRequest<ClientContext>("/contexts", session, {
+          method: "POST",
+          body: JSON.stringify({ type: draft.type, name: draft.name }),
+        });
+        resolved.push({ ...draft, serverId: resp.id });
+      } catch {
+        // 404 or other error — keep as local draft
+        resolved.push(draft);
+      }
+    }
+
+    setContexts(resolved);
+
+    // Fetch providers for each context (with fallback)
+    const newSlots: ProviderSlot[] = [];
+    for (const ctx of resolved) {
+      let providers: Omit<ContextProviderDef, "toolkit">[] = FALLBACK_PROVIDERS[ctx.type] ?? [];
+      if (ctx.serverId) {
+        try {
+          const fetched = await apiRequest<ContextProviderDef[]>(
+            `/contexts/${ctx.serverId}/providers`,
+            session,
+          );
+          providers = fetched.filter((p) => p.enabled);
+        } catch {
+          // 404 or not yet implemented — use fallback
+        }
+      }
+      for (const p of providers) {
+        newSlots.push({
+          contextKey: ctx.key,
+          provider: p.provider,
+          label: p.label,
+          category: p.category,
+          accountEmail: "",
+          connection: null,
+        });
+      }
+    }
+
+    setSlots(newSlots);
+    setBusyId(null);
+    setStep(3);
+  }
+
+  // ── Step 3: connect helpers ─────────────────────────────────────────────────
+
+  const slotId = useCallback(
+    (s: ProviderSlot) => `${s.contextKey}__${s.provider}`,
+    [],
+  );
+
+  async function saveSlotAndConnect(slot: ProviderSlot) {
+    if (!session) return;
+    const id = slotId(slot);
+    setBusyId(id);
+    setError(null);
+    setMessage(null);
+
+    try {
+      const contextDraft = contexts.find((c) => c.key === slot.contextKey);
+      const contextAccountId = `${slot.contextKey}_${slot.provider}`;
+
+      const contextPayload = contexts.map((ctx) => ({
+        context_id: ctx.serverId ?? ctx.key,
+        context_type: ctx.type,
+        display_name: ctx.name,
+        status: "active",
+        context_accounts: slots
+          .filter((s) => s.contextKey === ctx.key)
+          .map((s) => ({
+            context_account_id: `${s.contextKey}_${s.provider}`,
+            provider: s.provider,
+            context_account_purpose: s.category,
+            account_alias: `${s.contextKey}_${s.provider}`,
+            auth_scheme: "oauth",
+            ...(ctx.serverId ? { context_id: ctx.serverId } : {}),
+            ...(s.accountEmail ? { account_email: s.accountEmail } : {}),
+          })),
+      }));
+
+      const result = await apiRequest<OnboardingSaveResponse>("/onboarding/save", session, {
+        method: "POST",
+        body: JSON.stringify({
+          identity: {
+            display_name: identity.displayName.trim(),
+            legal_name: identity.displayName.trim(),
+            preferred_name: identity.preferredName.trim() || identity.displayName.trim(),
+            timezone: identity.timezone,
+            locale: "en-US",
+          },
+          authority_defaults: {
+            outbound_comms: "draft_only",
+            calendar_commits: "approval_required",
+            travel_booking: "approval_required",
+            money_movement: "blocked_without_explicit_approval",
+          },
+          onboarding: { status: "pending" },
+          contexts: contextPayload,
+        }),
+      });
+
+      // Find the connection for this slot
+      const conn =
+        result.provider_connections.find(
+          (c) => c.context_account_id === contextAccountId,
+        ) ??
+        result.provider_connections.find((c) => c.provider === slot.provider) ??
+        null;
+
+      setSlots((prev) =>
+        prev.map((s) => (slotId(s) === id ? { ...s, connection: conn } : s)),
+      );
+
+      if (conn && conn.status === "not_started") {
+        // Auto-trigger connect link
+        await triggerConnectLink(conn, id);
+      } else {
+        setMessage(`Provider slot saved.`);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to connect account.");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function triggerConnectLink(conn: ProviderConnection, busyKey: string) {
+    if (!session) return;
     try {
       const result = await apiRequest<ProviderConnectLinkResponse>(
         `/providers/${conn.provider}/connect-link`,
@@ -221,44 +444,24 @@ export default function OnboardingPage() {
           }),
         },
       );
-      setConnections((current) =>
-        current.map((item) =>
-          item.id === conn.id ? { ...item, status: result.status } : item,
+      setSlots((prev) =>
+        prev.map((s) =>
+          s.connection?.id === conn.id
+            ? { ...s, connection: { ...conn, status: result.status } }
+            : s,
         ),
       );
-      setMessage(`Connect link created for ${PROVIDER_LABELS[conn.provider]}.`);
       if (!result.url.includes("stub=true")) {
         window.location.href = result.url;
+      } else {
+        setMessage(`Connect link created for ${conn.provider}.`);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to create connect link.");
-    } finally {
-      setBusyId(null);
     }
   }
 
-  async function recordCallback(conn: ProviderConnection) {
-    if (!session) return;
-    setBusyId(conn.id);
-    setError(null);
-    setMessage(null);
-    try {
-      const result = await apiRequest<{ status: ProviderConnection["status"] }>(
-        `/providers/callback?provider_connection_id=${conn.id}&status=ACTIVE&connected_account_id=dev_${conn.context_account_id}`,
-        session,
-      );
-      setConnections((current) =>
-        current.map((item) => (item.id === conn.id ? { ...item, status: result.status } : item)),
-      );
-      setMessage(`${PROVIDER_LABELS[conn.provider]} callback recorded.`);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to record callback.");
-    } finally {
-      setBusyId(null);
-    }
-  }
-
-  async function verifySync(conn: ProviderConnection) {
+  async function handleVerifySync(conn: ProviderConnection) {
     if (!session) return;
     setBusyId(conn.id);
     setError(null);
@@ -272,35 +475,39 @@ export default function OnboardingPage() {
           body: JSON.stringify({ provider_connection_id: conn.id }),
         },
       );
-      setConnections((current) =>
-        current.map((item) => (item.id === conn.id ? { ...item, status: result.status } : item)),
+      setSlots((prev) =>
+        prev.map((s) =>
+          s.connection?.id === conn.id
+            ? { ...s, connection: { ...s.connection!, status: result.status } }
+            : s,
+        ),
       );
-      setMessage(
-        `${PROVIDER_LABELS[conn.provider]} sync verified; workflow ${result.workflow_run_id} queued.`,
-      );
+      setMessage(`Sync verified for ${conn.provider}; workflow ${result.workflow_run_id ?? "—"} queued.`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to verify first sync.");
+      setError(err instanceof Error ? err.message : "Unable to verify sync.");
     } finally {
       setBusyId(null);
     }
   }
 
-  function actionFor(conn: ProviderConnection) {
-    if (conn.status === "not_started") return () => createConnectLink(conn);
-    if (conn.status === "pending_consent" || conn.status === "initiated") {
-      return () => recordCallback(conn);
-    }
-    if (conn.status === "connected" || conn.status === "degraded") return () => verifySync(conn);
-    return undefined;
-  }
+  // ── Computed values ─────────────────────────────────────────────────────────
+  const readyCount = slots.filter((s) => s.connection?.status === "ready").length;
+  const connectedCount = slots.filter(
+    (s) =>
+      s.connection?.status === "connected" ||
+      s.connection?.status === "ready" ||
+      s.connection?.status === "syncing",
+  ).length;
+  const canGoToCommandCenter = readyCount > 0;
 
+  // ── No session guard ────────────────────────────────────────────────────────
   if (!session) {
     return (
       <main className="mx-auto min-h-screen max-w-xl bg-background px-6 py-10">
         <h1 className="text-2xl font-semibold tracking-tight">Client onboarding</h1>
         <p className="mt-3 text-sm text-muted">
-          Sign in first so onboarding can write tenant-scoped profile, provider, workflow,
-          and memory records.
+          Sign in first so onboarding can write tenant-scoped profile, provider, workflow, and
+          memory records.
         </p>
         <Link
           href="/login"
@@ -312,146 +519,474 @@ export default function OnboardingPage() {
     );
   }
 
+  // ─── Render ─────────────────────────────────────────────────────────────────
   return (
-    <main className="mx-auto min-h-screen max-w-4xl bg-background px-6 py-10">
-      <div className="flex items-start justify-between gap-6">
-        <div className="space-y-2">
+    <main className="mx-auto min-h-screen max-w-2xl bg-background px-6 py-10">
+      {/* Header */}
+      <div className="flex items-start justify-between gap-4">
+        <div>
           <p className="text-xs uppercase tracking-widest text-muted">FlavorOS</p>
-          <h1 className="text-2xl font-semibold tracking-tight">Client onboarding</h1>
-          <p className="max-w-2xl text-sm text-muted">
-            Intake creates the client profile, contexts, authority defaults, provider
-            expectations, GBrain memory, and initial agent workflow tasks.
-          </p>
+          <h1 className="mt-1 text-2xl font-semibold tracking-tight">Client onboarding</h1>
         </div>
         <Link href="/" className="text-sm text-muted hover:text-foreground">
           Back
         </Link>
       </div>
 
-      {message ? <p className="mt-5 rounded-md bg-emerald-50 p-3 text-sm text-emerald-800">{message}</p> : null}
-      {error ? <p className="mt-5 rounded-md bg-rose-50 p-3 text-sm text-rose-800">{error}</p> : null}
+      <div className="mt-4">
+        <StepIndicator current={step} />
+      </div>
 
-      <section className="mt-8 grid gap-4 md:grid-cols-[1fr_1.1fr]">
-        <div className="rounded-lg border border-border bg-surface p-4">
-          <div className="space-y-1">
-            <h2 className="text-sm font-medium">Dev client intake</h2>
-            <p className="text-xs text-muted">
-              Marcus Bivines · America/New_York · outbound communications are draft-only.
+      {/* Feedback banners */}
+      {message && (
+        <p className="mt-4 rounded-md bg-emerald-50 p-3 text-sm text-emerald-800">{message}</p>
+      )}
+      {error && (
+        <p className="mt-4 rounded-md bg-rose-50 p-3 text-sm text-rose-800">{error}</p>
+      )}
+
+      {/* ── Step 1: Identity ─────────────────────────────────────────────────── */}
+      {step === 1 && (
+        <section className="mt-8 rounded-lg border border-border bg-surface p-6">
+          <h2 className="text-base font-medium">Your identity</h2>
+          <p className="mt-1 text-sm text-muted">
+            This is how FlavorOS will know you and default your time settings.
+          </p>
+
+          <div className="mt-6 space-y-4">
+            <div>
+              <label className="block text-xs font-medium text-muted" htmlFor="displayName">
+                Display name <span className="text-rose-500">*</span>
+              </label>
+              <input
+                id="displayName"
+                type="text"
+                value={identity.displayName}
+                onChange={(e) => setIdentity((prev) => ({ ...prev, displayName: e.target.value }))}
+                placeholder="e.g. Marcus Bivines"
+                className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-accent"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-muted" htmlFor="preferredName">
+                Preferred name
+              </label>
+              <input
+                id="preferredName"
+                type="text"
+                value={identity.preferredName}
+                onChange={(e) =>
+                  setIdentity((prev) => ({ ...prev, preferredName: e.target.value }))
+                }
+                placeholder="e.g. Marcus"
+                className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-accent"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-muted" htmlFor="timezone">
+                Timezone
+              </label>
+              <select
+                id="timezone"
+                value={identity.timezone}
+                onChange={(e) => setIdentity((prev) => ({ ...prev, timezone: e.target.value }))}
+                className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-accent"
+              >
+                {TIMEZONES.map((tz) => (
+                  <option key={tz} value={tz}>
+                    {tz}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="mt-6 flex justify-end">
+            <button
+              type="button"
+              onClick={handleIdentityContinue}
+              disabled={busyId === "identity"}
+              className="rounded-md bg-accent px-5 py-2 text-sm font-medium text-accent-foreground hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {busyId === "identity" ? "Saving..." : "Continue"}
+            </button>
+          </div>
+        </section>
+      )}
+
+      {/* ── Step 2: Contexts ─────────────────────────────────────────────────── */}
+      {step === 2 && (
+        <section className="mt-8 space-y-4">
+          <div>
+            <h2 className="text-base font-medium">Your contexts</h2>
+            <p className="mt-1 text-sm text-muted">
+              Choose which areas of your life to connect. FlavorOS keeps them separate.
             </p>
           </div>
-          <div className="mt-4 space-y-2">
-            {CONTEXT_ACCOUNTS.map((account) => (
-              <div
-                key={account.contextAccountId}
-                className="flex items-center justify-between gap-3 rounded-md border border-border px-3 py-2"
-              >
-                <div>
-                  <p className="text-sm font-medium">{account.label}</p>
-                  <p className="text-xs text-muted">
-                    {account.contextLabel} · {PROVIDER_LABELS[account.provider]} ·{" "}
-                    {account.purpose}
-                  </p>
-                </div>
-                <span className="shrink-0 rounded-md border border-border-strong px-2 py-1 text-xs text-muted">
-                  {account.authScheme}
+
+          {/* Personal — always on */}
+          <div className="rounded-lg border border-border bg-surface p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <span className="inline-block rounded px-1.5 py-0.5 text-xs font-medium bg-violet-100 text-violet-800 mb-1">
+                  personal
                 </span>
+                <p className="text-sm font-medium">Personal</p>
+                <p className="text-xs text-muted">Always enabled. Email and calendar.</p>
               </div>
-            ))}
-          </div>
-          <button
-            type="button"
-            onClick={saveIntake}
-            disabled={busyId === "intake"}
-            className="mt-4 w-full rounded-md bg-accent px-4 py-2 text-sm font-medium text-accent-foreground hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {busyId === "intake" ? "Saving..." : "Save intake"}
-          </button>
-        </div>
-
-        <div className="rounded-lg border border-border bg-surface p-4">
-          <div className="flex items-start justify-between gap-3">
-            <div className="space-y-1">
-              <h2 className="text-sm font-medium">Provider readiness</h2>
-              <p className="text-xs text-muted">
-                {intake
-                  ? `${connections.length} OAuth-backed context accounts planned`
-                  : "Provider planning starts after intake is saved"}
-              </p>
+              <span className="rounded-md border border-border-strong px-2 py-1 text-xs text-muted">
+                Included
+              </span>
             </div>
-            <span className="rounded-md border border-border-strong px-2 py-1 text-xs text-muted">
-              {readyCount}/{eligibleAccounts.length} ready
-            </span>
           </div>
 
-          <div className="mt-4 space-y-3">
-            {eligibleAccounts.map((account) => {
-              const conn = connections.find(
-                (item) => item.context_account_id === account.contextAccountId,
-              );
-              const status = conn?.status ?? "not_planned";
-              const action = conn ? actionFor(conn) : undefined;
-              return (
-                <div
-                  key={account.contextAccountId}
-                  className="rounded-lg border border-border bg-background p-3"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <h3 className="text-sm font-medium">{account.label}</h3>
-                      <p className="text-xs text-muted">
-                        {account.contextId} · {account.contextAccountId} ·{" "}
-                        {PROVIDER_LABELS[account.provider]}
-                      </p>
-                    </div>
-                    <span
-                      className={`shrink-0 rounded-md border px-2 py-1 text-xs ${statusClasses(
-                        status,
-                      )}`}
-                    >
-                      {STATUS_LABELS[status]}
-                    </span>
-                  </div>
-                  <div className="mt-3 flex flex-wrap gap-2">
+          {/* Professional — optional */}
+          <div className="rounded-lg border border-border bg-surface p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex-1">
+                <span className="inline-block rounded px-1.5 py-0.5 text-xs font-medium bg-sky-100 text-sky-800 mb-1">
+                  professional
+                </span>
+                <p className="text-sm font-medium">Professional</p>
+                <p className="text-xs text-muted">Your work email and calendar.</p>
+                {professionalEnabled && (
+                  <input
+                    type="text"
+                    value={employerName}
+                    onChange={(e) => setEmployerName(e.target.value)}
+                    placeholder="Employer name"
+                    className="mt-3 w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-accent"
+                  />
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => setProfessionalEnabled((v) => !v)}
+                className={`shrink-0 rounded-md border px-3 py-1.5 text-xs font-medium transition-colors ${
+                  professionalEnabled
+                    ? "border-accent bg-accent text-accent-foreground"
+                    : "border-border-strong bg-background text-muted hover:text-foreground"
+                }`}
+              >
+                {professionalEnabled ? "Enabled" : "Add"}
+              </button>
+            </div>
+          </div>
+
+          {/* Business — multiple */}
+          <div className="rounded-lg border border-border bg-surface p-4">
+            <div className="mb-3 flex items-start justify-between gap-3">
+              <div>
+                <span className="inline-block rounded px-1.5 py-0.5 text-xs font-medium bg-amber-100 text-amber-800 mb-1">
+                  business
+                </span>
+                <p className="text-sm font-medium">Business</p>
+                <p className="text-xs text-muted">One entry per business. Add as many as you need.</p>
+              </div>
+            </div>
+
+            {/* Existing businesses */}
+            {businesses.length > 0 && (
+              <div className="mb-3 flex flex-wrap gap-2">
+                {businesses.map((b) => (
+                  <span
+                    key={b.key}
+                    className="flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1 text-xs"
+                  >
+                    {b.name}
                     <button
                       type="button"
-                      disabled={!action || busyId === conn?.id}
-                      onClick={action}
-                      className="rounded-md border border-border-strong px-3 py-1.5 text-xs font-medium text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+                      onClick={() =>
+                        setBusinesses((prev) => prev.filter((x) => x.key !== b.key))
+                      }
+                      className="text-muted hover:text-foreground"
+                      aria-label={`Remove ${b.name}`}
                     >
-                      {status === "not_started"
-                        ? "Create Connect Link"
-                        : status === "pending_consent" || status === "initiated"
-                          ? "Record callback"
-                          : status === "connected" || status === "degraded"
-                            ? "Verify first sync"
-                            : "No action"}
+                      ×
                     </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </section>
+                  </span>
+                ))}
+              </div>
+            )}
 
-      <div className="mt-8 flex items-center justify-between border-t border-border pt-6">
-        <p className="text-sm text-muted">
-          {canFinish
-            ? "Onboarding is ready for Command Center."
-            : "Command Center opens after required provider readiness is complete."}
-        </p>
-        <Link
-          href={canFinish ? "/command-center" : "#"}
-          aria-disabled={!canFinish}
-          className={`rounded-md px-4 py-2 text-sm font-medium ${
-            canFinish
-              ? "bg-accent text-accent-foreground hover:opacity-90"
-              : "cursor-not-allowed border border-border-strong text-muted"
-          }`}
-        >
-          Finish onboarding
-        </Link>
-      </div>
+            {/* Add business */}
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={newBusinessName}
+                onChange={(e) => setNewBusinessName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && newBusinessName.trim()) {
+                    setBusinesses((prev) => [
+                      ...prev,
+                      { key: uid(), name: newBusinessName.trim() },
+                    ]);
+                    setNewBusinessName("");
+                  }
+                }}
+                placeholder="Business name"
+                className="flex-1 rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-accent"
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  if (newBusinessName.trim()) {
+                    setBusinesses((prev) => [
+                      ...prev,
+                      { key: uid(), name: newBusinessName.trim() },
+                    ]);
+                    setNewBusinessName("");
+                  }
+                }}
+                className="rounded-md border border-border-strong px-3 py-2 text-xs font-medium text-foreground hover:bg-surface"
+              >
+                Add
+              </button>
+            </div>
+          </div>
+
+          <div className="flex justify-between pt-2">
+            <button
+              type="button"
+              onClick={() => setStep(1)}
+              className="text-sm text-muted hover:text-foreground"
+            >
+              Back
+            </button>
+            <button
+              type="button"
+              onClick={handleContextsContinue}
+              disabled={busyId === "contexts"}
+              className="rounded-md bg-accent px-5 py-2 text-sm font-medium text-accent-foreground hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {busyId === "contexts" ? "Setting up..." : "Continue"}
+            </button>
+          </div>
+        </section>
+      )}
+
+      {/* ── Step 3: Connect Accounts ─────────────────────────────────────────── */}
+      {step === 3 && (
+        <section className="mt-8 space-y-6">
+          <div>
+            <h2 className="text-base font-medium">Connect accounts</h2>
+            <p className="mt-1 text-sm text-muted">
+              Enter the email for each account and click Connect to start the OAuth flow.
+            </p>
+          </div>
+
+          {contexts.map((ctx) => {
+            const ctxSlots = slots.filter((s) => s.contextKey === ctx.key);
+            return (
+              <div key={ctx.key} className="rounded-lg border border-border bg-surface p-4">
+                <div className="mb-4 flex items-center gap-2">
+                  <h3 className="text-sm font-semibold">{ctx.name}</h3>
+                  <span
+                    className={`rounded px-1.5 py-0.5 text-xs font-medium ${typeBadgeClasses(ctx.type)}`}
+                  >
+                    {ctx.type}
+                  </span>
+                </div>
+
+                <div className="space-y-3">
+                  {ctxSlots.map((slot) => {
+                    const id = slotId(slot);
+                    const conn = slot.connection;
+                    const status = conn?.status ?? "not_started";
+                    const isBusy = busyId === id || (conn && busyId === conn.id);
+
+                    return (
+                      <div
+                        key={id}
+                        className="rounded-md border border-border bg-background p-3"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className="text-sm font-medium">{slot.label}</p>
+                            <p className="text-xs text-muted capitalize">{slot.category}</p>
+                          </div>
+                          <span
+                            className={`shrink-0 rounded-md border px-2 py-1 text-xs ${statusClasses(status)}`}
+                          >
+                            {STATUS_LABELS[status]}
+                          </span>
+                        </div>
+
+                        {/* Email input + connect */}
+                        {!conn && (
+                          <div className="mt-3 flex gap-2">
+                            <input
+                              type="email"
+                              value={slot.accountEmail}
+                              onChange={(e) =>
+                                setSlots((prev) =>
+                                  prev.map((s) =>
+                                    slotId(s) === id
+                                      ? { ...s, accountEmail: e.target.value }
+                                      : s,
+                                  ),
+                                )
+                              }
+                              placeholder="Account email"
+                              className="flex-1 rounded-md border border-border bg-surface px-3 py-1.5 text-sm text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-accent"
+                            />
+                            <button
+                              type="button"
+                              disabled={!!isBusy}
+                              onClick={() => saveSlotAndConnect(slot)}
+                              className="rounded-md bg-accent px-3 py-1.5 text-xs font-medium text-accent-foreground hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              {isBusy ? "Connecting..." : "Connect"}
+                            </button>
+                          </div>
+                        )}
+
+                        {/* Action buttons once connection exists */}
+                        {conn && (
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            {(status === "pending_consent" || status === "initiated") && (
+                              <button
+                                type="button"
+                                disabled={!!isBusy}
+                                onClick={() => triggerConnectLink(conn, conn.id)}
+                                className="rounded-md border border-border-strong px-3 py-1.5 text-xs font-medium text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+                              >
+                                {isBusy ? "Opening..." : "Re-open OAuth"}
+                              </button>
+                            )}
+                            {(status === "connected" || status === "degraded") && (
+                              <button
+                                type="button"
+                                disabled={!!isBusy}
+                                onClick={() => handleVerifySync(conn)}
+                                className="rounded-md border border-border-strong px-3 py-1.5 text-xs font-medium text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+                              >
+                                {isBusy ? "Syncing..." : "Verify sync"}
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+
+          <div className="flex items-center justify-between pt-2">
+            <button
+              type="button"
+              onClick={() => setStep(2)}
+              className="text-sm text-muted hover:text-foreground"
+            >
+              Back
+            </button>
+            <button
+              type="button"
+              onClick={() => setStep(4)}
+              className="rounded-md border border-border-strong px-5 py-2 text-sm font-medium text-foreground hover:bg-surface"
+            >
+              Continue to summary
+            </button>
+          </div>
+        </section>
+      )}
+
+      {/* ── Step 4: Ready ────────────────────────────────────────────────────── */}
+      {step === 4 && (
+        <section className="mt-8 space-y-6">
+          <div>
+            <h2 className="text-base font-medium">Setup summary</h2>
+            <p className="mt-1 text-sm text-muted">
+              Here is what was connected during onboarding.
+            </p>
+          </div>
+
+          <div className="rounded-lg border border-border bg-surface p-5">
+            <dl className="space-y-3 text-sm">
+              <div className="flex justify-between gap-4">
+                <dt className="text-muted">Contexts</dt>
+                <dd className="font-medium">{contexts.length}</dd>
+              </div>
+              <div className="flex justify-between gap-4">
+                <dt className="text-muted">Accounts connected</dt>
+                <dd className="font-medium">{connectedCount}</dd>
+              </div>
+              <div className="flex justify-between gap-4">
+                <dt className="text-muted">Accounts ready</dt>
+                <dd className="font-medium text-emerald-700">{readyCount}</dd>
+              </div>
+            </dl>
+
+            {/* Per-context summary */}
+            {contexts.length > 0 && (
+              <div className="mt-5 space-y-3">
+                {contexts.map((ctx) => {
+                  const ctxSlots = slots.filter((s) => s.contextKey === ctx.key);
+                  return (
+                    <div key={ctx.key} className="rounded-md border border-border p-3">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-sm font-medium">{ctx.name}</span>
+                        <span
+                          className={`rounded px-1.5 py-0.5 text-xs font-medium ${typeBadgeClasses(ctx.type)}`}
+                        >
+                          {ctx.type}
+                        </span>
+                      </div>
+                      <div className="space-y-1">
+                        {ctxSlots.map((slot) => {
+                          const status = slot.connection?.status ?? "not_started";
+                          return (
+                            <div
+                              key={slotId(slot)}
+                              className="flex items-center justify-between text-xs"
+                            >
+                              <span className="text-muted">{slot.label}</span>
+                              <span
+                                className={`rounded border px-1.5 py-0.5 ${statusClasses(status)}`}
+                              >
+                                {STATUS_LABELS[status]}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          <p className="text-xs text-muted">
+            You can add more accounts in Settings.
+          </p>
+
+          <div className="flex items-center justify-between pt-2">
+            <button
+              type="button"
+              onClick={() => setStep(3)}
+              className="text-sm text-muted hover:text-foreground"
+            >
+              Back
+            </button>
+            <Link
+              href={canGoToCommandCenter ? "/command-center" : "#"}
+              aria-disabled={!canGoToCommandCenter}
+              className={`rounded-md px-5 py-2 text-sm font-medium ${
+                canGoToCommandCenter
+                  ? "bg-accent text-accent-foreground hover:opacity-90"
+                  : "cursor-not-allowed border border-border-strong text-muted"
+              }`}
+            >
+              Go to Command Center
+            </Link>
+          </div>
+        </section>
+      )}
     </main>
   );
 }
