@@ -14,7 +14,6 @@ import {
   OnboardingSaveResponse,
   ProviderConnection,
   ProviderConnectLinkResponse,
-  ProviderSyncResponse,
   FlavorOSSession,
 } from "@/lib/api";
 
@@ -235,8 +234,6 @@ function OnboardingInner() {
 
     const resetFlag = searchParams.get("reset");
     const oauthConnId = searchParams.get("provider_connection_id");
-    const oauthStatus = searchParams.get("status");
-
     async function hydrate(sess: FlavorOSSession) {
       // Dev reset: wipe contexts + connections and start fresh
       if (resetFlag === "1") {
@@ -247,25 +244,7 @@ function OnboardingInner() {
         return; // stay on step 1
       }
 
-      // If returning from OAuth, verify the connection first
-      if (oauthConnId && oauthStatus) {
-        try {
-          const conns = await listProviderConnections(sess);
-          const conn = conns.find((c) => c.id === oauthConnId);
-          if (conn && !isConnected(conn)) {
-            await apiRequest<ProviderSyncResponse>(
-              `/providers/${conn.provider}/sync`,
-              sess,
-              {
-                method: "POST",
-                body: JSON.stringify({ provider_connection_id: conn.id }),
-              },
-            );
-          }
-        } catch {
-          // sync verify failed — continue anyway, user can retry
-        }
-        // Clear query params without a full reload
+      if (oauthConnId) {
         window.history.replaceState({}, "", "/onboarding");
       }
 
@@ -306,9 +285,10 @@ function OnboardingInner() {
       }
       setSlots(expected);
 
-      // Find first unconnected slot
+      // Find first unconnected slot — treat the OAuth return connection as done
       const firstUnconnected = expected.findIndex(
-        (s) => !isConnected(s.connection),
+        (s) =>
+          !isConnected(s.connection) && s.connection?.id !== oauthConnId,
       );
       if (firstUnconnected === -1) {
         // All connected
