@@ -236,16 +236,16 @@ function OnboardingInner() {
     const oauthConnId = searchParams.get("provider_connection_id");
     const oauthStatus = searchParams.get("status");
 
-    async function hydrate() {
+    async function hydrate(sess: FlavorOSSession) {
       // If returning from OAuth, verify the connection first
       if (oauthConnId && oauthStatus) {
         try {
-          const conns = await listProviderConnections(s);
+          const conns = await listProviderConnections(sess);
           const conn = conns.find((c) => c.id === oauthConnId);
           if (conn && !isConnected(conn)) {
             await apiRequest<ProviderSyncResponse>(
               `/providers/${conn.provider}/sync`,
-              s,
+              sess,
               {
                 method: "POST",
                 body: JSON.stringify({ provider_connection_id: conn.id }),
@@ -260,8 +260,8 @@ function OnboardingInner() {
       }
 
       const [ctxs, conns] = await Promise.all([
-        listContexts(s),
-        listProviderConnections(s),
+        listContexts(sess),
+        listProviderConnections(sess),
       ]);
 
       if (ctxs.length === 0) return; // fresh user — stay on step 1
@@ -310,7 +310,7 @@ function OnboardingInner() {
       }
     }
 
-    hydrate().catch(() => {});
+    hydrate(s).catch(() => {});
   }, [router, searchParams]);
 
   // ── Step 1: save identity ─────────────────────────────────────────────────
@@ -435,7 +435,6 @@ function OnboardingInner() {
     setMessage(null);
 
     try {
-      const ctx = contexts.find((c) => c.key === slot.contextKey);
       const contextPayload = contexts.map((c) => ({
         context_id: c.serverId ?? c.key,
         context_type: c.type,
