@@ -417,12 +417,7 @@ function OnboardingInner() {
         prev.map((s) => (slotId(s) === id ? { ...s, connection: conn } : s)),
       );
 
-      if (conn && conn.status === "not_started") {
-        // Auto-trigger connect link
-        await triggerConnectLink(conn, id);
-      } else {
-        setMessage(`Provider slot saved.`);
-      }
+      setMessage(conn ? `Account saved. Click Connect to start OAuth.` : `Provider slot saved.`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to connect account.");
     } finally {
@@ -452,7 +447,8 @@ function OnboardingInner() {
         ),
       );
       if (!result.url.includes("stub=true")) {
-        window.location.href = result.url;
+        window.open(result.url, "_blank", "noopener,noreferrer");
+        setMessage(`OAuth window opened for ${conn.provider}. Complete the sign-in there, then come back and click Verify.`);
       } else {
         setMessage(`Connect link created for ${conn.provider}.`);
       }
@@ -773,7 +769,7 @@ function OnboardingInner() {
           <div>
             <h2 className="text-base font-medium">Connect accounts</h2>
             <p className="mt-1 text-sm text-muted">
-              Enter the email for each account and click Connect to start the OAuth flow.
+              Enter the email for each account and click Save. Once saved, click Connect to open the OAuth window — you can connect all accounts before moving on.
             </p>
           </div>
 
@@ -814,7 +810,7 @@ function OnboardingInner() {
                           </span>
                         </div>
 
-                        {/* Email input + connect */}
+                        {/* Email input + save, then connect */}
                         {!conn && (
                           <div className="mt-3 flex gap-2">
                             <input
@@ -838,7 +834,21 @@ function OnboardingInner() {
                               onClick={() => saveSlotAndConnect(slot)}
                               className="rounded-md bg-accent px-3 py-1.5 text-xs font-medium text-accent-foreground hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
                             >
-                              {isBusy ? "Connecting..." : "Connect"}
+                              {isBusy ? "Saving..." : "Save"}
+                            </button>
+                          </div>
+                        )}
+
+                        {/* Connect OAuth once slot is saved */}
+                        {conn && (status === "not_started") && (
+                          <div className="mt-3">
+                            <button
+                              type="button"
+                              disabled={!!isBusy}
+                              onClick={() => triggerConnectLink(conn, conn.id)}
+                              className="rounded-md bg-accent px-3 py-1.5 text-xs font-medium text-accent-foreground hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              {isBusy ? "Opening..." : "Connect"}
                             </button>
                           </div>
                         )}
