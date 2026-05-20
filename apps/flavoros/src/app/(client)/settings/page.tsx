@@ -37,35 +37,45 @@ function humanizeKey(key: string): string {
 }
 
 export default function SettingsPage() {
-  const { profile, providers, loading, error } = useSettingsData();
+  const { profile, providers, envelope, loading, error } = useSettingsData();
 
-  const contextLabels = [
-    ...new Set(
-      providers
-        .map((conn) => conn.context_id)
-        .filter((id): id is string => Boolean(id)),
-    ),
-  ].map(formatContextId);
+  const contextLabels =
+    envelope && envelope.contexts.length > 0
+      ? envelope.contexts.map((ctx) => ctx.name || formatContextId(ctx.type))
+      : [
+          ...new Set(
+            providers
+              .map((conn) => conn.context_id)
+              .filter((id): id is string => Boolean(id)),
+          ),
+        ].map(formatContextId);
 
   const preferences = profile?.preferences ?? null;
   const authorityDefaults =
-    preferences &&
-    typeof preferences === "object" &&
-    "authority_defaults" in preferences &&
-    preferences.authority_defaults &&
-    typeof preferences.authority_defaults === "object"
-      ? (preferences.authority_defaults as Record<string, string>)
-      : null;
+    envelope?.authority && typeof envelope.authority === "object"
+      ? (envelope.authority as Record<string, string>)
+      : preferences &&
+          typeof preferences === "object" &&
+          "authority_defaults" in preferences &&
+          preferences.authority_defaults &&
+          typeof preferences.authority_defaults === "object"
+        ? (preferences.authority_defaults as Record<string, string>)
+        : null;
 
+  const onboardingSlice = envelope?.onboarding?.status;
   const onboardingStatus =
-    preferences &&
-    typeof preferences === "object" &&
-    "onboarding" in preferences &&
-    preferences.onboarding &&
-    typeof preferences.onboarding === "object" &&
-    "status" in preferences.onboarding
-      ? String((preferences.onboarding as Record<string, unknown>).status)
-      : null;
+    onboardingSlice &&
+    typeof onboardingSlice === "object" &&
+    "status" in onboardingSlice
+      ? String((onboardingSlice as Record<string, unknown>).status)
+      : preferences &&
+          typeof preferences === "object" &&
+          "onboarding" in preferences &&
+          preferences.onboarding &&
+          typeof preferences.onboarding === "object" &&
+          "status" in preferences.onboarding
+        ? String((preferences.onboarding as Record<string, unknown>).status)
+        : null;
 
   return (
     <>

@@ -1,6 +1,6 @@
 # Next Session Handoff
 
-**Last updated:** 2026-05-19 (K3 verification guardrails)  
+**Last updated:** 2026-05-19 (First real user — Composio OAuth + Sinclair LLM + Command Center wired)  
 **Purpose:** Single entry point for a new agent session. Read this first, then the linked docs.
 
 ---
@@ -56,6 +56,15 @@ Before first commit: update your lane row in [parallel_lanes_tracker.md](./paral
 ---
 
 ## Ready work (pick one lane per session)
+
+#### N — Real provider stabilization (post-first-user)
+
+**Paths:** `services/api/app/adapters/composio.py`, `services/api/app/routers/providers.py`, `services/api/tests/**`  
+**Goal:** harden the real Composio path now that one real user is connected
+- TODO-5: per-message ProviderEvent deduplication (`idempotency_key: "{provider_connection_id}:gmail:{message_id}"`)
+- TODO-6: move sync LLM call off request thread (`asyncio.to_thread`) — currently blocks HTTP for up to 30s
+- Verify `Action.GMAIL_FETCH_EMAILS` is the exact Composio SDK action name against current docs
+- Add Composio SDK HTTP timeout (`timeout=10.0` on client init — critical gap noted in eng review)
 
 #### K — Lane J hardening
 
@@ -138,12 +147,14 @@ cd services/api && .venv/bin/python -m pytest \
 # Next.js typecheck
 cd apps/flavoros && pnpm exec tsc --noEmit
 
-# API health + outbound smoke (API must be on 127.0.0.1:8001, migrated + seeded)
-curl -sf http://127.0.0.1:8001/health
+# API health + outbound smoke (API must be on 127.0.0.1:8008, migrated + seeded)
+curl -sf http://127.0.0.1:8008/health
 ./scripts/smoke-vertical-slice.sh
 ```
 
-**Local URLs:** Next `http://localhost:3000`, API `http://127.0.0.1:8001` (see runbook).
+**Local URLs:** Next `http://localhost:3000`, API `http://127.0.0.1:8008` (see runbook).
+
+**Operational note:** `ANTHROPIC_API_KEY` must not be set as an empty string in the shell. pydantic-settings prioritizes shell env vars over `.env` — if `ANTHROPIC_API_KEY=` is exported (even empty), it shadows the real key in `services/api/.env`. Run `unset ANTHROPIC_API_KEY` before starting the API process if the key lives only in `.env`.
 
 **Manual E2E:** login → onboarding (if needed) → sync → Command Center → approve → `/admin` live lists → `/settings` profile + providers.
 
@@ -153,7 +164,7 @@ For post-J work, keep the outbound E2E in the loop: approve communication draft 
 
 Run after promoting the app or API host:
 
-1. **API health** — `curl -sfI` (or `curl -sf`) the production API base URL `/health` (same host as `NEXT_PUBLIC_FLAVOROS_API_URL` in Vercel).
+1. **API health** — `curl -sfI` (or `curl -sf`) the production API base URL `/health`. Local API now runs on port **8008** (changed from 8001); `NEXT_PUBLIC_FLAVOROS_API_URL` in `apps/flavoros/.env.local` reflects this.
 2. **App shell** — open `https://flavoros.vercel.app` (or your production URL); confirm login loads without CORS errors.
 3. **Outbound route** — with a client session token, `GET /outbound-actions` returns **200** (not 404). If 404, production API likely needs restart after migration + env deploy.
 4. **Communications approve path** — log in as demo or pilot client → Command Center → approve a `send_communication_draft` item → confirm outbound row shows `executed` or `failed` (or `queued` only if defer is intentionally enabled).
@@ -191,12 +202,16 @@ Current reality:
 - Vertical slice is complete.
 - Post-slice lanes A through J are complete.
 - The MVP demo proof loop is complete for a communications-first path.
+- One real user (marcus@bivinesgroup.com) is connected via Composio OAuth; 10 real Gmail messages synced; Sinclair (claude-sonnet-4-6) generated a real artifact body; approve flow wires to outbound queue.
+- API runs on port 8008 (Cloudflare tunnel: api.flavoros.cc → localhost:8008).
+- Open TODOs from real-user session: TODO-5 (per-message dedup), TODO-6 (async LLM call), Composio SDK timeout, verify Action.GMAIL_FETCH_EMAILS name.
 
 Your assignment:
 Choose one follow-on lane and stay inside it:
-1. Lane K — harden communications write-back
-2. Lane L — build docs/FLAVOROS_TAXONOMY.md
-3. Lane M — plan/implement the next outbound breadth slice only if K is calm
+1. Lane N — stabilize the real Composio path (TODO-5, TODO-6, SDK timeout, action name verification)
+2. Lane K — harden communications write-back
+3. Lane L — build docs/FLAVOROS_TAXONOMY.md
+4. Lane M — plan/implement the next outbound breadth slice only if K is calm
 
 Success target:
 - preserve the current outbound proof path
@@ -262,8 +277,35 @@ Documented in [archive/build_vertical_slice_tasks.md](./archive/build_vertical_s
 | **H** — GBrain | Done | subsystem landing zone + integration doc |
 | **I** — Channel surfaces | Done | `useChannelData`, I1–I6 surfaces + CC widgets on API data |
 | **J** — Write-back | Done | communications-first outbound actions, client/admin visibility, smoke + CI coverage |
+| **First real user** | Done | Composio OAuth live, real Gmail synced, Sinclair LLM body, Command Center wired, 54 tests pass |
 
 ### Completed lane notes
+
+#### First real user (2026-05-19)
+
+**Status:** `done`  
+**Delivered:** end-to-end real provider integration for the first human user session.
+
+**Shipped:**
+
+- `RealComposioAdapter` with lazy `ComposioToolSet` init (avoids pydantic validation on startup)
+- `/providers/callback` made public; `provider_connection_id` embedded in redirect URI
+- Composio OAuth quirks handled: `status=success`, `connectedAccountId` camelCase
+- `ANTHROPIC_API_KEY` + `COMPOSIO_API_KEY` in `services/api/.env` (git-ignored)
+- Sinclair LLM call (claude-sonnet-4-6, timeout=30s, fallback-to-canned on exception) in `provider_first_sync.py`
+- Cloudflare named tunnel: `api.flavoros.cc` → `localhost:8008` (tunnel ID: `bcc8b555-8eb5-495e-943e-5a99f93c8528`)
+- Command Center wired to live API: `useChannelData` + `applyDecideResult` for optimistic updates
+- `approvalToInboxItem` joins artifact map; agent name detection (Gmail → "Sinclair")
+- conftest `settings` fixture pins `composio_api_key=""` + `anthropic_api_key=""` to prevent env leakage
+
+**Open TODOs (carry forward as Lane N):**
+
+- TODO-5: per-message ProviderEvent dedup (`idempotency_key: "{provider_connection_id}:gmail:{message_id}"`)
+- TODO-6: async LLM call off request thread (`asyncio.to_thread`)
+- Composio SDK HTTP timeout on client init (critical gap from eng review)
+- Verify `Action.GMAIL_FETCH_EMAILS` exact name against current Composio docs
+
+---
 
 #### Lane J — Write-back
 

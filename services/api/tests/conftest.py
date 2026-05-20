@@ -128,7 +128,11 @@ def _make_token(user: User, tenant: Tenant, secret: str = "test-secret") -> str:
 @pytest.fixture()
 def client(db: Session, settings: Settings) -> TestClient:
     app = create_app()
-    app.dependency_overrides[get_db] = lambda: db
+
+    def _override_get_db():
+        yield db
+
+    app.dependency_overrides[get_db] = _override_get_db
     app.dependency_overrides[get_settings] = lambda: settings
     return TestClient(app)
 

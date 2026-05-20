@@ -13,6 +13,7 @@ export type ProviderConnection = {
   id: string;
   client_id: string;
   provider: "gmail" | "googlecalendar" | "googledrive";
+  client_context_id: string | null;
   context_id: string | null;
   context_account_id: string | null;
   account_alias: string | null;
@@ -135,6 +136,32 @@ export type ClientContext = {
   created_at: string;
 };
 
+export type ClientContextEnvelope = ClientContext & {
+  provider_connections: ProviderConnection[];
+};
+
+export type ClientUniverseEnvelope = {
+  client_id: string;
+  profile: {
+    display_name?: string;
+    timezone?: string | null;
+    preferences?: Record<string, unknown>;
+  } | null;
+  contexts: ClientContextEnvelope[];
+  authority: Record<string, unknown> | null;
+  onboarding: Record<string, unknown>;
+  preferences: Record<string, unknown> | null;
+  readiness: Record<string, unknown>;
+  provider_expectations: Record<string, unknown>;
+};
+
+export type UniverseReadiness = {
+  client_id: string;
+  onboarding_complete: boolean;
+  sync_ready: boolean;
+  flags: Record<string, unknown>;
+};
+
 export type ContextProviderDef = {
   provider: string;
   toolkit: string;
@@ -181,6 +208,18 @@ export async function apiRequest<T>(
 
 export async function getProfile(session: FlavorOSSession): Promise<ProfileRead> {
   return apiRequest<ProfileRead>("/profiles/me", session);
+}
+
+export async function getUniverseEnvelope(
+  session: FlavorOSSession,
+): Promise<ClientUniverseEnvelope> {
+  return apiRequest<ClientUniverseEnvelope>("/universe/envelope", session);
+}
+
+export async function getUniverseReadiness(
+  session: FlavorOSSession,
+): Promise<UniverseReadiness> {
+  return apiRequest<UniverseReadiness>("/universe/readiness", session);
 }
 
 export async function listArtifacts(session: FlavorOSSession): Promise<ArtifactRead[]> {

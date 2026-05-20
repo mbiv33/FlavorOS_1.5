@@ -34,6 +34,13 @@ async def save_client_onboarding(
         user=user,
         body=body,
     )
+    client_context_ids = list(
+        dict.fromkeys(
+            str(conn.client_context_id)
+            for conn in provider_connections
+            if conn.client_context_id is not None
+        )
+    )
     summary = (
         f"Onboarding saved for {profile.display_name}; status={onboarding_status}; "
         f"providers={','.join(conn.provider for conn in provider_connections) or 'none'}."
@@ -46,6 +53,8 @@ async def save_client_onboarding(
             "workflow_run_id": str(workflow_run.id),
             "profile_id": str(profile.id),
             "provider_connection_ids": [str(conn.id) for conn in provider_connections],
+            "client_context_ids": client_context_ids,
+            "onboarding_status": onboarding_status,
         },
     )
     await gbrain.store_sigma(

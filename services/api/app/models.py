@@ -399,8 +399,8 @@ class ProviderConnection(Base):
         UniqueConstraint(
             "client_id",
             "provider",
-            "context_account_id",
-            name="uq_provconn_client_provider_context_account",
+            "client_context_id",
+            name="uq_provconn_client_provider_client_context",
         ),
     )
 

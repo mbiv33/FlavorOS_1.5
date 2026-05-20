@@ -29,7 +29,7 @@ Canonical repo homes:
 - `agents/*/protocols/`
 - `services/api/`
 - `apps/`
-- `client_universe/`
+- `client_universe/` — JSON Schema + dev seed/export YAML only; runtime truth is Postgres (`client_contexts`, `client_universe` KV, `profiles`) + GBrain (see `docs/architecture/client_universe_categories.md`)
 - `docs/workflows/planned_feature_catalog.md`
 
 ## Status Vocabulary

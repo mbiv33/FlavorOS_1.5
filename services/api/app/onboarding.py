@@ -3,10 +3,15 @@
 The Composio connection flow is triggered from saved onboarding state.  This
 keeps provider grants tenant-scoped and prevents scripts from creating shared
 or global client connections.
+
+Contexts and context accounts are stored relationally (`client_contexts`,
+`provider_connections.client_context_id`). KV `client_universe` holds only
+authority_defaults, onboarding, preferences, readiness, and provider_expectations.
 """
 
 from __future__ import annotations
 
+import uuid
 from datetime import datetime, timezone
 
 from sqlalchemy import select
@@ -16,16 +21,19 @@ from app.models import (
     AgentTask,
     Artifact,
     AuditEvent,
-    ClientUniverseEntry,
+    ClientContext,
     Profile,
     ProviderConnection,
     Tenant,
     User,
     WorkflowRun,
 )
-from app.schemas import OnboardingContextAccount, OnboardingSaveRequest
+from app.schemas import OnboardingContext, OnboardingContextAccount, OnboardingSaveRequest
+from app.services.client_universe import upsert_entry
 
 ONBOARDING_TRIGGER = "client_onboarding.profile_saved"
+
+_SINGLETON_CONTEXT_TYPES = frozenset({"personal", "professional"})
 
 GOOGLE_WORKSPACE_CATALOG = {
     "gmail": {
@@ -87,7 +95,6 @@ CONTEXT_PROVIDER_CATALOG: dict[str, list[dict]] = {
     "personal": [
         _p("gmail", "gmail", "Gmail", "email", True),
         _p("googlecalendar", "googlecalendar", "Google Calendar", "calendar", True),
-        # Socials (phase 2 — scaffold only, not wired for OAuth yet)
         _p("x", "twitter", "X / Twitter", "social", False),
         _p("linkedin", "linkedin", "LinkedIn", "social", False),
         _p("facebook", "facebook", "Facebook", "social", False),
@@ -102,7 +109,6 @@ CONTEXT_PROVIDER_CATALOG: dict[str, list[dict]] = {
         _p("gmail", "gmail", "Business Gmail", "email", True),
         _p("googlecalendar", "googlecalendar", "Business Calendar", "calendar", True),
         _p("googledrive", "googledrive", "Google Drive / Docs", "files", True),
-        # Socials (phase 2)
         _p("x", "twitter", "X / Twitter", "social", False),
         _p("linkedin", "linkedin", "LinkedIn", "social", False),
         _p("instagram", "instagram", "Instagram", "social", False),
@@ -119,37 +125,51 @@ def providers_for_context(context_type: str) -> list[dict]:
     return CONTEXT_PROVIDER_CATALOG.get(context_type, [])
 
 
-def _upsert_universe_entry(
+def _resolve_or_create_client_context(
     db: Session,
-    *,
-    client_id,
-    category: str,
-    key: str,
-    value: dict,
-) -> ClientUniverseEntry:
-    entry = db.execute(
-        select(ClientUniverseEntry).where(
-            ClientUniverseEntry.client_id == client_id,
-            ClientUniverseEntry.category == category,
-            ClientUniverseEntry.key == key,
+    tenant: Tenant,
+    context: OnboardingContext,
+) -> ClientContext:
+    """Upsert relational ClientContext from onboarding payload."""
+    try:
+        ctx_uuid = uuid.UUID(context.context_id)
+        existing = db.get(ClientContext, ctx_uuid)
+        if existing is not None and existing.client_id == tenant.id:
+            existing.name = context.display_name
+            existing.type = context.context_type
+            return existing
+    except ValueError:
+        pass
+
+    existing = db.execute(
+        select(ClientContext).where(
+            ClientContext.client_id == tenant.id,
+            ClientContext.type == context.context_type,
+            ClientContext.name == context.display_name,
         )
     ).scalar_one_or_none()
-    if entry is None:
-        entry = ClientUniverseEntry(
-            client_id=client_id,
-            category=category,
-            key=key,
-            value=value,
-        )
-        db.add(entry)
-    else:
-        entry.value = value
-        entry.updated_at = datetime.now(timezone.utc)
-    return entry
+    if existing is not None:
+        return existing
 
+    if context.context_type in _SINGLETON_CONTEXT_TYPES:
+        singleton = db.execute(
+            select(ClientContext).where(
+                ClientContext.client_id == tenant.id,
+                ClientContext.type == context.context_type,
+            )
+        ).scalar_one_or_none()
+        if singleton is not None:
+            singleton.name = context.display_name
+            return singleton
 
-def _account_payload(account: OnboardingContextAccount) -> dict:
-    return account.model_dump()
+    ctx = ClientContext(
+        client_id=tenant.id,
+        type=context.context_type,
+        name=context.display_name,
+    )
+    db.add(ctx)
+    db.flush()
+    return ctx
 
 
 def _queue_agent_task(
@@ -197,6 +217,7 @@ def _create_onboarding_sigma(
     workflow_run: WorkflowRun,
     provider_connections: list[ProviderConnection],
     status: str,
+    client_context_ids: list[str],
 ) -> Artifact:
     artifact = Artifact(
         client_id=tenant.id,
@@ -210,6 +231,7 @@ def _create_onboarding_sigma(
             "sigma_type": "client_onboarding_readiness",
             "onboarding_status": status,
             "provider_connection_ids": [str(conn.id) for conn in provider_connections],
+            "client_context_ids": client_context_ids,
         },
     )
     db.add(artifact)
@@ -221,7 +243,8 @@ def _upsert_provider_connection(
     *,
     tenant: Tenant,
     user: User,
-    context_id: str,
+    client_context: ClientContext,
+    context_slug: str,
     account: OnboardingContextAccount,
 ) -> ProviderConnection | None:
     if account.auth_scheme != "oauth":
@@ -236,19 +259,17 @@ def _upsert_provider_connection(
         select(ProviderConnection).where(
             ProviderConnection.client_id == tenant.id,
             ProviderConnection.provider == provider,
-            ProviderConnection.context_account_id == account.context_account_id,
+            ProviderConnection.client_context_id == client_context.id,
         )
     ).scalar_one_or_none()
 
     shared_fields = {
-        "context_id": context_id,
+        "client_context_id": client_context.id,
+        "context_id": context_slug,
+        "context_account_id": account.context_account_id,
         "account_alias": account.account_alias,
         "purpose": account.context_account_purpose,
         "toolkit": catalog_item["toolkit"],
-        # composio_user_id is intentionally left NULL here.
-        # providers.create_provider_connect_link sets it to f"conn:{conn.id}"
-        # on first OAuth initiation, ensuring each connection maps to a distinct
-        # Composio entity (critical for multi-account same-provider scenarios).
         "enabled": True,
         "config": {
             "external_identifier": account.external_identifier,
@@ -260,7 +281,6 @@ def _upsert_provider_connection(
         conn = ProviderConnection(
             client_id=tenant.id,
             provider=provider,
-            context_account_id=account.context_account_id,
             status="not_started",
             **shared_fields,
         )
@@ -276,7 +296,8 @@ def _upsert_provider_connection(
                 detail={
                     "trigger": ONBOARDING_TRIGGER,
                     "provider": provider,
-                    "context_id": context_id,
+                    "context_id": context_slug,
+                    "client_context_id": str(client_context.id),
                     "context_account_id": account.context_account_id,
                 },
             )
@@ -324,50 +345,51 @@ def save_onboarding(
         profile.preferences = preferences
         profile.updated_at = datetime.now(timezone.utc)
 
-    _upsert_universe_entry(
-        db,
-        client_id=tenant.id,
-        category="authority_defaults",
-        key="defaults",
-        value=body.authority_defaults,
-    )
-    _upsert_universe_entry(
-        db,
-        client_id=tenant.id,
-        category="onboarding",
-        key="status",
-        value=body.onboarding.model_dump(),
-    )
-
     provider_connections: list[ProviderConnection] = []
+    client_context_ids: list[str] = []
+
     for context in body.contexts:
-        _upsert_universe_entry(
-            db,
-            client_id=tenant.id,
-            category="context",
-            key=context.context_id,
-            value=context.model_dump(exclude={"context_accounts"}),
-        )
+        client_context = _resolve_or_create_client_context(db, tenant, context)
+        context_uuid = str(client_context.id)
+        client_context_ids.append(context_uuid)
+        context_slug = context_uuid
+
         for account in context.context_accounts:
-            _upsert_universe_entry(
-                db,
-                client_id=tenant.id,
-                category="context_account",
-                key=account.context_account_id,
-                value={"context_id": context.context_id, **_account_payload(account)},
-            )
             conn = _upsert_provider_connection(
                 db,
                 tenant=tenant,
                 user=user,
-                context_id=context.context_id,
+                client_context=client_context,
+                context_slug=context_slug,
                 account=account,
             )
             if conn is not None:
                 provider_connections.append(conn)
 
+    authority_value = {
+        **body.authority_defaults,
+        "client_context_ids": client_context_ids,
+    }
+    upsert_entry(
+        db,
+        client_id=tenant.id,
+        category="authority_defaults",
+        key="defaults",
+        value=authority_value,
+    )
+    upsert_entry(
+        db,
+        client_id=tenant.id,
+        category="onboarding",
+        key="status",
+        value={
+            **body.onboarding.model_dump(),
+            "client_context_ids": client_context_ids,
+        },
+    )
+
     next_status = "ready_for_auth" if provider_connections else body.onboarding.status
-    _upsert_universe_entry(
+    upsert_entry(
         db,
         client_id=tenant.id,
         category="onboarding",
@@ -376,8 +398,17 @@ def save_onboarding(
             "trigger": ONBOARDING_TRIGGER,
             "status": next_status,
             "provider_connections": len(provider_connections),
+            "client_context_ids": client_context_ids,
         },
     )
+    upsert_entry(
+        db,
+        client_id=tenant.id,
+        category="readiness",
+        key="onboarding",
+        value={"status": next_status, "client_context_ids": client_context_ids},
+    )
+
     workflow_run = _queue_agent_task(
         db,
         tenant=tenant,
@@ -387,7 +418,7 @@ def save_onboarding(
         payload={
             "trigger": ONBOARDING_TRIGGER,
             "onboarding_status": next_status,
-            "contexts": [context.context_id for context in body.contexts],
+            "contexts": client_context_ids,
             "provider_connections": len(provider_connections),
         },
     )
@@ -422,6 +453,7 @@ def save_onboarding(
         workflow_run=workflow_run,
         provider_connections=provider_connections,
         status=next_status,
+        client_context_ids=client_context_ids,
     )
     db.add(
         AuditEvent(
@@ -432,6 +464,7 @@ def save_onboarding(
             resource_id=tenant.id,
             detail={
                 "contexts": len(body.contexts),
+                "client_context_ids": client_context_ids,
                 "provider_connections": len(provider_connections),
                 "status": next_status,
             },

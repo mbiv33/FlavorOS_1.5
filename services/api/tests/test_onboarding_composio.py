@@ -6,7 +6,8 @@ from sqlalchemy.orm import Session
 
 from app.adapters.gbrain import IngestResult, SigmaResult
 from app.deps import get_gbrain
-from app.models import AgentTask, Artifact, AuditEvent, ProviderConnection, WorkflowRun
+from app.models import AgentTask, Artifact, AuditEvent, ClientContext, ClientUniverseEntry, ProviderConnection, WorkflowRun
+from app.universe_registry import DEPRECATED_KV_CATEGORIES
 
 
 class RecordingGBrain:
@@ -111,6 +112,13 @@ def test_onboarding_save_plans_oauth_provider_connections(
 
     saved = db.execute(select(ProviderConnection)).scalars().all()
     assert len(saved) == 2
+    contexts = db.execute(select(ClientContext)).scalars().all()
+    assert len(contexts) == 1
+    for conn in saved:
+        assert conn.client_context_id == contexts[0].id
+
+    universe = db.execute(select(ClientUniverseEntry)).scalars().all()
+    assert not {e.category for e in universe} & DEPRECATED_KV_CATEGORIES
 
     workflows = db.execute(select(WorkflowRun)).scalars().all()
     workflow_types = {run.workflow_type for run in workflows}

@@ -327,6 +327,35 @@ class ProviderConnectionWrite(BaseModel):
     enabled: bool = True
 
 
+class ClientContextEnvelopeRead(BaseModel):
+    id: uuid.UUID
+    client_id: uuid.UUID
+    type: str
+    name: str
+    created_at: datetime
+    provider_connections: list[ProviderConnectionRead] = Field(default_factory=list)
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ClientUniverseEnvelopeRead(BaseModel):
+    client_id: uuid.UUID
+    profile: Optional[dict] = None
+    contexts: list[ClientContextEnvelopeRead] = Field(default_factory=list)
+    authority: Optional[dict] = None
+    onboarding: dict = Field(default_factory=dict)
+    preferences: Optional[dict] = None
+    readiness: dict = Field(default_factory=dict)
+    provider_expectations: dict = Field(default_factory=dict)
+
+
+class UniverseReadinessRead(BaseModel):
+    client_id: uuid.UUID
+    onboarding_complete: bool
+    sync_ready: bool
+    flags: dict = Field(default_factory=dict)
+
+
 class ProviderCatalogItem(BaseModel):
     provider: str
     toolkit: str

@@ -10,8 +10,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.adapters import ComposioAdapter
-from app.deps import get_composio, get_db, require_tenant_match
+from app.adapters import ComposioAdapter, GBrainAdapter
+from app.deps import get_composio, get_db, get_gbrain, require_tenant_match
 from app.models import (
     AgentTask,
     AuditEvent,
@@ -33,6 +33,7 @@ from app.schemas import (
     ProviderSyncRead,
     ProviderSyncRequest,
 )
+from app.services.client_universe import record_provider_sync_completion
 from app.workflows.provider_first_sync import process_provider_first_sync
 
 router = APIRouter(prefix="/providers", tags=["providers"])
@@ -40,6 +41,7 @@ router = APIRouter(prefix="/providers", tags=["providers"])
 TenantUser = Annotated[tuple[Tenant, User], Depends(require_tenant_match)]
 DB = Annotated[Session, Depends(get_db)]
 Composio = Annotated[ComposioAdapter, Depends(get_composio)]
+GBrain = Annotated[GBrainAdapter, Depends(get_gbrain)]
 
 
 def _get_connection(db: Session, tenant: Tenant, provider_connection_id: uuid.UUID):
@@ -243,6 +245,7 @@ async def sync_provider(
     tu: TenantUser,
     db: DB,
     composio: Composio,
+    gbrain: GBrain,
 ):
     tenant, user = tu
     conn = _get_connection(db, tenant, body.provider_connection_id)
@@ -396,6 +399,31 @@ async def sync_provider(
     db.refresh(workflow_run)
 
     process_provider_first_sync(db, workflow_run.id)
+
+    record_provider_sync_completion(
+        db,
+        client_id=tenant.id,
+        provider=conn.provider,
+        items_synced=result.records_synced,
+        status=conn.status,
+        workflow_run_id=workflow_run.id,
+    )
+    db.commit()
+
+    await gbrain.ingest(
+        client_id=tenant.id,
+        category="provider_memory",
+        content=(
+            f"{conn.provider} first sync: {result.records_synced} items, "
+            f"{len(new_items)} new."
+        ),
+        metadata={
+            "provider": conn.provider,
+            "provider_connection_id": str(conn.id),
+            "workflow_run_id": str(workflow_run.id),
+            "records_synced": result.records_synced,
+        },
+    )
 
     return {
         "provider_connection_id": conn.id,

@@ -25,6 +25,7 @@ from sqlalchemy.orm import Session
 
 from app.config import get_settings
 from app.models import AgentTask, Approval, Artifact, NormalizedItem, WorkflowRun
+from app.services.client_universe import get_envelope
 
 logger = logging.getLogger(__name__)
 
@@ -184,11 +185,21 @@ def process_provider_first_sync(db: Session, workflow_run_id: uuid.UUID) -> None
             AgentTask.task_type == "provider_first_sync_review",
         )
     ).scalar_one_or_none()
+    envelope = get_envelope(db, run.client_id)
+    profile = envelope.profile or {}
+    universe_context = {
+        "profile_display_name": profile.get("display_name"),
+        "context_count": len(envelope.contexts),
+        "onboarding_status": (envelope.onboarding or {}).get("status"),
+        "readiness": envelope.readiness,
+    }
+
     if task is not None:
         task.status = "completed"
         task.result = {
             "artifact_id": str(artifact.id),
             "approval_id": str(approval.id),
+            "universe_context": universe_context,
         }
 
     run.status = "completed"
@@ -196,6 +207,7 @@ def process_provider_first_sync(db: Session, workflow_run_id: uuid.UUID) -> None
     run.output_data = {
         "artifact_id": str(artifact.id),
         "approval_id": str(approval.id),
+        "universe_context": universe_context,
     }
 
     db.commit()

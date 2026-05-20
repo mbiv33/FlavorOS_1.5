@@ -1,17 +1,33 @@
 # Client Universe
 
-Client-scoped state model — see [docs/architecture/client_universe_model.md](../docs/architecture/client_universe_model.md).
+Client-scoped operating context — see [docs/architecture/client_universe_model.md](../docs/architecture/client_universe_model.md) and [docs/architecture/client_universe_categories.md](../docs/architecture/client_universe_categories.md).
 
-- `schemas/` — JSON Schema fragments for MVP slices (start with profile).
-- `clients/` — human-readable client envelope files and client-scoped working folders.
-- `clients/<client_id>/profile.yaml` — canonical MVP profile slice.
-- `clients/<client_id>/preferences.yaml` — client preferences and operating notes.
-- `clients/<client_id>/account_aliases.yaml` — context accounts and OAuth connection metadata references.
-- `clients/<client_id>/hitl_policy.yaml` — HITL and authority defaults.
-- `clients/<client_id>/onboarding_status.yaml` — onboarding, consent, provider sync, and approval readiness.
-- `clients/<client_id>/artifacts/` — client-facing artifacts prepared for review, approval, delivery, or briefing.
-- `clients/<client_id>/sigma/` — internal SIGMA artifacts for workflow and agent state.
-- `clients/<client_id>/knowledge_base/` — client-specific reference material.
-- `clients/<client_id>/memory/` — durable client memory projections.
+## Runtime truth (production)
 
-Client envelope files may store account aliases, expected providers, approval defaults, and human-readable onboarding state. They must not store OAuth refresh tokens, access tokens, API keys, passwords, raw provider secret blobs, admin/operator permissions, or mutable runtime sync checkpoints.
+| Layer | Where |
+|-------|--------|
+| Contexts + provider connections | Postgres `client_contexts`, `provider_connections` |
+| Policy / onboarding / readiness KV | Postgres `client_universe` |
+| Semantic memory | GBrain |
+| Artifacts, approvals, outbound | Postgres workflow tables |
+
+The API assembles an agent envelope via `GET /universe/envelope`. Nothing in this folder is read at request time.
+
+## This folder (dev seed + export only)
+
+- `schemas/` — JSON Schema for YAML import/export slices.
+- `clients/<client_id>/` — optional fixtures: `profile.yaml`, `preferences.yaml`, `hitl_policy.yaml`, `onboarding_status.yaml`, `account_aliases.yaml`.
+
+Import: `scripts/seed_client_universe.py` (requires existing tenant + profile).  
+Export: `GET /universe/export-yaml` (JSON shape; does not write files here).
+
+## Legacy folders (not runtime)
+
+May exist for demos; do not treat as canonical:
+
+- `clients/<id>/artifacts/` — DB `artifacts`
+- `clients/<id>/sigma/` — GBrain + `artifacts` (`kind=sigma`)
+- `clients/<id>/memory/` — GBrain only
+- `clients/<id>/knowledge_base/` — reference ingest via GBrain
+
+Never store OAuth tokens, API keys, or passwords in YAML or KV.
