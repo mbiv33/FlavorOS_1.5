@@ -71,7 +71,7 @@ export function PileRow({
   onAfterDecide,
 }: {
   piles: PileDef[];
-  onAfterDecide?: (result?: ApprovalDecideRead) => void;
+  onAfterDecide?: (result: ApprovalDecideRead) => void;
 }) {
   const [openKey, setOpenKey] = useState<string | null>(null);
 

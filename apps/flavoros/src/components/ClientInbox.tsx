@@ -1,4 +1,5 @@
 import { PileRow, type PileDef, type PileTone } from "./PileRow";
+import type { ApprovalDecideRead } from "@/lib/api";
 import type { InboxItem, InboxPile } from "@/lib/fixtures";
 
 const PILE_DEF: Record<
@@ -24,7 +25,13 @@ const PILE_DEF: Record<
 
 const PILE_ORDER: InboxPile[] = ["urgent", "needs-attention", "updates"];
 
-export function ClientInbox({ items }: { items: InboxItem[] }) {
+export function ClientInbox({
+  items,
+  onAfterDecide,
+}: {
+  items: InboxItem[];
+  onAfterDecide?: (result: ApprovalDecideRead) => void;
+}) {
   const piles: PileDef[] = PILE_ORDER.map((pile) => {
     const def = PILE_DEF[pile];
     return {
@@ -44,7 +51,7 @@ export function ClientInbox({ items }: { items: InboxItem[] }) {
         </h2>
         <p className="text-xs text-muted">Click a stack to open</p>
       </header>
-      <PileRow piles={piles} />
+      <PileRow piles={piles} onAfterDecide={onAfterDecide} />
     </section>
   );
 }

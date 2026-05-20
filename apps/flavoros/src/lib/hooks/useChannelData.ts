@@ -38,9 +38,10 @@ function buildInboxItems(
   const outboundByApproval = new Map(
     outboundList.map((o) => [o.approval_id, o]),
   );
+  const artifactMap = new Map(artifactList.map((a) => [a.id, a]));
   const items: InboxItem[] = [
-    ...approvalList.map(approvalToInboxItem),
-    ...artifactList.map(artifactToInboxItem),
+    ...approvalList.map((a) => approvalToInboxItem(a, artifactMap)),
+    ...artifactList.map((a) => artifactToInboxItem(a)),
   ];
   return enrichInboxItemsWithOutbound(items, outboundByApproval);
 }

@@ -99,15 +99,29 @@ export function enrichInboxItemsWithOutbound(
   });
 }
 
-export function approvalToInboxItem(approval: ApprovalRead): InboxItem {
+function agentForAction(action: string): "Sinclair" | "Khadijah" | "Regine" {
+  if (action.startsWith("provider_first_sync") || action.includes("email") || action.includes("gmail")) {
+    return "Sinclair";
+  }
+  return "Khadijah";
+}
+
+export function approvalToInboxItem(
+  approval: ApprovalRead,
+  artifactMap?: Map<string, ArtifactRead>,
+): InboxItem {
+  const artifact = approval.artifact_id ? artifactMap?.get(approval.artifact_id) : undefined;
+  const detail = artifact?.body
+    ? artifact.body.slice(0, 120)
+    : (approval.reason ?? "Pending your decision");
   return {
     id: `approval-${approval.id}`,
     pile: "urgent",
     kind: "approval",
-    title: humanizeAction(approval.governed_action),
+    title: artifact?.title ?? humanizeAction(approval.governed_action),
     status: "Ready to approve" as CardStatus,
-    agent: "Khadijah",
-    detail: approval.reason ?? "Pending your decision",
+    agent: agentForAction(approval.governed_action),
+    detail,
     when: relativeTime(approval.created_at),
     approvalId: approval.id,
   };
@@ -198,11 +212,12 @@ export function briefingAttentionItems(
   artifacts: ArtifactRead[],
   approvals: ApprovalRead[],
 ): InboxItem[] {
+  const artifactMap = new Map(artifacts.map((a) => [a.id, a]));
   const items: InboxItem[] = [
-    ...approvals.map(approvalToInboxItem),
+    ...approvals.map((a) => approvalToInboxItem(a, artifactMap)),
     ...artifacts
       .filter((a) => a.status === "ready" || a.status === "draft")
-      .map(artifactToInboxItem),
+      .map((a) => artifactToInboxItem(a)),
   ];
   return items.slice(0, 6);
 }

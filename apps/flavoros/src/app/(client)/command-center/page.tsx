@@ -7,8 +7,9 @@ import { ClientInbox } from "@/components/ClientInbox";
 import { GoalsStrip } from "@/components/GoalsStrip";
 import { MiniCalendar } from "@/components/MiniCalendar";
 import { Card, CardMeta, CardTitle } from "@/components/Card";
-import { useCommandCenterData } from "@/lib/hooks/useCommandCenterData";
 import { useChannelData } from "@/lib/hooks/useChannelData";
+import { useEffect, useState } from "react";
+import { getProfile, loadSession, type ProfileRead } from "@/lib/api";
 import {
   artifactHighlightDays,
   buildCurrentMonthGrid,
@@ -20,12 +21,20 @@ import {
 import type { Stat } from "@/components/StatStrip";
 
 export default function CommandCenterPage() {
-  const { profile, inboxItems, loading, error } = useCommandCenterData();
+  const [profile, setProfile] = useState<ProfileRead | null>(null);
   const {
     artifacts,
-    loading: channelLoading,
-    error: channelError,
+    inboxItems,
+    loading,
+    error,
+    applyDecideResult,
   } = useChannelData();
+
+  useEffect(() => {
+    const session = loadSession();
+    if (!session) return;
+    getProfile(session).then(setProfile).catch(() => null);
+  }, []);
 
   const greeting = profile ? buildGreeting(profile.display_name) : "Good day.";
   const dateLine = todayDateLine();
@@ -64,9 +73,7 @@ export default function CommandCenterPage() {
           </Link>
         }
       >
-        {channelError ? (
-          <p className="text-sm text-rose-800">{channelError}</p>
-        ) : channelLoading ? (
+        {loading ? (
           <p className="text-sm text-muted">Loading milestones…</p>
         ) : (
           <GoalsStrip stats={goalStats} />
@@ -89,7 +96,7 @@ export default function CommandCenterPage() {
           </p>
         </section>
       ) : (
-        <ClientInbox items={inboxItems} />
+        <ClientInbox items={inboxItems} onAfterDecide={applyDecideResult} />
       )}
 
       <SurfaceSection
@@ -102,7 +109,7 @@ export default function CommandCenterPage() {
       >
         <div className="grid gap-4 md:grid-cols-[1fr_320px]">
           <div className="space-y-3">
-            {channelLoading ? (
+            {loading ? (
               <p className="text-sm text-muted">Loading events…</p>
             ) : eventCards.length === 0 ? (
               <p className="text-sm text-muted">No events from sync yet.</p>

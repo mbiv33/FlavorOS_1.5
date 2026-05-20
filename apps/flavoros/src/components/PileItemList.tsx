@@ -25,7 +25,7 @@ export function PileItemList({
 }: {
   items: PileListItem[];
   emptyLabel?: string;
-  onAfterDecide?: (result?: ApprovalDecideRead) => void;
+  onAfterDecide?: (result: ApprovalDecideRead) => void;
 }) {
   const [decidedIds, setDecidedIds] = useState<Set<string>>(new Set());
   const [pendingId, setPendingId] = useState<string | null>(null);

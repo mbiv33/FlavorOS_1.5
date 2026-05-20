@@ -39,9 +39,10 @@ export function useCommandCenterData(): CommandCenterData {
     ])
       .then(([prof, artifacts, approvals]) => {
         setProfile(prof);
+        const artifactMap = new Map(artifacts.map((a) => [a.id, a]));
         const items: InboxItem[] = [
-          ...approvals.map(approvalToInboxItem),
-          ...artifacts.map(artifactToInboxItem),
+          ...approvals.map((a) => approvalToInboxItem(a, artifactMap)),
+          ...artifacts.map((a) => artifactToInboxItem(a)),
         ];
         setInboxItems(items);
       })
