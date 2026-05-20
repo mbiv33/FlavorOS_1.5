@@ -1,0 +1,32 @@
+[Unit]
+Description=FlavorOS API (uvicorn)
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=simple
+User=flavoros
+Group=flavoros
+WorkingDirectory=/opt/flavoros/api
+EnvironmentFile=/etc/flavoros/api.env
+
+ExecStart=/opt/flavoros/api/.venv/bin/uvicorn app.main:app \
+    --host 127.0.0.1 \
+    --port 8008 \
+    --workers 2 \
+    --log-level info
+
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=flavoros-api
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/opt/flavoros/api
+
+[Install]
+WantedBy=multi-user.target

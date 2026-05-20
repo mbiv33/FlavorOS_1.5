@@ -46,6 +46,34 @@ class Settings(BaseSettings):
     def normalize_database_url(cls, v: str) -> str:
         return _normalize_postgres_url(v)
 
+    @field_validator("jwt_secret")
+    @classmethod
+    def jwt_secret_must_not_be_default(cls, v: str, info) -> str:
+        env = (info.data or {}).get("api_env", "development")
+        if v == "change-me" and env == "production":
+            raise ValueError(
+                "JWT_SECRET is set to the default 'change-me' — "
+                "generate a real secret before deploying: "
+                "python -c \"import secrets; print(secrets.token_hex(32))\""
+            )
+        return v
+
+    @field_validator("anthropic_api_key")
+    @classmethod
+    def anthropic_key_required_in_prod(cls, v: str, info) -> str:
+        env = (info.data or {}).get("api_env", "development")
+        if not v and env == "production":
+            raise ValueError("ANTHROPIC_API_KEY must be set in production")
+        return v
+
+    @field_validator("composio_api_key")
+    @classmethod
+    def composio_key_required_in_prod(cls, v: str, info) -> str:
+        env = (info.data or {}).get("api_env", "development")
+        if not v and env == "production":
+            raise ValueError("COMPOSIO_API_KEY must be set in production")
+        return v
+
 
 @lru_cache
 def get_settings() -> Settings:
