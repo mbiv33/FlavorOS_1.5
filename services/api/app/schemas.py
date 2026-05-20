@@ -468,7 +468,7 @@ class OnboardingSaveRequest(BaseModel):
     identity: OnboardingIdentity
     authority_defaults: dict = Field(default_factory=dict)
     onboarding: OnboardingState = Field(default_factory=OnboardingState)
-    contexts: list[OnboardingContext] = Field(..., min_length=1)
+    contexts: list[OnboardingContext] = Field(default_factory=list)
 
 
 class OnboardingSaveRead(BaseModel):
