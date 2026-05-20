@@ -320,30 +320,33 @@ def save_onboarding(
     """Persist onboarding state and trigger tenant-scoped provider planning."""
 
     profile = db.execute(select(Profile).where(Profile.user_id == user.id)).scalar_one_or_none()
-    preferences = {
-        "locale": body.identity.locale,
-        "legal_name": body.identity.legal_name,
-        "preferred_name": body.identity.preferred_name,
-        "title": body.identity.title,
-        "birth_date": body.identity.birth_date,
-        "gender": body.identity.gender,
-        "authority_defaults": body.authority_defaults,
-        "onboarding": body.onboarding.model_dump(),
-    }
-    if profile is None:
-        profile = Profile(
-            client_id=tenant.id,
-            user_id=user.id,
-            display_name=body.identity.display_name,
-            timezone=body.identity.timezone,
-            preferences=preferences,
-        )
-        db.add(profile)
-    else:
-        profile.display_name = body.identity.display_name
-        profile.timezone = body.identity.timezone
-        profile.preferences = preferences
-        profile.updated_at = datetime.now(timezone.utc)
+    if body.identity is not None:
+        preferences = {
+            "locale": body.identity.locale,
+            "legal_name": body.identity.legal_name,
+            "preferred_name": body.identity.preferred_name,
+            "title": body.identity.title,
+            "birth_date": body.identity.birth_date,
+            "gender": body.identity.gender,
+            "authority_defaults": body.authority_defaults,
+            "onboarding": body.onboarding.model_dump(),
+        }
+        if profile is None:
+            profile = Profile(
+                client_id=tenant.id,
+                user_id=user.id,
+                display_name=body.identity.display_name,
+                timezone=body.identity.timezone,
+                preferences=preferences,
+            )
+            db.add(profile)
+        else:
+            profile.display_name = body.identity.display_name
+            profile.timezone = body.identity.timezone
+            profile.preferences = preferences
+            profile.updated_at = datetime.now(timezone.utc)
+    elif profile is None:
+        raise ValueError("identity is required for first-time onboarding save")
 
     provider_connections: list[ProviderConnection] = []
     client_context_ids: list[str] = []
@@ -430,7 +433,11 @@ def save_onboarding(
         task_type="briefing_seed_from_onboarding",
         payload={
             "trigger": ONBOARDING_TRIGGER,
-            "profile_display_name": body.identity.display_name,
+            "profile_display_name": (
+                body.identity.display_name
+                if body.identity
+                else (profile.display_name if profile else "")
+            ),
             "onboarding_status": next_status,
         },
     )

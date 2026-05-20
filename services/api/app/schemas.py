@@ -465,7 +465,7 @@ class OnboardingState(BaseModel):
 
 
 class OnboardingSaveRequest(BaseModel):
-    identity: OnboardingIdentity
+    identity: Optional[OnboardingIdentity] = None
     authority_defaults: dict = Field(default_factory=dict)
     onboarding: OnboardingState = Field(default_factory=OnboardingState)
     contexts: list[OnboardingContext] = Field(default_factory=list)
