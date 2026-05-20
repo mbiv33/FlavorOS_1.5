@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.adapters import GBrainAdapter
 from app.deps import get_db, get_gbrain, require_tenant_match
-from app.models import Tenant, User
+from app.models import ClientContext, ProviderConnection, Tenant, User
 from app.onboarding import ONBOARDING_TRIGGER, save_onboarding
 from app.schemas import OnboardingSaveRead, OnboardingSaveRequest
 
@@ -72,3 +72,16 @@ async def save_client_onboarding(
         "profile": profile,
         "provider_connections": provider_connections,
     }
+
+
+@router.delete("/reset")
+async def reset_client_onboarding(tu: TenantUser, db: DB):
+    tenant, _ = tu
+    db.query(ProviderConnection).filter(
+        ProviderConnection.client_id == tenant.id,
+    ).delete()
+    db.query(ClientContext).filter(
+        ClientContext.client_id == tenant.id,
+    ).delete()
+    db.commit()
+    return {"status": "reset"}

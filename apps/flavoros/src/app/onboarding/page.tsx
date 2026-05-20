@@ -233,10 +233,20 @@ function OnboardingInner() {
     }
     setSession(s);
 
+    const resetFlag = searchParams.get("reset");
     const oauthConnId = searchParams.get("provider_connection_id");
     const oauthStatus = searchParams.get("status");
 
     async function hydrate(sess: FlavorOSSession) {
+      // Dev reset: wipe contexts + connections and start fresh
+      if (resetFlag === "1") {
+        try {
+          await apiRequest("/onboarding/reset", sess, { method: "DELETE" });
+        } catch { /* ignore */ }
+        window.history.replaceState({}, "", "/onboarding");
+        return; // stay on step 1
+      }
+
       // If returning from OAuth, verify the connection first
       if (oauthConnId && oauthStatus) {
         try {
@@ -897,13 +907,22 @@ function OnboardingInner() {
             </div>
 
             <div className="mt-6 flex items-center justify-between">
-              <button
-                type="button"
-                onClick={() => advanceToNextSlot(currentSlotIndex)}
-                className="text-sm text-muted hover:text-foreground"
-              >
-                Skip this account
-              </button>
+              <div className="flex gap-4">
+                <button
+                  type="button"
+                  onClick={() => setStep(2)}
+                  className="text-sm text-muted hover:text-foreground"
+                >
+                  Back
+                </button>
+                <button
+                  type="button"
+                  onClick={() => advanceToNextSlot(currentSlotIndex)}
+                  className="text-sm text-muted hover:text-foreground"
+                >
+                  Skip
+                </button>
+              </div>
               <button
                 type="button"
                 disabled={busy}
