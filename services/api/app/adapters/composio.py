@@ -56,6 +56,9 @@ class SyncResult:
     # Email items fetched during sync: [{subject, snippet, message_id}, ...]
     # Populated by RealComposioAdapter; empty list in stub mode.
     items: list[dict[str, Any]] = field(default_factory=list)
+    # Opaque cursor for incremental re-sync (Gmail historyId, Calendar syncToken).
+    # None means the provider did not return a new cursor.
+    next_cursor: str | None = None
 
 
 @dataclass(frozen=True)
@@ -118,8 +121,14 @@ class ComposioAdapter(Protocol):
         client_id: uuid.UUID,
         provider: str,
         composio_user_id: str | None = None,
+        cursor: str | None = None,
     ) -> SyncResult:
-        """Trigger an inbound data sync from the provider into Client Universe."""
+        """Trigger an inbound data sync from the provider into Client Universe.
+
+        ``cursor`` is the opaque checkpoint value from the last successful sync
+        (Gmail historyId, Calendar syncToken). Pass None for a full fetch.
+        Returns ``SyncResult.next_cursor`` with the new cursor when available.
+        """
         ...
 
 
@@ -183,6 +192,7 @@ class StubComposioAdapter:
         client_id: uuid.UUID,
         provider: str,
         composio_user_id: str | None = None,
+        cursor: str | None = None,
     ) -> SyncResult:
         return SyncResult(provider=provider, records_synced=0)
 
@@ -285,6 +295,7 @@ class RealComposioAdapter:
         client_id: uuid.UUID,
         provider: str,
         composio_user_id: str | None = None,
+        cursor: str | None = None,
     ) -> SyncResult:
         if not composio_user_id:
             return SyncResult(
@@ -323,11 +334,16 @@ class RealComposioAdapter:
                 errors=[f"No sync configuration for provider: {provider}"],
             )
 
+        params: dict[str, Any] = dict(sync_config["params"])
         if provider == "googlecalendar":
-            params: dict[str, Any] = dict(sync_config["params"])
-            params["time_min"] = _dt.datetime.now(_dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-        else:
-            params = sync_config["params"]
+            if cursor:
+                # Incremental sync: pass sync token; time_min is ignored when token is set
+                params["sync_token"] = cursor
+            else:
+                params["time_min"] = _dt.datetime.now(_dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        elif provider == "gmail" and cursor:
+            # Incremental sync: fetch only messages since this history point
+            params["history_id"] = cursor
 
         try:
             raw = await asyncio.to_thread(
@@ -342,8 +358,11 @@ class RealComposioAdapter:
 
         # Composio wraps results in {"data": {...}, "successful": bool}
         data = raw if isinstance(raw, dict) else {}
+        inner = data.get("data") if isinstance(data.get("data"), dict) else data
+
+        next_cursor: str | None = None
         if provider == "gmail":
-            messages = (data.get("data", {}).get("messages", []) or data.get("messages", []))
+            messages = inner.get("messages", []) or []
             items = [
                 {
                     "subject": (
@@ -356,8 +375,12 @@ class RealComposioAdapter:
                 for m in (messages if isinstance(messages, list) else [])
                 if isinstance(m, dict)
             ]
+            # Gmail returns a historyId for incremental syncs
+            raw_cursor = inner.get("historyId") or inner.get("history_id")
+            if raw_cursor:
+                next_cursor = str(raw_cursor)
         elif provider == "googlecalendar":
-            events = (data.get("data", {}).get("items", []) or data.get("items", []) or [])
+            events = inner.get("items", []) or []
             items = [
                 {
                     "summary": e.get("summary", "(no title)"),
@@ -374,10 +397,19 @@ class RealComposioAdapter:
                 for e in (events if isinstance(events, list) else [])
                 if isinstance(e, dict)
             ]
+            # Calendar returns a nextSyncToken for incremental syncs
+            raw_cursor = inner.get("nextSyncToken") or inner.get("next_sync_token")
+            if raw_cursor:
+                next_cursor = str(raw_cursor)
         else:
             items = []
 
-        return SyncResult(provider=provider, records_synced=len(items), items=items)
+        return SyncResult(
+            provider=provider,
+            records_synced=len(items),
+            items=items,
+            next_cursor=next_cursor,
+        )
 
 
 def _header(message: dict[str, Any], name: str) -> str | None:

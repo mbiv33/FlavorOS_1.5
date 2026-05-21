@@ -18,6 +18,7 @@ from app.models import (
     NormalizedItem,
     ProviderConnection,
     ProviderEvent,
+    SyncCheckpoint,
     Tenant,
     User,
     WorkflowRun,
@@ -34,6 +35,7 @@ from app.schemas import (
     ProviderSyncRequest,
 )
 from app.services.client_universe import record_provider_sync_completion
+from app.workflows.communication_sweep import process_communication_sweep
 from app.workflows.provider_first_sync import process_provider_first_sync
 
 router = APIRouter(prefix="/providers", tags=["providers"])
@@ -70,6 +72,13 @@ def _item_type_for_provider(provider: str) -> str:
         "googlecalendar": "calendar_sync_receipt",
         "googledrive": "drive_sync_receipt",
     }.get(provider, "provider_sync_receipt")
+
+
+def _checkpoint_key_for_provider(provider: str) -> str:
+    return {
+        "gmail": "gmail_history_id",
+        "googlecalendar": "calendar_sync_token",
+    }.get(provider, f"{provider}_cursor")
 
 
 @router.get("/catalog", response_model=list[ProviderCatalogItem])
@@ -257,6 +266,20 @@ async def sync_provider(
             detail="Provider must be connected before first sync.",
         )
 
+    # Detect first vs. incremental sync before overwriting last_sync_at.
+    is_first_sync = conn.last_sync_at is None
+
+    # Read incremental sync cursor from SyncCheckpoint (None → full fetch).
+    ck_key = _checkpoint_key_for_provider(conn.provider)
+    ckpt = db.execute(
+        select(SyncCheckpoint).where(
+            SyncCheckpoint.client_id == tenant.id,
+            SyncCheckpoint.provider_connection_id == conn.id,
+            SyncCheckpoint.checkpoint_key == ck_key,
+        )
+    ).scalar_one_or_none()
+    prior_cursor = ckpt.checkpoint_value if ckpt else None
+
     conn.status = "syncing"
     db.flush()
     user_ref = conn.composio_user_id or f"conn:{conn.id}"
@@ -264,11 +287,32 @@ async def sync_provider(
         client_id=tenant.id,
         provider=conn.provider,
         composio_user_id=user_ref,
+        cursor=prior_cursor,
     )
+    now = datetime.now(timezone.utc)
     conn.status = "ready" if not result.errors else "degraded"
-    conn.status_reason = "; ".join(result.errors) if result.errors else "First sync verified."
-    conn.last_sync_at = datetime.now(timezone.utc)
-    conn.last_checked_at = conn.last_sync_at
+    conn.status_reason = (
+        "; ".join(result.errors) if result.errors
+        else ("First sync verified." if is_first_sync else "Incremental sync complete.")
+    )
+    conn.last_sync_at = now
+    conn.last_checked_at = now
+
+    # Write back updated cursor when the provider returned one.
+    if result.next_cursor:
+        if ckpt is not None:
+            ckpt.checkpoint_value = result.next_cursor
+            ckpt.synced_at = now
+        else:
+            db.add(
+                SyncCheckpoint(
+                    client_id=tenant.id,
+                    provider_connection_id=conn.id,
+                    checkpoint_key=ck_key,
+                    checkpoint_value=result.next_cursor,
+                    synced_at=now,
+                )
+            )
 
     # Per-item dedup: create one ProviderEvent + NormalizedItem per message/event.
     # Idempotency key is stable across re-syncs so the same item is never duplicated.
@@ -300,9 +344,7 @@ async def sync_provider(
                 client_id=tenant.id,
                 provider_event_id=item_pe.id,
                 item_type=_item_type_for_provider(conn.provider),
-                title=(
-                    item.get("subject") or item.get("summary") or conn.provider
-                ),
+                title=(item.get("subject") or item.get("summary") or conn.provider),
                 data=item,
             )
         )
@@ -311,17 +353,21 @@ async def sync_provider(
     # Batch sync event records the sync itself (timestamp-keyed, always written).
     # The batch NormalizedItem passes only new items to the workflow so Sinclair
     # summarises what's actually new on re-sync.
+    workflow_type = "provider_first_sync" if is_first_sync else "communication_sweep"
+    task_type = "provider_first_sync_review" if is_first_sync else "communication_sweep_review"
+
     provider_event = ProviderEvent(
         client_id=tenant.id,
         provider_connection_id=conn.id,
         provider=conn.provider,
-        event_type="provider_first_sync",
-        idempotency_key=f"{conn.id}:sync:{conn.last_sync_at.isoformat()}",
+        event_type=workflow_type,
+        idempotency_key=f"{conn.id}:sync:{now.isoformat()}",
         status="received",
         payload={
             "records_synced": result.records_synced,
             "new_items": len(new_items),
             "errors": result.errors,
+            "is_first_sync": is_first_sync,
             "source": "providers.sync",
         },
     )
@@ -331,7 +377,7 @@ async def sync_provider(
         client_id=tenant.id,
         provider_event_id=provider_event.id,
         item_type=_item_type_for_provider(conn.provider),
-        title=f"{conn.provider} first sync",
+        title=f"{conn.provider} {'first sync' if is_first_sync else 'sweep'}",
         data={
             "provider_connection_id": str(conn.id),
             "records_synced": result.records_synced,
@@ -343,7 +389,7 @@ async def sync_provider(
     db.flush()
     workflow_run = WorkflowRun(
         client_id=tenant.id,
-        workflow_type="provider_first_sync",
+        workflow_type=workflow_type,
         agent=_agent_for_provider(conn.provider),
         status="queued",
         input_data={
@@ -351,6 +397,7 @@ async def sync_provider(
             "provider_event_id": str(provider_event.id),
             "normalized_item_id": str(normalized_item.id),
             "provider": conn.provider,
+            "is_first_sync": is_first_sync,
         },
     )
     db.add(workflow_run)
@@ -360,14 +407,14 @@ async def sync_provider(
             client_id=tenant.id,
             workflow_run_id=workflow_run.id,
             agent=workflow_run.agent or "khadijah",
-            task_type="provider_first_sync_review",
+            task_type=task_type,
             status="queued",
             payload={
                 "schema_version": "flavoros.agent_task.v1",
                 "workflow_run_id": str(workflow_run.id),
                 "client_id": str(tenant.id),
                 "target_agent": workflow_run.agent,
-                "task_type": "provider_first_sync_review",
+                "task_type": task_type,
                 "source_refs": {
                     "provider_event_id": str(provider_event.id),
                     "normalized_item_id": str(normalized_item.id),
@@ -388,6 +435,8 @@ async def sync_provider(
                 "records_synced": result.records_synced,
                 "new_items": len(new_items),
                 "errors": result.errors,
+                "is_first_sync": is_first_sync,
+                "workflow_type": workflow_type,
                 "provider_event_id": str(provider_event.id),
                 "workflow_run_id": str(workflow_run.id),
             },
@@ -398,7 +447,10 @@ async def sync_provider(
     db.refresh(provider_event)
     db.refresh(workflow_run)
 
-    process_provider_first_sync(db, workflow_run.id)
+    if is_first_sync:
+        process_provider_first_sync(db, workflow_run.id)
+    else:
+        process_communication_sweep(db, workflow_run.id)
 
     record_provider_sync_completion(
         db,
@@ -414,13 +466,14 @@ async def sync_provider(
         client_id=tenant.id,
         category="provider_memory",
         content=(
-            f"{conn.provider} first sync: {result.records_synced} items, "
-            f"{len(new_items)} new."
+            f"{conn.provider} {'first sync' if is_first_sync else 'sweep'}: "
+            f"{result.records_synced} items, {len(new_items)} new."
         ),
         metadata={
             "provider": conn.provider,
             "provider_connection_id": str(conn.id),
             "workflow_run_id": str(workflow_run.id),
+            "workflow_type": workflow_type,
             "records_synced": result.records_synced,
         },
     )
@@ -431,6 +484,7 @@ async def sync_provider(
         "status": conn.status,
         "records_synced": result.records_synced,
         "errors": result.errors,
+        "is_first_sync": is_first_sync,
         "provider_event_id": provider_event.id,
         "workflow_run_id": workflow_run.id,
     }
