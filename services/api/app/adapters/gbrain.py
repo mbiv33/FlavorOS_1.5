@@ -316,7 +316,11 @@ class GBrainCliAdapter:
             stderr=asyncio.subprocess.PIPE,
         )
         stdout_b, stderr_b = await proc.communicate(input=stdin_data)
-        return proc.returncode or 0, stdout_b.decode(errors="replace"), stderr_b.decode(errors="replace")
+        return (
+            proc.returncode or 0,
+            stdout_b.decode(errors="replace"),
+            stderr_b.decode(errors="replace"),
+        )
 
     # ------------------------------------------------------------------
     # GBrainAdapter protocol

@@ -340,7 +340,8 @@ class RealComposioAdapter:
                 # Incremental sync: pass sync token; time_min is ignored when token is set
                 params["sync_token"] = cursor
             else:
-                params["time_min"] = _dt.datetime.now(_dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+                now_utc = _dt.datetime.now(_dt.timezone.utc)
+                params["time_min"] = now_utc.strftime("%Y-%m-%dT%H:%M:%SZ")
         elif provider == "gmail" and cursor:
             # Incremental sync: fetch only messages since this history point
             params["history_id"] = cursor
