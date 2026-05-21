@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 
 import {
+  API_BASE_URL,
   apiRequest,
   ClientContext,
   ContextProviderDef,
@@ -44,6 +45,35 @@ type ProviderSlot = {
 };
 
 // ─── Constants ───────────────────────────────────────────────────────────────
+
+const OAUTH_COMPLETE_STORAGE_KEY = "flavoros_onboarding_oauth_complete";
+/** Survives Next.js remount after replaceState strips ?provider_connection_id from the URL. */
+const OAUTH_TAB_SESSION_KEY = "flavoros_onboarding_oauth_return_tab";
+
+function readOauthTabCompleteFlag(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return sessionStorage.getItem(OAUTH_TAB_SESSION_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function markOauthTabComplete(): void {
+  try {
+    sessionStorage.setItem(OAUTH_TAB_SESSION_KEY, "1");
+  } catch {
+    /* private mode */
+  }
+}
+
+function clearOauthTabComplete(): void {
+  try {
+    sessionStorage.removeItem(OAUTH_TAB_SESSION_KEY);
+  } catch {
+    /* ignore */
+  }
+}
 
 const FALLBACK_PROVIDERS: Record<
   string,
@@ -127,6 +157,130 @@ function isConnected(conn: ProviderConnection | null) {
   return ["connected", "syncing", "ready"].includes(conn.status);
 }
 
+/** Stable key for slot account ids (personal_gmail) — matches step 2 and saved connections. */
+function contextDraftKey(ctx: Pick<ClientContext, "id" | "type">): string {
+  if (ctx.type === "personal" || ctx.type === "professional") return ctx.type;
+  return ctx.id;
+}
+
+function slotContextAccountId(ctx: ContextDraft, provider: string): string {
+  return `${ctx.key}_${provider}`;
+}
+
+function candidateContextAccountIds(
+  ctx: ContextDraft,
+  provider: string,
+): string[] {
+  const ids = new Set<string>();
+  ids.add(slotContextAccountId(ctx, provider));
+  if (ctx.serverId) ids.add(`${ctx.serverId}_${provider}`);
+  if (ctx.type === "personal" || ctx.type === "professional") {
+    ids.add(`${ctx.type}_${provider}`);
+  }
+  return [...ids];
+}
+
+/** True when a saved/API connection belongs to this slot (never match provider alone). */
+function connectionMatchesSlot(
+  conn: ProviderConnection,
+  ctx: ContextDraft,
+  provider: string,
+  contextKey: string,
+): boolean {
+  if (conn.provider !== provider) return false;
+  const draftForSlot: ContextDraft = { ...ctx, key: contextKey };
+  for (const accountId of candidateContextAccountIds(draftForSlot, provider)) {
+    if (conn.context_account_id === accountId) return true;
+  }
+  if (ctx.serverId && conn.client_context_id === ctx.serverId) return true;
+  return false;
+}
+
+function findConnectionForSlot(
+  ctx: ContextDraft,
+  provider: string,
+  conns: ProviderConnection[],
+): ProviderConnection | undefined {
+  return conns.find((c) => connectionMatchesSlot(c, ctx, provider, ctx.key));
+}
+
+/** Public API callback — no auth headers (browser redirect from Composio). */
+async function recordProviderCallbackFromSearchParams(
+  params: URLSearchParams,
+): Promise<void> {
+  const connId = params.get("provider_connection_id");
+  if (!connId) return;
+
+  const qs = new URLSearchParams();
+  qs.set("provider_connection_id", connId);
+  const status =
+    params.get("status") ??
+    (params.get("stub") === "true" ? "connected" : "ACTIVE");
+  qs.set("status", status);
+  const accountId =
+    params.get("connected_account_id") ?? params.get("connectedAccountId");
+  if (accountId) qs.set("connected_account_id", accountId);
+
+  const response = await fetch(
+    `${API_BASE_URL}/providers/callback?${qs.toString()}`,
+  );
+  if (!response.ok) {
+    throw new Error(
+      (await response.text()) || `Callback failed: ${response.status}`,
+    );
+  }
+}
+
+function buildSlotsFromContexts(
+  drafts: ContextDraft[],
+  conns: ProviderConnection[],
+): ProviderSlot[] {
+  const typeOrder = { personal: 0, professional: 1, business: 2 };
+  const sorted = [...drafts].sort(
+    (a, b) => (typeOrder[a.type] ?? 9) - (typeOrder[b.type] ?? 9),
+  );
+  const expected: ProviderSlot[] = [];
+  for (const ctx of sorted) {
+    const providers = FALLBACK_PROVIDERS[ctx.type] ?? [];
+    for (const p of providers) {
+      const existing = findConnectionForSlot(ctx, p.provider, conns);
+      expected.push({
+        contextKey: ctx.key,
+        provider: p.provider,
+        label: p.label,
+        category: p.category,
+        accountEmail: existing?.account_alias ?? "",
+        connection: existing ?? null,
+      });
+    }
+  }
+  return expected;
+}
+
+function firstUnconnectedSlotIndex(slotList: ProviderSlot[]): number {
+  return slotList.findIndex((s) => !isConnected(s.connection));
+}
+
+function applyStep3FromSlots(
+  slotList: ProviderSlot[],
+): { step: OnboardingStep; currentSlotIndex: number } {
+  const firstUnconnected = firstUnconnectedSlotIndex(slotList);
+  if (firstUnconnected === -1) {
+    return { step: 4, currentSlotIndex: slotList.length };
+  }
+  return { step: 3, currentSlotIndex: firstUnconnected };
+}
+
+function advanceToNextSlotFrom(slotsList: ProviderSlot[], fromIndex: number) {
+  const next = slotsList.findIndex(
+    (s, i) => i > fromIndex && !isConnected(s.connection),
+  );
+  if (next === -1) {
+    return { step: 4 as OnboardingStep, currentSlotIndex: slotsList.length };
+  }
+  return { step: 3 as OnboardingStep, currentSlotIndex: next };
+}
+
 // ─── Progress bar ───────────────────────────────────────────────────────────
 
 function ProgressBar({
@@ -196,6 +350,12 @@ function OnboardingInner() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [awaitingOAuthReturn, setAwaitingOAuthReturn] = useState(false);
+  /** OAuth finished in this tab — show close prompt instead of step 3 connect UI. */
+  const [oauthTabComplete, setOauthTabComplete] = useState(
+    readOauthTabCompleteFlag,
+  );
+  const oauthCallbackHandledRef = useRef(false);
 
   const slotId = useCallback(
     (s: ProviderSlot) => `${s.contextKey}__${s.provider}`,
@@ -223,6 +383,20 @@ function OnboardingInner() {
           ? `Step 3 — Account ${currentSlotIndex + 1} of ${slots.length}`
           : "Complete";
 
+  const refreshProviderSlots = useCallback(
+    async (sess: FlavorOSSession, drafts: ContextDraft[]) => {
+      const conns = await listProviderConnections(sess);
+      const expected = buildSlotsFromContexts(drafts, conns);
+      const { step: nextStep, currentSlotIndex: nextIndex } =
+        applyStep3FromSlots(expected);
+      setSlots(expected);
+      setStep(nextStep);
+      setCurrentSlotIndex(nextIndex);
+      if (nextStep === 4) setAwaitingOAuthReturn(false);
+    },
+    [],
+  );
+
   // ── Mount: hydrate from server + handle OAuth return ──────────────────────
   useEffect(() => {
     const s = loadSession();
@@ -246,12 +420,26 @@ function OnboardingInner() {
         setStep(1);
         setError(null);
         setMessage(null);
+        setAwaitingOAuthReturn(false);
+        setOauthTabComplete(false);
+        clearOauthTabComplete();
         window.history.replaceState({}, "", "/onboarding");
         return;
       }
 
-      if (oauthConnId) {
+      if (oauthConnId && !oauthCallbackHandledRef.current) {
+        oauthCallbackHandledRef.current = true;
+        markOauthTabComplete();
+        await recordProviderCallbackFromSearchParams(searchParams);
+        try {
+          localStorage.setItem(OAUTH_COMPLETE_STORAGE_KEY, String(Date.now()));
+        } catch {
+          /* private mode / blocked storage */
+        }
+        setOauthTabComplete(true);
         window.history.replaceState({}, "", "/onboarding");
+      } else if (readOauthTabCompleteFlag()) {
+        setOauthTabComplete(true);
       }
 
       const [ctxs, conns] = await Promise.all([
@@ -264,7 +452,7 @@ function OnboardingInner() {
       const typeOrder = { personal: 0, professional: 1, business: 2 };
       const drafts: ContextDraft[] = ctxs
         .map((c) => ({
-          key: c.id,
+          key: contextDraftKey(c),
           type: c.type,
           name: c.name,
           serverId: c.id,
@@ -272,45 +460,91 @@ function OnboardingInner() {
         .sort((a, b) => (typeOrder[a.type] ?? 9) - (typeOrder[b.type] ?? 9));
       setContexts(drafts);
 
-      // Build expected slots from contexts
-      const expected: ProviderSlot[] = [];
-      for (const ctx of drafts) {
-        const providers = FALLBACK_PROVIDERS[ctx.type] ?? [];
-        for (const p of providers) {
-          const existing = conns.find(
-            (c) =>
-              c.client_context_id === ctx.serverId &&
-              c.provider === p.provider,
-          );
-          expected.push({
-            contextKey: ctx.key,
-            provider: p.provider,
-            label: p.label,
-            category: p.category,
-            accountEmail: existing?.account_alias ?? "",
-            connection: existing ?? null,
-          });
-        }
-      }
+      const expected = buildSlotsFromContexts(drafts, conns);
       setSlots(expected);
 
-      // Find first unconnected slot — treat the OAuth return connection as done
-      const firstUnconnected = expected.findIndex(
-        (s) =>
-          !isConnected(s.connection) && s.connection?.id !== oauthConnId,
-      );
-      if (firstUnconnected === -1) {
-        // All connected
-        setCurrentSlotIndex(expected.length);
-        setStep(4);
-      } else {
-        setCurrentSlotIndex(firstUnconnected);
-        setStep(3);
-      }
+      const { step: nextStep, currentSlotIndex: nextIndex } =
+        applyStep3FromSlots(expected);
+      setStep(nextStep);
+      setCurrentSlotIndex(nextIndex);
+      setAwaitingOAuthReturn(false);
     }
 
-    hydrate(s).catch(() => {});
+    hydrate(s).catch((err) => {
+      setError(
+        err instanceof Error ? err.message : "Failed to load onboarding state",
+      );
+    });
   }, [router, searchParams]);
+
+  // Re-hydrate when user returns from OAuth tab (this tab stayed on step 3)
+  useEffect(() => {
+    if (!session || step !== 3 || contexts.length === 0) return;
+
+    const onVisible = () => {
+      if (document.visibilityState !== "visible") return;
+      void refreshProviderSlots(session, contexts).catch((err) => {
+        setError(
+          err instanceof Error ? err.message : "Failed to refresh connections",
+        );
+      });
+    };
+
+    const onStorage = (e: StorageEvent) => {
+      if (e.key !== OAUTH_COMPLETE_STORAGE_KEY) return;
+      onVisible();
+    };
+
+    window.addEventListener("focus", onVisible);
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("storage", onStorage);
+    return () => {
+      window.removeEventListener("focus", onVisible);
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("storage", onStorage);
+    };
+  }, [session, step, contexts, refreshProviderSlots]);
+
+  // Poll while OAuth runs in another tab (focus/storage alone is easy to miss)
+  useEffect(() => {
+    if (!session || step !== 3 || contexts.length === 0) return;
+    if (firstUnconnectedSlotIndex(slots) === -1) return;
+
+    const tick = () => {
+      let oauthDone = false;
+      try {
+        oauthDone = Boolean(localStorage.getItem(OAUTH_COMPLETE_STORAGE_KEY));
+        if (oauthDone) {
+          localStorage.removeItem(OAUTH_COMPLETE_STORAGE_KEY);
+        }
+      } catch {
+        /* ignore */
+      }
+      if (!awaitingOAuthReturn && !oauthDone) return;
+
+      void refreshProviderSlots(session, contexts)
+        .then(() => {
+          setAwaitingOAuthReturn(false);
+          setMessage(null);
+        })
+        .catch((err) => {
+          setError(
+            err instanceof Error ? err.message : "Failed to refresh connections",
+          );
+        });
+    };
+
+    tick();
+    const id = window.setInterval(tick, 1200);
+    return () => window.clearInterval(id);
+  }, [
+    session,
+    step,
+    contexts,
+    slots,
+    awaitingOAuthReturn,
+    refreshProviderSlots,
+  ]);
 
   // ── Step 1: save identity ─────────────────────────────────────────────────
   async function handleIdentityContinue() {
@@ -397,8 +631,14 @@ function OnboardingInner() {
           body: JSON.stringify({ type: draft.type, name: draft.name }),
         });
         resolved.push({ ...draft, serverId: resp.id });
-      } catch {
-        resolved.push(draft);
+      } catch (err) {
+        setError(
+          err instanceof Error
+            ? err.message
+            : `Could not save ${draft.name} context. Try again.`,
+        );
+        setBusy(false);
+        return;
       }
     }
 
@@ -434,25 +674,35 @@ function OnboardingInner() {
     setMessage(null);
 
     try {
-      const contextPayload = contexts.map((c) => ({
-        context_id: c.serverId ?? c.key,
-        context_type: c.type,
-        display_name: c.name,
-        status: "active",
-        context_accounts: [
-          {
-            context_account_id: `${slot.contextKey}_${slot.provider}`,
-            provider: slot.provider,
-            context_account_purpose: slot.category,
-            account_alias: `${slot.contextKey}_${slot.provider}`,
-            auth_scheme: "oauth",
-            ...(c.serverId ? { context_id: c.serverId } : {}),
-            ...(slot.accountEmail ? { account_email: slot.accountEmail } : {}),
-          },
-        ].filter((a) => a.context_account_id === `${slot.contextKey}_${slot.provider}`
-          ? true
-          : false),
-      }));
+      const ctxDraftForSlot = contexts.find((c) => c.key === slot.contextKey);
+      if (!ctxDraftForSlot) {
+        setError("Context for this account is missing. Go back to step 2.");
+        setBusy(false);
+        return;
+      }
+
+      const accountId = slotContextAccountId(ctxDraftForSlot, slot.provider);
+      const contextPayload = [
+        {
+          context_id: ctxDraftForSlot.serverId ?? ctxDraftForSlot.key,
+          context_type: ctxDraftForSlot.type,
+          display_name: ctxDraftForSlot.name,
+          status: "active",
+          context_accounts: [
+            {
+              context_account_id: accountId,
+              provider: slot.provider,
+              context_account_purpose: slot.category,
+              account_alias: accountId,
+              auth_scheme: "oauth",
+              ...(ctxDraftForSlot.serverId
+                ? { context_id: ctxDraftForSlot.serverId }
+                : {}),
+              ...(slot.accountEmail ? { account_email: slot.accountEmail } : {}),
+            },
+          ],
+        },
+      ];
 
       // Save the slot
       const result = await apiRequest<OnboardingSaveResponse>(
@@ -468,21 +718,41 @@ function OnboardingInner() {
         },
       );
 
+      const ctxDraft = ctxDraftForSlot;
+
       const conn =
-        result.provider_connections.find(
-          (c) =>
-            c.context_account_id === `${slot.contextKey}_${slot.provider}`,
-        ) ??
-        result.provider_connections.find(
-          (c) => c.provider === slot.provider,
-        ) ??
-        null;
+        result.provider_connections.find((c) =>
+          connectionMatchesSlot(c, ctxDraft, slot.provider, slot.contextKey),
+        ) ?? null;
 
       if (!conn) {
         setError("Could not find the saved connection. Try again.");
         setBusy(false);
         return;
       }
+
+      const contextServerId =
+        conn.client_context_id ?? ctxDraft.serverId ?? undefined;
+      const nextContexts =
+        contextServerId && conn.client_context_id
+          ? contexts.map((c) =>
+              c.key === slot.contextKey
+                ? { ...c, serverId: contextServerId }
+                : c,
+            )
+          : contexts;
+      setContexts(nextContexts);
+      setSlots((prev) =>
+        prev.map((s) =>
+          slotId(s) === slotId(slot)
+            ? {
+                ...s,
+                connection: conn,
+                accountEmail: slot.accountEmail || conn.account_alias || "",
+              }
+            : s,
+        ),
+      );
 
       // Get the OAuth URL and redirect (same tab)
       const link = await apiRequest<ProviderConnectLinkResponse>(
@@ -497,21 +767,20 @@ function OnboardingInner() {
         },
       );
 
-      // Mark slot as connected locally and advance to next
-      setSlots((prev) =>
-        prev.map((s) =>
-          slotId(s) === slotId(slot)
-            ? { ...s, connection: { ...conn, status: "connected" } }
-            : s,
-        ),
-      );
-      advanceToNextSlot(currentSlotIndex);
-      setBusy(false);
+      const isStub = link.url.includes("stub=true");
 
-      // Open OAuth in new tab — user continues on this page
-      if (!link.url.includes("stub=true")) {
+      if (isStub) {
+        await recordProviderCallbackFromSearchParams(new URL(link.url).searchParams);
+        await refreshProviderSlots(session, nextContexts);
+        setMessage("Stub provider connected for local testing.");
+      } else {
+        setAwaitingOAuthReturn(true);
+        setMessage(
+          "Sign-in opened in a new tab. When you finish, return to this page — we'll advance automatically.",
+        );
         window.open(link.url, "_blank", "noopener");
       }
+      setBusy(false);
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Unable to connect account.",
@@ -521,14 +790,10 @@ function OnboardingInner() {
   }
 
   function advanceToNextSlot(fromIndex: number) {
-    const next = slots.findIndex(
-      (s, i) => i > fromIndex && !isConnected(s.connection),
-    );
-    if (next === -1) {
-      setStep(4);
-    } else {
-      setCurrentSlotIndex(next);
-    }
+    const { step: nextStep, currentSlotIndex: nextIndex } =
+      advanceToNextSlotFrom(slots, fromIndex);
+    setStep(nextStep);
+    setCurrentSlotIndex(nextIndex);
   }
 
   // ── Current slot for step 3 ───────────────────────────────────────────────
@@ -562,6 +827,41 @@ function OnboardingInner() {
   }
 
   // ─── Render ────────────────────────────────────────────────────────────────
+  if (oauthTabComplete) {
+    return (
+      <main className="mx-auto flex min-h-screen max-w-xl flex-col justify-center bg-background px-6 py-10">
+        <p className="text-xs uppercase tracking-widest text-muted">FlavorOS</p>
+        <h1 className="mt-1 text-2xl font-semibold tracking-tight">
+          Sign-in complete
+        </h1>
+        <p className="mt-3 text-sm text-muted">
+          Close this tab and return to the onboarding tab you started from.
+          That page should advance to the next account on its own within a few
+          seconds.
+        </p>
+        <div className="mt-6 flex flex-wrap gap-3">
+          <button
+            type="button"
+            onClick={() => window.close()}
+            className="rounded-md bg-accent px-5 py-2 text-sm font-medium text-accent-foreground hover:opacity-90"
+          >
+            Close this tab
+          </button>
+          <Link
+            href="/onboarding"
+            className="rounded-md border border-border-strong px-5 py-2 text-sm font-medium text-foreground hover:bg-surface"
+            onClick={() => {
+              clearOauthTabComplete();
+              setOauthTabComplete(false);
+            }}
+          >
+            Continue here instead
+          </Link>
+        </div>
+      </main>
+    );
+  }
+
   return (
     <main className="mx-auto min-h-screen max-w-xl bg-background px-6 py-10">
       {/* Header */}
@@ -867,9 +1167,14 @@ function OnboardingInner() {
               Connect your {currentSlot.label}
             </h2>
             <p className="mt-1 text-sm text-muted">
-              Enter the email for this account and click Connect. You&apos;ll be
-              redirected to sign in, then brought right back here.
+              Enter the email for this account and click Connect. Sign-in opens
+              in a new tab; keep this page open and return here when you finish.
             </p>
+            {awaitingOAuthReturn && (
+              <p className="mt-2 text-sm text-amber-800">
+                Waiting for sign-in to complete in the other tab…
+              </p>
+            )}
 
             <div className="mt-6">
               <label
