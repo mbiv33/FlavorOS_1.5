@@ -18,7 +18,7 @@ export function ApprovalCard({
   sourceLinkLabel?: string;
 }) {
   return (
-    <Card>
+    <Card accentBar={status}>
       <CardRow>
         <div className="space-y-1">
           <CardTitle>{title}</CardTitle>
@@ -28,7 +28,7 @@ export function ApprovalCard({
         </div>
         <StatusChip status={status} />
       </CardRow>
-      <div className="mt-4 flex flex-wrap gap-2">
+      <div className="mt-4 flex flex-wrap justify-end gap-2">
         <button className="rounded-md bg-accent px-3 py-1.5 text-xs font-medium text-accent-foreground hover:opacity-90">
           Approve
         </button>

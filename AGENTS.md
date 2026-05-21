@@ -83,3 +83,12 @@ pnpm dlx vercel deploy --prod --yes
 ### VPS Fallback
 
 If Vercel becomes limiting, the app can still run on a VPS with Node.js 20+, pnpm 9, `pnpm --filter flavoros build`, `pnpm --filter flavoros start`, and a Caddy or nginx reverse proxy to the Next.js process.
+
+## Design System
+
+- **Source of truth:** [`DESIGN.md`](DESIGN.md) (visual tokens, typography, motion, component skin rules).
+- **Product UX canon:** [`docs/ui/`](docs/ui/) (IA, Command Center wireframe, Approval Card, surfaces).
+- **Implementation:** `apps/flavoros/src/app/globals.css`, Geist Sans/Mono in `layout.tsx`.
+- **Aesthetic:** Calm command — warm stone palette, no chat-first UI, empty zones hide.
+- **Token previews:** `docs/design-preview/preview-safe.html` and `preview-risk.html` (open in browser).
+- **Approved direction:** SAFE (near-black accent `#1c1917`, Geist only). RISK was declined; see `DESIGN.md`.

@@ -96,17 +96,13 @@ Constraint: mobile should preserve the visual command model.
 
 ## Visual Design System
 
-Status: direction exists; full design system is not complete.
+Status: canonical in repo root [`DESIGN.md`](../../DESIGN.md) (2026-05-21 design consultation). Token previews: [`docs/design-preview/`](../design-preview/).
 
-Open questions:
+Remaining open questions:
 
-- type scale and font choices,
-- spacing and density tokens,
-- color system for status/context/provider states,
-- iconography,
-- focus and accessibility tokens,
-- motion language,
-- dark mode parity.
+- iconography set (not specified in `DESIGN.md`),
+- dark mode parity (tokens documented; not implemented),
+- live UI alignment pass against `DESIGN.md` (Command Center, Approval Card, nav).
 
 Constraint: operational surfaces should feel calm, structured, and high-trust.
 

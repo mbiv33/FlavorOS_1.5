@@ -1,15 +1,22 @@
 import type { ReactNode } from "react";
+import { statusAccentBorder } from "@/lib/statusAccent";
+import type { CardStatus } from "@/lib/fixtures";
 
 export function Card({
   children,
   className = "",
+  accentBar,
 }: {
   children: ReactNode;
   className?: string;
+  accentBar?: CardStatus;
 }) {
+  const accent = accentBar
+    ? statusAccentBorder(accentBar)
+    : "border-l-transparent";
   return (
     <div
-      className={`rounded-xl border border-border bg-surface p-4 shadow-[0_1px_0_rgba(0,0,0,0.02)] ${className}`}
+      className={`rounded-lg border border-border-strong border-l-4 bg-surface p-4 ${accent} ${className}`}
     >
       {children}
     </div>

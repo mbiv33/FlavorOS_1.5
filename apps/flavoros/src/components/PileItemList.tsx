@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { StatusChip } from "./StatusChip";
 import { decideApproval, loadSession, type ApprovalDecideRead } from "@/lib/api";
+import { statusAccentBorder } from "@/lib/statusAccent";
 import type { CardStatus, AgentName, ItemKind } from "@/lib/fixtures";
 
 export type PileListItem = {
@@ -56,7 +57,10 @@ export function PileItemList({
   return (
     <ul className="divide-y divide-border">
       {visible.map((item) => (
-        <li key={item.id} className="px-5 py-4 hover:bg-surface-muted">
+        <li
+          key={item.id}
+          className={`border-l-4 px-5 py-4 hover:bg-surface-muted ${statusAccentBorder(item.status)}`}
+        >
           <div className="flex items-start justify-between gap-3">
             <div className="space-y-1">
               <h3 className="text-sm font-medium">{item.title}</h3>
@@ -93,7 +97,7 @@ function ItemActions({
     const canAct = !!item.approvalId && !isPending;
     return (
       <>
-        <div className="mt-3 flex flex-wrap gap-2">
+        <div className="mt-3 flex flex-wrap justify-end gap-2">
           <button
             disabled={!canAct}
             onClick={() => onDecide(item, "approved")}
@@ -130,7 +134,7 @@ function ItemActions({
   }
   if (item.kind === "update") {
     return (
-      <div className="mt-3 flex flex-wrap gap-2">
+      <div className="mt-3 flex flex-wrap justify-end gap-2">
         <button className="rounded-md border border-border-strong px-3 py-1 text-xs font-medium hover:bg-surface-muted">
           Open
         </button>
@@ -144,7 +148,7 @@ function ItemActions({
   }
   // event
   return (
-    <div className="mt-3 flex flex-wrap gap-2">
+    <div className="mt-3 flex flex-wrap justify-end gap-2">
       <button className="rounded-md border border-border-strong px-3 py-1 text-xs font-medium hover:bg-surface-muted">
         Open
       </button>

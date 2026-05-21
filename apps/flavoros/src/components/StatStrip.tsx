@@ -1,19 +1,13 @@
-export type StatTone = "neutral" | "ok" | "attention" | "blocked" | "info";
+import { statToneAccentBorder } from "@/lib/statusAccent";
 
-const TILE_TONE: Record<StatTone, string> = {
-  neutral: "border-border bg-surface",
-  ok: "border-emerald-200 bg-emerald-50/40",
-  attention: "border-amber-200 bg-amber-50/40",
-  blocked: "border-rose-200 bg-rose-50/40",
-  info: "border-blue-200 bg-blue-50/40",
-};
+export type StatTone = "neutral" | "ok" | "attention" | "blocked" | "info";
 
 const VALUE_TONE: Record<StatTone, string> = {
   neutral: "text-foreground",
-  ok: "text-emerald-800",
-  attention: "text-amber-900",
-  blocked: "text-rose-800",
-  info: "text-blue-800",
+  ok: "text-foreground",
+  attention: "text-foreground",
+  blocked: "text-foreground",
+  info: "text-foreground",
 };
 
 export type Stat = {
@@ -32,7 +26,7 @@ export function StatStrip({ stats }: { stats: Stat[] }) {
         return (
           <div
             key={s.id}
-            className={`rounded-xl border p-4 ${TILE_TONE[tone]}`}
+            className={`rounded-lg border border-border-strong border-l-4 bg-surface p-4 ${statToneAccentBorder(tone)}`}
           >
             <p className="text-xs uppercase tracking-wider text-muted-strong">
               {s.label}

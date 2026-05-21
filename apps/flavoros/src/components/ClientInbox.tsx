@@ -41,7 +41,11 @@ export function ClientInbox({
       subtitle: def.subtitle,
       items: items.filter((i) => i.pile === pile),
     };
-  });
+  }).filter((pile) => pile.items.length > 0);
+
+  if (piles.length === 0) {
+    return null;
+  }
 
   return (
     <section className="space-y-3">

@@ -13,7 +13,7 @@ export function SurfaceFrame({
 }) {
   return (
     <div className="flex-1 overflow-y-auto">
-      <div className="mx-auto max-w-5xl space-y-8 px-6 py-8">
+      <div className="mx-auto max-w-7xl space-y-8 px-6 py-8">
         <header className="flex flex-wrap items-end justify-between gap-3 border-b border-border pb-4">
           <div className="space-y-1">
             <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>

@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>FlavorOS — SAFE (Calm Command)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --background: #f7f7f5;
+      --foreground: #18181b;
+      --surface: #ffffff;
+      --surface-muted: #fafaf9;
+      --border: #e7e5e4;
+      --border-strong: #d6d3d1;
+      --muted: #78716c;
+      --accent: #1c1917;
+      --accent-fg: #fafaf9;
+      --attention: #b45309;
+      --ok: #047857;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, system-ui, sans-serif;
+      background: var(--background);
+      color: var(--foreground);
+      line-height: 1.5;
+      padding: 2rem;
+    }
+    h1 { font-size: 1.75rem; font-weight: 600; margin: 0 0 0.5rem; }
+    .sub { color: var(--muted); margin-bottom: 2rem; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+    .swatch {
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      background: var(--surface);
+    }
+    .swatch-color { height: 64px; }
+    .swatch-meta { padding: 0.5rem 0.75rem; font-size: 12px; }
+    .swatch-meta code { color: var(--muted); }
+    .mock {
+      display: grid;
+      grid-template-columns: 220px 1fr;
+      gap: 0;
+      border: 1px solid var(--border-strong);
+      border-radius: 12px;
+      overflow: hidden;
+      max-width: 960px;
+      background: var(--surface);
+    }
+    .nav {
+      background: var(--surface-muted);
+      border-right: 1px solid var(--border);
+      padding: 1.25rem 1rem;
+      font-size: 13px;
+    }
+    .nav .brand { font-weight: 600; margin-bottom: 1.5rem; }
+    .nav a { display: block; padding: 0.5rem 0.75rem; border-radius: 6px; color: var(--muted); text-decoration: none; }
+    .nav a.active { background: var(--surface); color: var(--foreground); font-weight: 500; }
+    .main { padding: 1.5rem; }
+    .today {
+      background: var(--surface-muted);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.25rem 1.5rem;
+      margin-bottom: 1rem;
+    }
+    .today h2 { margin: 0 0 0.25rem; font-size: 1.25rem; }
+    .today p { margin: 0; color: var(--muted); font-size: 14px; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+    .card {
+      border: 1px solid var(--border-strong);
+      border-radius: 8px;
+      padding: 1rem;
+      font-size: 13px;
+    }
+    .card h3 { margin: 0 0 0.75rem; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); font-weight: 500; }
+    .approval {
+      border-left: 3px solid var(--attention);
+      padding: 0.75rem;
+      background: var(--surface);
+      border-radius: 0 6px 6px 0;
+      margin-bottom: 0.5rem;
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--attention);
+    }
+    .btn {
+      display: inline-block;
+      margin-top: 0.75rem;
+      padding: 0.5rem 1rem;
+      background: var(--accent);
+      color: var(--accent-fg);
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 500;
+      border: none;
+    }
+  </style>
+</head>
+<body>
+  <h1>SAFE — Calm Command</h1>
+  <p class="sub">Default direction. Matches current <code>globals.css</code>. Geist Sans in production.</p>
+
+  <div class="grid">
+    <div class="swatch"><div class="swatch-color" style="background:#f7f7f5"></div><div class="swatch-meta"><strong>background</strong><br><code>#f7f7f5</code></div></div>
+    <div class="swatch"><div class="swatch-color" style="background:#ffffff"></div><div class="swatch-meta"><strong>surface</strong><br><code>#ffffff</code></div></div>
+    <div class="swatch"><div class="swatch-color" style="background:#18181b"></div><div class="swatch-meta"><strong>foreground</strong><br><code>#18181b</code></div></div>
+    <div class="swatch"><div class="swatch-color" style="background:#1c1917"></div><div class="swatch-meta"><strong>accent</strong><br><code>#1c1917</code></div></div>
+    <div class="swatch"><div class="swatch-color" style="background:#b45309"></div><div class="swatch-meta"><strong>attention</strong><br><code>#b45309</code></div></div>
+    <div class="swatch"><div class="swatch-color" style="background:#047857"></div><div class="swatch-meta"><strong>ok</strong><br><code>#047857</code></div></div>
+  </div>
+
+  <div class="mock">
+    <nav class="nav">
+      <div class="brand">FlavorOS</div>
+      <a class="active" href="#">Command Center</a>
+      <a href="#">Briefings</a>
+      <a href="#">Meetings</a>
+      <a href="#">Comms &amp; Calendar</a>
+    </nav>
+    <main class="main">
+      <div class="today">
+        <h2>Good morning, Alex</h2>
+        <p>Morning Standup is ready · 2 approvals waiting · Next: Team sync at 10:00</p>
+      </div>
+      <div class="row">
+        <div class="card">
+          <h3>Needs attention</h3>
+          <div class="approval">
+            <strong>Approve draft reply</strong><br>
+            <span style="color:var(--muted)">Khadijah · Email to vendor</span>
+          </div>
+          <button class="btn" type="button">Review</button>
+        </div>
+        <div class="card">
+          <h3>Briefings</h3>
+          <p style="margin:0;color:var(--muted)">Morning Standup — Ready</p>
+          <p style="margin:0.5rem 0 0">COB Work Day — Scheduled 5:00 PM</p>
+        </div>
+      </div>
+    </main>
+  </div>
+</body>
+</html>

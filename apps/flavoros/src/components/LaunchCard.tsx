@@ -29,7 +29,7 @@ export function LaunchCard({
           ) : null}
         </div>
       </CardRow>
-      <div className="mt-4 flex gap-2">
+      <div className="mt-4 flex flex-wrap justify-end gap-2">
         <Link
           href={primaryHref}
           className="rounded-md bg-accent px-3 py-1.5 text-xs font-medium text-accent-foreground hover:opacity-90"

@@ -31,3 +31,5 @@ Current UI build priorities:
 | `13-meetings.md` | Meetings launcher + topic-scoped session screen |
 | `14-channel-surfaces.md` | Comms & Calendar, Projects, Reports & Artifacts, Travel/Logistics, Settings/Profile |
 | `15-admin-console.md` | Admin/operator console specification |
+
+**Visual design system (tokens, typography, motion):** repo root [`DESIGN.md`](../../DESIGN.md). Browser previews: [`docs/design-preview/`](../design-preview/).

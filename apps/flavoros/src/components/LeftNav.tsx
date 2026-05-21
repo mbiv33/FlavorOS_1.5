@@ -55,11 +55,11 @@ export function LeftNav({ variant }: { variant: "client" | "admin" }) {
   const userInitials = displayName ? initials(displayName) : "…";
 
   return (
-    <nav className="flex h-full w-64 flex-col border-r border-border bg-surface">
+    <nav className="flex h-full w-60 flex-col border-r border-border bg-surface">
       <div className="px-5 pb-3 pt-5">
         <Link href="/" className="block">
-          <span className="text-base font-semibold tracking-tight">
-            Flavor<span className="text-rose-700">OS</span>
+          <span className="text-base font-semibold tracking-tight text-foreground">
+            FlavorOS
           </span>
         </Link>
       </div>
@@ -82,7 +82,7 @@ export function LeftNav({ variant }: { variant: "client" | "admin" }) {
           <div className="mx-5 mb-4">
             <Link
               href="/meetings"
-              className="block rounded-full bg-accent px-4 py-2 text-center text-sm font-medium text-accent-foreground shadow-sm hover:opacity-90"
+              className="block rounded-md bg-accent px-4 py-2 text-center text-sm font-medium text-accent-foreground hover:opacity-90"
             >
               Start a Meeting
             </Link>

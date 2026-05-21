@@ -169,12 +169,68 @@ export function todayDateLine(): string {
   });
 }
 
+/** Plain-English Zone 1 summary for the Operating Picture strip. */
+export function buildOperatingPictureSummary(params: {
+  pendingApprovals: number;
+  inboxItems: InboxItem[];
+  briefingSummaries: BriefingSummary[];
+}): string {
+  const parts: string[] = [];
+
+  const inboxDecisions = params.inboxItems.filter(
+    (item) =>
+      (item.pile === "urgent" || item.pile === "needs-attention") &&
+      item.kind !== "update",
+  ).length;
+  const decisionCount = Math.max(params.pendingApprovals, inboxDecisions);
+
+  if (decisionCount > 0) {
+    parts.push(
+      `${decisionCount} item${decisionCount === 1 ? "" : "s"} need your decision`,
+    );
+  }
+
+  const readyBriefing = params.briefingSummaries.find(
+    (b) => b.preparedStatus === "ready",
+  );
+  if (readyBriefing) {
+    parts.push(`${readyBriefing.title} ready`);
+  }
+
+  if (parts.length === 0) {
+    return "Everything is quiet";
+  }
+
+  if (decisionCount > 0) {
+    parts.push("Everything else is quiet");
+  }
+
+  return parts.join(" · ");
+}
+
 export type BriefingSummary = BriefingDefinition & {
   type: BriefingType;
   preparedStatus: BriefingPreparedStatus;
   topicCount: number;
   approvalCount: number;
 };
+
+export function briefingPreparedStatusLabel(
+  status: BriefingPreparedStatus,
+): string {
+  switch (status) {
+    case "ready":
+      return "Ready";
+    case "not_prepared":
+      return "Not prepared";
+    case "in_progress":
+      return "In progress";
+    case "completed":
+      return "Completed";
+    default:
+      return status;
+  }
+}
 
 function deriveBriefingPreparedStatus(
   artifacts: ArtifactRead[],
