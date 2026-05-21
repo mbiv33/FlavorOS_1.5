@@ -1,6 +1,6 @@
 # Current Build Plan
 
-**Last updated:** 2026-05-19 14:13 EDT
+**Last updated:** 2026-05-21 EDT
 
 ## Purpose
 
@@ -173,7 +173,7 @@ Required outcomes:
 - onboarding status and sync readiness,
 - initial workflow lanes.
 
-Current status: canonical docs and envelope fixtures exist; onboarding app/script is missing.
+Current status: deployed. Sequential 4-step wizard (identity → contexts → connect accounts → ready) with progress bar. Server-side state hydration. Known connect-advance bug in step 3.
 
 ### Phase 5: Provider Ingestion
 

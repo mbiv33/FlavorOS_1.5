@@ -1,6 +1,6 @@
 # Local Dev Runbook
 
-**Last updated:** 2026-05-19 (K3 verification guardrails)
+**Last updated:** 2026-05-21 (VPS production section added)
 
 Repeatable setup for the **demo vertical slice** on one machine. Historical slice checklist: [archive/build_vertical_slice_tasks.md](./archive/build_vertical_slice_tasks.md).
 
@@ -208,6 +208,32 @@ When multiple agents work the repo, use [parallel_lanes_tracker.md](./parallel_l
 | Redirect loop to login | No session in localStorage | Complete login; check `(client)/layout` SessionGuard |
 | `/outbound-actions` 404 | Stale API process or missing migration | [Restart API after outbound migration](#restart-api-after-outbound-migration-lane-j--k3) |
 | Smoke: outbound stayed `queued` | `OUTBOUND_DEFER_EXECUTION=true` on API | Unset for inline demo, or run `SMOKE_OUTBOUND_DEFER=1` with defer enabled |
+
+## VPS production (Hostinger)
+
+| Field | Value |
+|---|---|
+| **Host** | `2.24.65.59` (SSH as `root`) |
+| **Deploy path** | `/opt/flavoros/api/repo/services/api` |
+| **systemd service** | `flavoros-api` |
+| **API URL** | `https://api.flavoros.cc` |
+| **Cloudflare tunnel** | `bcc8b555-8eb5-495e-943e-5a99f93c8528` |
+| **DB** | Postgres 16, database `flavoros`, user `flavoros` |
+| **Migrations** | Alembic 0001–0007 at head |
+
+### Manual deploy (until GitHub Actions CD is wired)
+
+```bash
+ssh root@2.24.65.59
+cd /opt/flavoros/api/repo && git pull
+cd services/api && source .venv/bin/activate && alembic upgrade head
+systemctl restart flavoros-api
+curl -sf https://api.flavoros.cc/health
+```
+
+### Onboarding dev reset
+
+Append `?reset=1` to the onboarding URL (`/onboarding?reset=1`) to wipe all contexts and provider connections for the current tenant, then restart the onboarding flow. Calls `DELETE /onboarding/reset` on the API.
 
 ## Related docs
 

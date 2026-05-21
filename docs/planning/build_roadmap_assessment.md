@@ -2,7 +2,7 @@
 
 ## Status
 
-**Last updated:** 2026-05-19 14:22 EDT
+**Last updated:** 2026-05-21 EDT
 
 This file memorializes a **point-in-time execution assessment** (May 2026): where the repo stands relative to the MVP proof loop, what actually blocks shipping, and the recommended build order for the next 2–4 weeks.
 
@@ -18,23 +18,23 @@ It does **not** replace the canonical development plan. If anything here conflic
 
 ## Executive Summary
 
-*Updated 2026-05-19 14:22 EDT after vertical slice + post-slice lanes A through J.*
+*Updated 2026-05-21 EDT after VPS deployment, Client Universe wiring, and onboarding rewrite.*
 
-FlavorOS has crossed the **first integration milestone**:
+FlavorOS has crossed the **first production deployment milestone**:
 
-- **Demo vertical slice is complete:** login → onboarding → sync → Command Center artifact + approval → client decide with audit.
-- **Operator console (admin)** reads live list data from the API (`/admin`).
-- **Settings** shows profile and provider connections from the API.
-- **API regression tests** now cover first-sync, approval decide, and outbound actions (45 tests).
-- **Client channel surfaces** now read API-backed state instead of fixture display rows.
-- **Smoke + CI scaffolding** exist for the post-slice loop.
-- **Communications write-back** is live as a narrow approval-gated slice: approve draft -> `outbound_actions` -> queued/executed/failed/pulled-back state -> admin diagnostics.
+- **VPS deployed:** API live at `https://api.flavoros.cc` (Hostinger VPS, Cloudflare tunnel, systemd, Postgres with 7 migrations).
+- **Frontend deployed:** `https://flavoros.vercel.app` pointing at production API.
+- **Client Universe wired:** Onboarding saves contexts, provider connections, and universe envelope through the real API.
+- **Onboarding rewritten:** Sequential single-connection form with progress bar, server-side state hydration, dev reset support.
+- **Demo vertical slice + post-slice lanes A through M complete.**
+- **Communications write-back** proven end-to-end.
 
-The bottleneck has shifted from “can FlavorOS take an approved action back out into the world safely?” to **can we harden and generalize the new outbound path without losing trust?**
+The bottleneck has shifted to **production UX polish and deployment automation**:
 
-- **Write-back** (MVP step 7) is now proven for a communications-first slice.
+- **Onboarding connect-advance bug** — step 3 doesn't properly advance after OAuth return in production (Lane O — high priority).
+- **Manual VPS deploys** — no CI/CD yet; pushes require SSH + git pull + systemctl restart (Lane P).
+- **Provider hardening** — real Gmail send, dedup, async LLM, SDK timeout still open (Lane N).
 - **Agent runtime** remains stub + inline processor (not durable multi-step workflows).
-- **Provider hardening** still needs production-grade OAuth and execution trust boundaries.
 
 **Next agents:** read [`next_session_handoff.md`](./next_session_handoff.md) before claiming work.
 
@@ -42,7 +42,7 @@ The bottleneck has shifted from “can FlavorOS take an approved action back out
 
 ## Where The Repo Stands
 
-*Updated 2026-05-19 14:22 EDT.*
+*Updated 2026-05-21 EDT.*
 
 | Layer | Status | Notes |
 |---|---|---|
@@ -51,10 +51,12 @@ The bottleneck has shifted from “can FlavorOS take an approved action back out
 | **UI → API (hero path)** | Done (slice) | Login, onboarding, Command Center, LeftNav, Settings use `api.ts` |
 | **UI → API (admin)** | Done (Lane C) | `/admin` via `admin-api.ts` + list endpoints; `SessionGuard` on admin layout |
 | **UI → API (channels)** | Done (Lane I) | Client channel surfaces + Command Center widgets use shared channel loaders/mappers |
-| **Onboarding** | Done (gate) | SessionGuard, readiness routing, sync on onboarding |
+| **Onboarding** | Done (bug) | Sequential form with progress bar; server hydration; connect-advance bug in step 3 |
 | **Provider ingestion** | Done (demo) | Inline `process_provider_first_sync` → artifact + pending approval |
 | **Agent runtime** | Stub + inline | `StubOrchestratorAdapter`; demo loop in `provider_first_sync.py` |
 | **Write-back** | Done (narrow slice) | Lane J shipped communications-first outbound actions + admin/client visibility |
+| **VPS production** | Done | API at api.flavoros.cc; manual deploy; GitHub Actions CD not yet wired |
+| **Client Universe** | Done | Onboarding → contexts → provider connections → universe envelope |
 
 ### Phase Alignment (`current_build_plan.md`)
 
@@ -63,7 +65,7 @@ The bottleneck has shifted from “can FlavorOS take an approved action back out
 | 1 — Visualization & surfaces | Done (MVP breadth) | Command Center, admin, settings, and client channel pages are live on API data |
 | 2 — Database & storage | Done (demo scope) | Models + CRUD; hero surfaces consume API |
 | 3 — Integrations | Partial | Composio boundary + provider routes; prod OAuth matrix deferred |
-| 4 — Onboarding | Done (demo scope) | Gate + sync path complete |
+| 4 — Onboarding | Done (production, bug) | Sequential flow + progress bar deployed; connect-advance bug in step 3 |
 | 5 — Provider ingestion | Done (demo scope) | First-sync → inbox loop closed |
 | 6 — Agent workflows | Partial | Inline processor only; real orchestration deferred |
 | 7 — Write-back | Done (demo scope) | Communications-first proof exists; broader channel/provider depth deferred |
@@ -109,12 +111,20 @@ From `current_build_plan.md`, the MVP must prove:
 - `apps/flavoros/src/components/GoalsStrip.tsx`, `MiniCalendar.tsx`
 - shared `useChannelData` + per-surface config/hook pattern
 
+### Remaining: production UX + deployment
+
+- **Onboarding connect-advance bug** — step 3 doesn't advance after OAuth return (Lane O, high priority)
+- **GitHub Actions auto-deploy** — manual VPS deploy is fragile (Lane P)
+- **Real Gmail send** — wire `ComposioGmailOutboundAdapter` calling `GMAIL_SEND_EMAIL` (TODO-4)
+- **User invite/registration** — `invite_tokens` table, invite endpoints (TODO-3 / Lane Q)
+
 ### Remaining: production hardening
 
-- Extract outbound execution from the inline demo loop
+- Per-message ProviderEvent dedup (TODO-5)
+- Async LLM call off request thread (TODO-6)
+- Composio SDK HTTP timeout
 - Full Composio OAuth matrix
-- Local/dev restart + migration hygiene so smoke hits the new outbound routes consistently
-- Keep CI + smoke green as the trust gate for outbound work
+- Extract outbound execution from the inline demo loop
 
 ### Remaining: platform depth
 
@@ -135,43 +145,36 @@ From `current_build_plan.md`, the MVP must prove:
 
 *Supersedes the pre-slice ordering below for **new** work. Steps 1–5 and post-slice lanes A–J are complete.*
 
-### 1. Re-verify and freeze the current proof slice (~0.5 day)
+### 1. Fix onboarding connect-advance bug (Lane O — ~1 day)
 
-- Run pytest, `tsc --noEmit`, and `scripts/smoke-vertical-slice.sh`
-- Manual sweep: login → onboarding/sync → Command Center → approve/reject → outbound queue/status → `/admin` → `/settings` → communications/calendar
-- Restart API + run migrations locally so smoke and manual E2E use the outbound routes
+- Debug why step 3 doesn't advance after OAuth completes in new tab
+- Test with `?reset=1` to wipe state and restart flow end-to-end
+- Verify all 4 steps work in production (Vercel + VPS)
 
-### 2. Harden Lane J into a trustworthy default (2–4 days)
+### 2. Wire GitHub Actions auto-deploy (Lane P — ~0.5 day)
 
-**Goal:** Make the new outbound path boring to operate.
+- `.github/workflows/deploy-api.yml`: SSH into VPS on push to main
+- `git pull && systemctl restart flavoros-api` on the VPS
+- Health check after deploy
 
-- tighten migration/reseed/runbook flow
-- expand failure diagnostics and receipt visibility
-- verify pull-back and deferred execution behavior under local + CI paths
+### 3. Provider stabilization (Lane N — 2–3 days)
 
-### 3. Extract execution from the inline demo loop (2–4 days)
+- TODO-4: wire real Gmail send (`GMAIL_SEND_EMAIL`)
+- TODO-5: per-message dedup
+- TODO-6: async LLM call
+- Composio SDK timeout
 
-- Move outbound execution off the inline first-sync path
-- Introduce durable execution lifecycle/state transitions before adding breadth
-- Preserve the current demo flow while isolating write-back concerns
+### 4. User invite/registration (Lane Q — 2–3 days)
 
-### 4. Publish the vocabulary layer (1–2 days)
+- `invite_tokens` table + migration
+- Invite endpoints
+- Self-registration flow
 
-- Add `docs/FLAVOROS_TAXONOMY.md`
-- Lock outbound/status/workflow vocabulary now that Lane J terms are real
-- Point humans and agents at it before they descend into domain docs
+### 5. Only then expand breadth again
 
-### 5. Harden provider execution trust boundaries (2–3 days)
-
-- Production OAuth/credential handling for the chosen outbound lane
-- Idempotency, retry, and pull-back semantics
-- Failure diagnostics visible in admin
-
-### 6. Only then expand breadth again
-
-- Calendar write-back
-- richer orchestrator/runtime behavior
-- GBrain follow-on work that directly improves execution context
+- Richer orchestrator/runtime behavior
+- GBrain follow-on work
+- Broader outbound coverage
 
 ### Explicitly defer
 
@@ -203,7 +206,10 @@ Plus post-slice: **admin** live lists, **settings** wired, **API tests** for cor
 | **Internal operator alpha** | Admin read path — **done** (Lane C); polish optional |
 | **Broader client UX** | Lane I — **done** |
 | **Full MVP demo loop** | Steps 1–7 — **done** |
-| **Production-ready outbound trust path** | Verification pass → Lane J hardening → runtime extraction |
+| **Production onboarding** | Lane O — fix connect-advance bug |
+| **Automated deploys** | Lane P — GitHub Actions CD for VPS |
+| **Real email sending** | Lane N — wire `GMAIL_SEND_EMAIL` via Composio |
+| **Multi-user** | Lane Q — invite tokens + registration |
 
 ---
 
@@ -287,7 +293,10 @@ These can be done in parallel **if ownership boundaries stay clean**.
 | Provider sync | `services/api/app/routers/providers.py` |
 | Sync processor | `services/api/app/workflows/provider_first_sync.py` |
 | Orchestrator stub | `services/api/app/adapters/orchestrator.py` |
-| Production deploy | `https://flavoros.vercel.app` (see root `AGENTS.md`) |
+| Production app | `https://flavoros.vercel.app` |
+| Production API | `https://api.flavoros.cc` (Hostinger VPS via Cloudflare tunnel) |
+| VPS deploy path | `/opt/flavoros/api/repo` on `2.24.65.59` |
+| Onboarding page | `apps/flavoros/src/app/onboarding/page.tsx` |
 
 ---
 
@@ -309,4 +318,5 @@ When starting implementation in a new agent session, point the agent at:
 
 - Initial capture: product review + repo inspection (May 2026).
 - **2026-05-19:** Updated after vertical slice steps 1–5 and post-slice lanes A through J.
+- **2026-05-21:** Updated after VPS deployment, Client Universe wiring, and onboarding rewrite.
 - Intended as a durable handoff for humans and coding agents.

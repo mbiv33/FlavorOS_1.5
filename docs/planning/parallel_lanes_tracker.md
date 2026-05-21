@@ -12,7 +12,7 @@
 | **Current step** | All steps 1–5 complete |
 | **Branch** | `main` (local) |
 | **Status** | `complete` |
-| **Last updated** | 2026-05-19 (Phase 0 verify) |
+| **Last updated** | 2026-05-21 (VPS deploy + onboarding rewrite) |
 
 **Rule:** While status ≠ `complete`, only the slice owner edits paths in the [Slice freeze zone](#slice-freeze-zone-steps-15--do-not-touch). Post-slice: freeze lifted; still respect per-lane allowed paths.
 
@@ -33,15 +33,15 @@
 
 | Lane | Owner | Status | Branch | Allowed paths | Open PR | Notes |
 |---|---|---|---|---|---|---|
-| — | — | — | — | — | — | No active lanes |
+| O — Fix onboarding connect-advance | Cursor agent | `in_progress` | `main` | `apps/flavoros/src/app/onboarding/page.tsx`, `services/api/app/routers/onboarding.py`, `services/api/app/schemas.py` | — | OAuth return + original-tab stale state |
 
-## Ready lanes (unlocked — slice lock = complete)
+## Ready lanes (unlocked — pick one)
 
 | Lane | Blocked by | Status | Notes |
 |---|---|---|---|
-| K — Lane J hardening | None | `done` | K1/K2/K3 + Gate K: pytest 35 pass, tsc clean; smoke requires live API on :8001 |
-| K3 — Verification guardrails | None | `done` | Smoke status asserts, runbook restart section, CI outbound tests verified, post-deploy checklist |
-| M — Calendar write-back follow-on | None | `done` | `calendar_outbound.py`, approve hook, calendar page outbound queue, seed hold approval, pytest calendar cases |
+| P — GitHub Actions auto-deploy | None | `ready` | Wire `.github/workflows/deploy-api.yml` to SSH into VPS on push to main |
+| N — Provider stabilization | None | `ready` | TODO-4/5/6, SDK timeout, real Gmail send |
+| Q — User invite/registration | None | `ready` | invite_tokens table, endpoints, self-registration |
 
 ## Coordination checklist (every agent, every session)
 
@@ -92,6 +92,9 @@ When done: move your lane out of Active parallel lanes, update the Completed lan
 | K1 — Backend extraction | Cursor agent | `done` | Split enqueue/execute; POST `/outbound-actions/{id}/execute`; GmailOutboundAdapter stub; defer-by-default approve |
 | L — Taxonomy guide | Session | `done` | `docs/FLAVOROS_TAXONOMY.md` + planning README rank 1.5 + AGENTS.md pointer |
 | M — Calendar write-back | Session | `done` | `send_calendar_hold` / `googlecalendar` / `calendar_create_hold`; client queue + seed + tests |
+| VPS deploy | Session | `done` | api.flavoros.cc live: Hostinger VPS, systemd, Cloudflare tunnel, Postgres + Alembic 0001–0007 |
+| Client Universe (Cursor) | Cursor | `done` | Wire Client Universe: onboarding → contexts → provider connections → universe envelope |
+| Onboarding rewrite | Session | `done` | Sequential single-connection form + progress bar; server-side hydration; ?reset=1; connect-advance bug remains (Lane O) |
 
 ### Lane I sub-lanes (complete)
 
@@ -114,3 +117,6 @@ When done: move your lane out of Active parallel lanes, update the Completed lan
 | 2026-05-19 | Cursor agent | K1 | Lane K1 done: enqueue_for_approval + execute_outbound split; defer-by-default on approve; POST execute + 409 on non-queued; GmailOutboundAdapter stub; pytest test_outbound_actions 11 pass |
 | 2026-05-19 | Cursor agent | K2 | Lane K2 done: pull-back on comms queue (queued only); optimistic decide via outbound_action; execution_result_json snippets; admin outbound filters + overview counts via admin-api; removed fake PileItemList pull-back; tsc clean |
 | 2026-05-19 (K3) | Session | K3 | Smoke status asserts + defer path; runbook restart/migrate; CI outbound tests; handoff post-deploy checklist |
+| 2026-05-20 | Session | VPS deploy | Full VPS deployment: Postgres, systemd, Cloudflare tunnel, api.flavoros.cc live, Vercel env updated |
+| 2026-05-20 | Cursor | Client Universe | Wire Client Universe: ruff E501 fixes, onboarding save, contexts, provider connections, universe envelope |
+| 2026-05-20–21 | Session | Onboarding | Rewrite step 3 as sequential form + progress bar; server hydration; ?reset=1 reset; OAuth new-tab; multiple bug fixes |

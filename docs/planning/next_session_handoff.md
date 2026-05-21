@@ -1,6 +1,6 @@
 # Next Session Handoff
 
-**Last updated:** 2026-05-19 (First real user — Composio OAuth + Sinclair LLM + Command Center wired)  
+**Last updated:** 2026-05-21 (VPS deployed, Client Universe wired, onboarding rewrite)  
 **Purpose:** Single entry point for a new agent session. Read this first, then the linked docs.
 
 ---
@@ -57,51 +57,35 @@ Before first commit: update your lane row in [parallel_lanes_tracker.md](./paral
 
 ## Ready work (pick one lane per session)
 
+#### O — Fix onboarding connect-advance bug (HIGH PRIORITY)
+
+**Paths:** `apps/flavoros/src/app/onboarding/page.tsx`, `services/api/app/routers/onboarding.py`, `services/api/app/schemas.py`  
+**Goal:** Fix the remaining bug where the sequential onboarding flow doesn't properly advance to the next account after OAuth completes in a new tab  
+**Context:** Onboarding step 3 was rewritten as a sequential single-connection form with a progress bar. OAuth opens in a new tab while the current page advances. User reports it still doesn't work correctly — the page either doesn't advance or shows incorrect state after returning from OAuth.  
+**Backend changes already made:** `identity` is optional in `OnboardingSaveRequest`, `contexts` defaults to empty list, `DELETE /onboarding/reset` exists for dev testing (`?reset=1` query param)  
+**Test with:** `?reset=1` to wipe state, then walk through all 4 steps
+
+#### P — GitHub Actions auto-deploy for VPS
+
+**Paths:** `.github/workflows/deploy-api.yml` (new), VPS systemd  
+**Goal:** Wire CI/CD so pushes to `main` auto-deploy the API to the Hostinger VPS  
+**Context:** Currently manual: `ssh root@2.24.65.59`, `cd /opt/flavoros/api/repo && git pull && systemctl restart flavoros-api`  
+**VPS details:** Ubuntu 24.04, deploy path `/opt/flavoros/api/repo`, systemd service `flavoros-api`, Cloudflare tunnel handles routing
+
 #### N — Real provider stabilization (post-first-user)
 
 **Paths:** `services/api/app/adapters/composio.py`, `services/api/app/routers/providers.py`, `services/api/tests/**`  
 **Goal:** harden the real Composio path now that one real user is connected
-- TODO-5: per-message ProviderEvent deduplication (`idempotency_key: "{provider_connection_id}:gmail:{message_id}"`)
+- TODO-4: wire real Gmail send via `ComposioGmailOutboundAdapter` calling `GMAIL_SEND_EMAIL`
+- TODO-5: per-message ProviderEvent deduplication (`idempotency_key: “{provider_connection_id}:gmail:{message_id}”`)
 - TODO-6: move sync LLM call off request thread (`asyncio.to_thread`) — currently blocks HTTP for up to 30s
 - Verify `Action.GMAIL_FETCH_EMAILS` is the exact Composio SDK action name against current docs
 - Add Composio SDK HTTP timeout (`timeout=10.0` on client init — critical gap noted in eng review)
 
-#### K — Lane J hardening
+#### Q — User invite/registration flow
 
-**Paths:** `services/api/app/**`, `services/api/tests/**`  
-**Goal:** extract execution from inline demo flow, tighten retries/idempotency/receipts, improve runbook clarity
-
-#### L — Taxonomy guide
-
-**Paths:** `docs/**`  
-**Goal:** produce `docs/FLAVOROS_TAXONOMY.md` now that Lane J vocabulary is real
-
-#### M — Calendar write-back follow-on
-
-**Paths:** `services/api/**`, `apps/flavoros/src/app/(client)/calendar/**`, relevant shared hooks/mappers  
-**Goal:** broaden outbound proof beyond communications only after J hardening settles
-
-### Parallel follow-ons (safe to split)
-
-#### K1 — Backend execution extraction
-
-**Paths:** `services/api/app/**`, `services/api/tests/**`  
-**Goal:** decouple outbound execution from inline first-sync path, preserve current UX
-
-#### K2 — Client/admin outbound polish
-
-**Paths:** `apps/flavoros/src/app/(client)/communications/**`, `apps/flavoros/src/app/admin/**`, related hooks/components  
-**Goal:** clearer status/error states, pull-back polish, receipt visibility
-
-#### K3 — Verification / rollout guardrails — **done**
-
-**Paths:** `scripts/**`, `.github/workflows/**`, `docs/planning/**`  
-**Shipped:** smoke status asserts + optional defer; runbook “Restart API after outbound migration”; CI includes `test_outbound_actions.py`; post-deploy checklist below
-
-#### L1 — Taxonomy doc + doc index updates
-
-**Paths:** `docs/**`, optional root `AGENTS.md` pointer  
-**Goal:** canonical shared language before the repo broadens again
+**Paths:** `services/api/app/models.py`, `services/api/app/routers/auth.py`, `services/api/alembic/versions/`  
+**Goal:** `invite_tokens` table, invite endpoints, self-registration for new clients (TODO-3)
 
 ---
 
@@ -110,25 +94,23 @@ Before first commit: update your lane row in [parallel_lanes_tracker.md](./paral
 ```mermaid
 flowchart TD
   start[New session]
-  verify[Freeze current slice: pytest + tsc + smoke + manual]
-  harden[Lane K: harden write-back]
-  taxonomy[Lane L: taxonomy guide]
-  runtime[Execution extraction]
-  expand[Lane M: broaden outbound coverage]
+  fix_onboard[Lane O: Fix onboarding connect bug]
+  auto_deploy[Lane P: GitHub Actions auto-deploy]
+  stabilize[Lane N: Provider stabilization]
+  invite[Lane Q: User invite flow]
 
-  start --> verify
-  verify --> harden
-  harden --> taxonomy
-  harden --> runtime
-  runtime --> expand
+  start --> fix_onboard
+  fix_onboard --> auto_deploy
+  auto_deploy --> stabilize
+  stabilize --> invite
 ```
 
 | Week | Focus | Outcome |
 |---|---|---|
-| 1 | Verification freeze + Lane K | Stable outbound trust path |
-| 1 | Parallel Lane L | Canonical taxonomy guide |
-| 2 | Runtime extraction + rollout guardrails | Safer execution + cleaner execution boundaries |
-| 3+ | Lane M | Broader outbound coverage beyond communications |
+| 1 | Lane O — Fix onboarding connect-advance | Sequential onboarding works end-to-end in production |
+| 1 | Lane P — GitHub Actions auto-deploy | Push to main auto-deploys API to VPS |
+| 2 | Lane N — Provider stabilization | TODO-4/5/6, SDK timeout, real Gmail send |
+| 3+ | Lane Q — User invite/registration | New clients can be invited and self-register |
 
 ---
 
@@ -152,11 +134,14 @@ curl -sf http://127.0.0.1:8008/health
 ./scripts/smoke-vertical-slice.sh
 ```
 
-**Local URLs:** Next `http://localhost:3000`, API `http://127.0.0.1:8008` (see runbook).
+**Local URLs:** Next `http://localhost:3000`, API `http://127.0.0.1:8008` (see runbook).  
+**Production URLs:** App `https://flavoros.vercel.app`, API `https://api.flavoros.cc`
 
 **Operational note:** `ANTHROPIC_API_KEY` must not be set as an empty string in the shell. pydantic-settings prioritizes shell env vars over `.env` — if `ANTHROPIC_API_KEY=` is exported (even empty), it shadows the real key in `services/api/.env`. Run `unset ANTHROPIC_API_KEY` before starting the API process if the key lives only in `.env`.
 
 **Manual E2E:** login → onboarding (if needed) → sync → Command Center → approve → `/admin` live lists → `/settings` profile + providers.
+
+**Onboarding dev reset:** Append `?reset=1` to the onboarding URL to wipe contexts + connections and restart the flow. Calls `DELETE /onboarding/reset` on the API.
 
 For post-J work, keep the outbound E2E in the loop: approve communication draft → queued outbound action visible → execution/receipt or failure state visible in client + admin.
 
@@ -179,6 +164,9 @@ Local parity before deploy: [local_dev_runbook.md](./local_dev_runbook.md) → �
 
 | Area | Path |
 |---|---|
+| Onboarding page | `apps/flavoros/src/app/onboarding/page.tsx` |
+| Onboarding backend | `services/api/app/routers/onboarding.py`, `services/api/app/onboarding.py` |
+| Onboarding schemas | `services/api/app/schemas.py` (`OnboardingSaveRequest`, `OnboardingIdentity`) |
 | Admin API client | `apps/flavoros/src/lib/admin-api.ts` |
 | Admin surfaces config | `apps/flavoros/src/lib/admin-surfaces.ts` |
 | Admin UI panel | `apps/flavoros/src/components/admin/AdminSurfacePanel.tsx` |
@@ -188,6 +176,9 @@ Local parity before deploy: [local_dev_runbook.md](./local_dev_runbook.md) → �
 | Sync processor | `services/api/app/workflows/provider_first_sync.py` |
 | Fixtures (types only) | `apps/flavoros/src/lib/fixtures.ts` — display arrays unused on client routes |
 | Production app | `https://flavoros.vercel.app` |
+| Production API | `https://api.flavoros.cc` (Hostinger VPS via Cloudflare tunnel) |
+| VPS deploy path | `/opt/flavoros/api/repo` on `2.24.65.59` |
+| VPS systemd service | `flavoros-api` — `systemctl restart flavoros-api` |
 
 ---
 
@@ -199,41 +190,44 @@ Copy this into a new implementation session:
 Read docs/planning/next_session_handoff.md first, then docs/planning/build_roadmap_assessment.md and docs/planning/parallel_lanes_tracker.md.
 
 Current reality:
-- Vertical slice is complete.
-- Post-slice lanes A through J are complete.
-- The MVP demo proof loop is complete for a communications-first path.
-- One real user (marcus@bivinesgroup.com) is connected via Composio OAuth; 10 real Gmail messages synced; Sinclair (claude-sonnet-4-6) generated a real artifact body; approve flow wires to outbound queue.
-- API runs on port 8008 (Cloudflare tunnel: api.flavoros.cc → localhost:8008).
-- Open TODOs from real-user session: TODO-5 (per-message dedup), TODO-6 (async LLM call), Composio SDK timeout, verify Action.GMAIL_FETCH_EMAILS name.
+- Vertical slice + post-slice lanes A through M are complete.
+- MVP demo proof loop complete for communications-first path.
+- One real user (marcus@bivinesgroup.com) connected via Composio OAuth.
+- VPS deployed: API live at https://api.flavoros.cc (Hostinger VPS, systemd, Cloudflare tunnel).
+- Frontend deployed: https://flavoros.vercel.app (Vercel, NEXT_PUBLIC_FLAVOROS_API_URL=https://api.flavoros.cc).
+- Client Universe wired: onboarding → contexts → provider connections → universe envelope.
+- Onboarding rewritten as sequential single-connection form with progress bar.
+- Known bug: onboarding step 3 connect-advance doesn't work correctly after OAuth return.
+- VPS deploy is manual (git pull + systemctl restart); GitHub Actions CD not yet wired.
+- DB at head: Alembic migrations 0001–0007.
 
 Your assignment:
 Choose one follow-on lane and stay inside it:
-1. Lane N — stabilize the real Composio path (TODO-5, TODO-6, SDK timeout, action name verification)
-2. Lane K — harden communications write-back
-3. Lane L — build docs/FLAVOROS_TAXONOMY.md
-4. Lane M — plan/implement the next outbound breadth slice only if K is calm
+1. Lane O — Fix onboarding connect-advance bug (HIGH PRIORITY)
+2. Lane P — GitHub Actions auto-deploy for VPS
+3. Lane N — Stabilize real Composio path (TODO-4/5/6, SDK timeout)
+4. Lane Q — User invite/registration flow
+
+IMPORTANT: Always explain the problem + approach before writing code. Wait for confirmation.
 
 Success target:
 - preserve the current outbound proof path
 - do not regress pytest/tsc/smoke/manual E2E
-- keep vocabulary and status language aligned across client, admin, and docs
+- test onboarding changes with ?reset=1 to wipe and restart
 
 Scope guardrails:
 - do not destabilize the current communications-first flow
 - do not broaden multiple outbound lanes at once
-- do not rewrite the orchestrator casually
 - keep the diff aligned with existing api/mappers/hooks patterns
 
 Before editing:
 - confirm lane ownership in docs/planning/parallel_lanes_tracker.md
 - preserve existing user changes
-- verify with pytest, tsc --noEmit, scripts/smoke-vertical-slice.sh, and the outbound manual E2E
+- verify with pytest, tsc --noEmit, scripts/smoke-vertical-slice.sh
 
-If splitting work:
-- execution extraction / backend hardening
-- client/admin outbound polish
-- taxonomy guide + docs index wiring
-- verification/rollout guardrails
+VPS manual deploy (until Lane P ships):
+  ssh root@2.24.65.59
+  cd /opt/flavoros/api/repo && git pull && systemctl restart flavoros-api
 ```
 
 ---
@@ -278,8 +272,43 @@ Documented in [archive/build_vertical_slice_tasks.md](./archive/build_vertical_s
 | **I** — Channel surfaces | Done | `useChannelData`, I1–I6 surfaces + CC widgets on API data |
 | **J** — Write-back | Done | communications-first outbound actions, client/admin visibility, smoke + CI coverage |
 | **First real user** | Done | Composio OAuth live, real Gmail synced, Sinclair LLM body, Command Center wired, 54 tests pass |
+| **VPS deploy** | Done | API at api.flavoros.cc, Hostinger VPS, Cloudflare tunnel, systemd service, Postgres + Alembic 0001–0007 |
+| **Client Universe (Cursor)** | Done | Wire Client Universe: onboarding save → contexts → provider connections → universe envelope |
+| **Onboarding rewrite** | Done (bug) | Sequential single-connection form with progress bar; server-side hydration; ?reset=1 dev reset; connect-advance bug remains |
 
 ### Completed lane notes
+
+#### VPS deployment (2026-05-20)
+
+**Status:** `done`  
+**Delivered:** Production API running on Hostinger VPS accessible at `https://api.flavoros.cc`.
+
+**Shipped:**
+
+- Postgres 16 on VPS: `flavoros` DB + user, Alembic migrations 0001–0007
+- systemd service `flavoros-api` at `/opt/flavoros/api/repo/services/api`
+- Cloudflare named tunnel `bcc8b555-8eb5-495e-943e-5a99f93c8528` routing `api.flavoros.cc` → `127.0.0.1:8008`
+- Vercel env `NEXT_PUBLIC_FLAVOROS_API_URL=https://api.flavoros.cc` for production frontend
+- `.env` on VPS with production secrets (git-ignored)
+
+**Manual deploy:** `ssh root@2.24.65.59`, `cd /opt/flavoros/api/repo && git pull && systemctl restart flavoros-api`
+
+#### Onboarding rewrite (2026-05-20–21)
+
+**Status:** `done` (with known connect-advance bug — see Lane O)  
+**Delivered:** Sequential onboarding flow with progress bar, server-side hydration, dev reset.
+
+**Shipped:**
+
+- Step 3 shows ONE connection at a time with `currentSlotIndex` state
+- ProgressBar component replaces StepIndicator
+- Server-side hydration on mount: `GET /contexts` + `GET /providers` rebuild React state
+- Contexts sorted personal → professional → business
+- OAuth opens in new tab, current page advances immediately
+- `DELETE /onboarding/reset` endpoint + `?reset=1` query param for dev testing
+- Backend: `identity` optional in `OnboardingSaveRequest`, `contexts` defaults to empty list
+
+**Known bug:** After OAuth return, the page sometimes doesn't advance to the next account or shows incorrect state. See Lane O.
 
 #### First real user (2026-05-19)
 
