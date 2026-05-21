@@ -1,0 +1,55 @@
+# Lane P: auto-deploy API to Hostinger VPS on push to main.
+# Does not modify jobs in ci.yml or api-integration-tests.yml.
+#
+# Required GitHub repository secrets (Settings → Secrets and variables → Actions):
+#   SSH_HOST          — VPS hostname or IP (e.g. 2.24.65.59)
+#   SSH_USER          — SSH login user (e.g. root)
+#   SSH_PRIVATE_KEY   — PEM private key for SSH (full key including BEGIN/END lines)
+#
+# Optional:
+#   SSH_KNOWN_HOSTS   — output of `ssh-keyscan -H <host>`; omit to skip strict host check
+#
+# VPS layout (manual reference):
+#   Deploy path: /opt/flavoros/api/repo
+#   systemd:     flavoros-api
+#   Health:      https://api.flavoros.cc/health
+
+name: Deploy API to VPS
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "services/api/**"
+      - ".github/workflows/deploy-api.yml"
+
+concurrency:
+  group: deploy-api-vps
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: SSH deploy to Hostinger VPS
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          known_hosts: ${{ secrets.SSH_KNOWN_HOSTS }}
+          script_stop: true
+          script: |
+            set -euo pipefail
+            cd /opt/flavoros/api/repo
+            git fetch origin main
+            git checkout main
+            git pull --ff-only origin main
+            systemctl restart flavoros-api
+            systemctl is-active --quiet flavoros-api
+
+      - name: Verify production health
+        run: curl -sf --retry 5 --retry-delay 3 --retry-all-errors https://api.flavoros.cc/health
