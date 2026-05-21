@@ -6,10 +6,10 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import case, select
 from sqlalchemy.orm import Session
 
-from app.models import ClientContext, ClientUniverseEntry, Profile, ProviderConnection
+from app.models import ClientContext, ClientUniverseEntry, Profile, ProviderConnection, User
 from app.schemas import (
     ClientContextEnvelopeRead,
     ClientUniverseEnvelopeRead,
@@ -72,7 +72,17 @@ def materialize_onboarding_kv(
 
 
 def get_envelope(db: Session, client_id: uuid.UUID) -> ClientUniverseEnvelopeRead:
-    profile = db.execute(select(Profile).where(Profile.client_id == client_id)).scalar_one_or_none()
+    profile = (
+        db.execute(
+            select(Profile)
+            .join(User, Profile.user_id == User.id)
+            .where(Profile.client_id == client_id)
+            .order_by(case((User.role == "client", 0), else_=1), Profile.created_at.desc())
+            .limit(1)
+        )
+        .scalars()
+        .first()
+    )
 
     contexts = (
         db.execute(

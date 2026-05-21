@@ -7,11 +7,15 @@ from sqlalchemy.orm import Session
 
 from app.adapters.gbrain import LocalFileGBrainAdapter
 from app.agent_context import assemble_agent_context
-from app.models import ClientContext, ClientUniverseEntry, ProviderConnection
+from app.models import ClientContext, ClientUniverseEntry, Profile, ProviderConnection, User
 from app.universe_registry import DEPRECATED_KV_CATEGORIES
 
 
-def test_materialize_onboarding_kv_categories(client: TestClient, auth_headers_a: dict, db: Session):
+def test_materialize_onboarding_kv_categories(
+    client: TestClient,
+    auth_headers_a: dict,
+    db: Session,
+):
     resp = client.post(
         "/onboarding/save",
         json={
@@ -93,6 +97,49 @@ def test_get_envelope_and_readiness(client: TestClient, auth_headers_a: dict, db
     ready = ready_resp.json()
     assert ready["client_id"]
     assert "flags" in ready
+
+
+def test_readiness_prefers_client_profile_when_tenant_has_admin_profile(
+    client: TestClient,
+    auth_headers_a: dict,
+    db: Session,
+    tenant_a,
+):
+    save_resp = client.post(
+        "/onboarding/save",
+        json=_minimal_onboarding_payload(display_name="Client Profile"),
+        headers=auth_headers_a,
+    )
+    assert save_resp.status_code == 200
+
+    admin_user = User(
+        email="admin@a.com",
+        hashed_password="unused",
+        tenant_id=tenant_a.id,
+        role="developer_admin",
+    )
+    db.add(admin_user)
+    db.flush()
+    db.add(
+        Profile(
+            client_id=tenant_a.id,
+            user_id=admin_user.id,
+            display_name="Admin Profile",
+            timezone="UTC",
+            preferences={},
+        )
+    )
+    db.commit()
+
+    # Regression: ISSUE-001 — duplicate tenant profiles crashed /universe/readiness.
+    # Found by /qa on 2026-05-21.
+    # Report: .gstack/qa-reports/qa-report-localhost-2026-05-21.md
+    ready_resp = client.get("/universe/readiness", headers=auth_headers_a)
+    assert ready_resp.status_code == 200
+
+    env_resp = client.get("/universe/envelope", headers=auth_headers_a)
+    assert env_resp.status_code == 200
+    assert env_resp.json()["profile"]["display_name"] == "Client Profile"
 
 
 def test_export_yaml_slices(client: TestClient, auth_headers_a: dict, db: Session):
