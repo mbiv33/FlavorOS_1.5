@@ -33,7 +33,7 @@
 
 | Lane | Owner | Status | Branch | Allowed paths | Open PR | Notes |
 |---|---|---|---|---|---|---|
-| O — Fix onboarding connect-advance | Cursor agent | `in_progress` | `main` | `apps/flavoros/src/app/onboarding/page.tsx`, `services/api/app/routers/onboarding.py`, `services/api/app/schemas.py` | — | OAuth return + original-tab stale state |
+| — | — | — | — | — | — | *(none — claim one lane from Ready lanes below)* |
 
 ## Ready lanes (unlocked — pick one)
 
@@ -94,7 +94,8 @@ When done: move your lane out of Active parallel lanes, update the Completed lan
 | M — Calendar write-back | Session | `done` | `send_calendar_hold` / `googlecalendar` / `calendar_create_hold`; client queue + seed + tests |
 | VPS deploy | Session | `done` | api.flavoros.cc live: Hostinger VPS, systemd, Cloudflare tunnel, Postgres + Alembic 0001–0007 |
 | Client Universe (Cursor) | Cursor | `done` | Wire Client Universe: onboarding → contexts → provider connections → universe envelope |
-| Onboarding rewrite | Session | `done` | Sequential single-connection form + progress bar; server-side hydration; ?reset=1; connect-advance bug remains (Lane O) |
+| O — Onboarding connect-advance | Cursor agent | `done` | Prod verified 2026-05-21: `flavoros.vercel.app/onboarding` — step 3 messages/buttons/advance after OAuth; `advanceToNextSlotFrom` + `preserveUiAdvance` |
+| Onboarding rewrite | Session | `done` | Sequential single-connection form + progress bar; server-side hydration; ?reset=1; connect-advance closed in Lane O |
 
 ### Lane I sub-lanes (complete)
 
@@ -112,11 +113,8 @@ When done: move your lane out of Active parallel lanes, update the Completed lan
 
 | Timestamp | Agent | Lane | Action |
 |---|---|---|---|
-| 2026-05-19 (Phase 0) EDT | Subagent | Phase 0 | Baseline verified: pytest 30 pass, tsc clean, smoke OK; stale :8001 API replaced (migration 0005 + uvicorn restart) |
-| 2026-05-19 | Cursor agent | M + Gate K | Lane M done: calendar_outbound + seed googlecalendar hold approval; calendar page outbound queue; executeOutboundAction in api.ts; pytest 35 pass (incl. calendar defer+execute); tsc clean; smoke not run (needs API :8001) |
-| 2026-05-19 | Cursor agent | K1 | Lane K1 done: enqueue_for_approval + execute_outbound split; defer-by-default on approve; POST execute + 409 on non-queued; GmailOutboundAdapter stub; pytest test_outbound_actions 11 pass |
-| 2026-05-19 | Cursor agent | K2 | Lane K2 done: pull-back on comms queue (queued only); optimistic decide via outbound_action; execution_result_json snippets; admin outbound filters + overview counts via admin-api; removed fake PileItemList pull-back; tsc clean |
-| 2026-05-19 (K3) | Session | K3 | Smoke status asserts + defer path; runbook restart/migrate; CI outbound tests; handoff post-deploy checklist |
+| 2026-05-21 | User + agent | O | **Lane O done:** prod onboarding verified at https://flavoros.vercel.app/onboarding — page messages, buttons, and step advance work after OAuth |
+| 2026-05-21 | Cursor agent | O | Code: `advanceToNextSlotFrom` after `window.open`, `oauthAdvanceFromIndexRef` + `preserveUiAdvance` on refresh/poll; commits `6e0cb94`/`f23ecf9`; tsc clean |
+| 2026-05-20–21 | Session | Onboarding | Rewrite step 3 as sequential form + progress bar; server hydration; `?reset=1`; OAuth new-tab |
+| 2026-05-20 | Cursor | Client Universe | Wire Client Universe: onboarding save, contexts, provider connections, universe envelope |
 | 2026-05-20 | Session | VPS deploy | Full VPS deployment: Postgres, systemd, Cloudflare tunnel, api.flavoros.cc live, Vercel env updated |
-| 2026-05-20 | Cursor | Client Universe | Wire Client Universe: ruff E501 fixes, onboarding save, contexts, provider connections, universe envelope |
-| 2026-05-20–21 | Session | Onboarding | Rewrite step 3 as sequential form + progress bar; server hydration; ?reset=1 reset; OAuth new-tab; multiple bug fixes |

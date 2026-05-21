@@ -356,6 +356,8 @@ function OnboardingInner() {
     readOauthTabCompleteFlag,
   );
   const oauthCallbackHandledRef = useRef(false);
+  /** Slot index we advanced from when OAuth opened in another tab (avoid refresh snapping back). */
+  const oauthAdvanceFromIndexRef = useRef<number | null>(null);
 
   const slotId = useCallback(
     (s: ProviderSlot) => `${s.contextKey}__${s.provider}`,
@@ -384,15 +386,46 @@ function OnboardingInner() {
           : "Complete";
 
   const refreshProviderSlots = useCallback(
-    async (sess: FlavorOSSession, drafts: ContextDraft[]) => {
+    async (
+      sess: FlavorOSSession,
+      drafts: ContextDraft[],
+      options?: { preserveUiAdvance?: boolean },
+    ) => {
       const conns = await listProviderConnections(sess);
       const expected = buildSlotsFromContexts(drafts, conns);
+      setSlots(expected);
+
+      const allDone = firstUnconnectedSlotIndex(expected) === -1;
+      if (allDone) {
+        setStep(4);
+        setCurrentSlotIndex(expected.length);
+        setAwaitingOAuthReturn(false);
+        oauthAdvanceFromIndexRef.current = null;
+        return;
+      }
+
+      const fromIndex = oauthAdvanceFromIndexRef.current;
+      if (options?.preserveUiAdvance && fromIndex !== null) {
+        const nextAfterPending = expected.findIndex(
+          (s, i) => i > fromIndex && !isConnected(s.connection),
+        );
+        setStep(3);
+        setCurrentSlotIndex(
+          nextAfterPending === -1
+            ? Math.max(fromIndex + 1, firstUnconnectedSlotIndex(expected))
+            : nextAfterPending,
+        );
+        return;
+      }
+
       const { step: nextStep, currentSlotIndex: nextIndex } =
         applyStep3FromSlots(expected);
-      setSlots(expected);
       setStep(nextStep);
       setCurrentSlotIndex(nextIndex);
-      if (nextStep === 4) setAwaitingOAuthReturn(false);
+      if (nextStep === 4) {
+        setAwaitingOAuthReturn(false);
+        oauthAdvanceFromIndexRef.current = null;
+      }
     },
     [],
   );
@@ -423,6 +456,7 @@ function OnboardingInner() {
         setAwaitingOAuthReturn(false);
         setOauthTabComplete(false);
         clearOauthTabComplete();
+        oauthAdvanceFromIndexRef.current = null;
         window.history.replaceState({}, "", "/onboarding");
         return;
       }
@@ -483,7 +517,9 @@ function OnboardingInner() {
 
     const onVisible = () => {
       if (document.visibilityState !== "visible") return;
-      void refreshProviderSlots(session, contexts).catch((err) => {
+      void refreshProviderSlots(session, contexts, {
+        preserveUiAdvance: awaitingOAuthReturn,
+      }).catch((err) => {
         setError(
           err instanceof Error ? err.message : "Failed to refresh connections",
         );
@@ -503,7 +539,7 @@ function OnboardingInner() {
       document.removeEventListener("visibilitychange", onVisible);
       window.removeEventListener("storage", onStorage);
     };
-  }, [session, step, contexts, refreshProviderSlots]);
+  }, [session, step, contexts, awaitingOAuthReturn, refreshProviderSlots]);
 
   // Poll while OAuth runs in another tab (focus/storage alone is easy to miss)
   useEffect(() => {
@@ -522,9 +558,10 @@ function OnboardingInner() {
       }
       if (!awaitingOAuthReturn && !oauthDone) return;
 
-      void refreshProviderSlots(session, contexts)
+      void refreshProviderSlots(session, contexts, {
+        preserveUiAdvance: true,
+      })
         .then(() => {
-          setAwaitingOAuthReturn(false);
           setMessage(null);
         })
         .catch((err) => {
@@ -537,14 +574,7 @@ function OnboardingInner() {
     tick();
     const id = window.setInterval(tick, 1200);
     return () => window.clearInterval(id);
-  }, [
-    session,
-    step,
-    contexts,
-    slots,
-    awaitingOAuthReturn,
-    refreshProviderSlots,
-  ]);
+  }, [session, step, contexts, awaitingOAuthReturn, refreshProviderSlots]);
 
   // ── Step 1: save identity ─────────────────────────────────────────────────
   async function handleIdentityContinue() {
@@ -742,17 +772,16 @@ function OnboardingInner() {
             )
           : contexts;
       setContexts(nextContexts);
-      setSlots((prev) =>
-        prev.map((s) =>
-          slotId(s) === slotId(slot)
-            ? {
-                ...s,
-                connection: conn,
-                accountEmail: slot.accountEmail || conn.account_alias || "",
-              }
-            : s,
-        ),
+      const slotsWithConn = slots.map((s) =>
+        slotId(s) === slotId(slot)
+          ? {
+              ...s,
+              connection: conn,
+              accountEmail: slot.accountEmail || conn.account_alias || "",
+            }
+          : s,
       );
+      setSlots(slotsWithConn);
 
       // Get the OAuth URL and redirect (same tab)
       const link = await apiRequest<ProviderConnectLinkResponse>(
@@ -774,11 +803,16 @@ function OnboardingInner() {
         await refreshProviderSlots(session, nextContexts);
         setMessage("Stub provider connected for local testing.");
       } else {
+        oauthAdvanceFromIndexRef.current = currentSlotIndex;
         setAwaitingOAuthReturn(true);
         setMessage(
-          "Sign-in opened in a new tab. When you finish, return to this page — we'll advance automatically.",
+          "Sign-in opened in a new tab. Connect the next account here while you finish sign-in in the other tab.",
         );
         window.open(link.url, "_blank", "noopener");
+        const { step: nextStep, currentSlotIndex: nextIndex } =
+          advanceToNextSlotFrom(slotsWithConn, currentSlotIndex);
+        setStep(nextStep);
+        setCurrentSlotIndex(nextIndex);
       }
       setBusy(false);
     } catch (err) {
