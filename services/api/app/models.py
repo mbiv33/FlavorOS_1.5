@@ -531,3 +531,333 @@ class AuditEvent(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+
+
+# ---------------------------------------------------------------------------
+# Sync Checkpoint — tracks incremental sync cursor per provider connection
+# ---------------------------------------------------------------------------
+
+
+class SyncCheckpoint(Base):
+    """Last-known sync position per provider connection and checkpoint key.
+
+    checkpoint_key identifies what is being tracked, e.g. "gmail_history_id"
+    or "calendar_sync_token". checkpoint_value is the opaque cursor returned
+    by the provider. On re-sync, the ingestion path reads this value to fetch
+    only new events rather than replaying the full history.
+    """
+
+    __tablename__ = "sync_checkpoints"
+    __table_args__ = (
+        UniqueConstraint(
+            "client_id",
+            "provider_connection_id",
+            "checkpoint_key",
+            name="uq_sync_checkpoints_conn_key",
+        ),
+        Index("ix_sync_checkpoints_conn", "client_id", "provider_connection_id"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    client_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False
+    )
+    provider_connection_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("provider_connections.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    checkpoint_key: Mapped[str] = mapped_column(String(128), nullable=False)
+    checkpoint_value: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    synced_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        server_onupdate=func.now(),
+        nullable=False,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Agent Task Event — immutable step log per agent task
+# ---------------------------------------------------------------------------
+
+
+class AgentTaskEvent(Base):
+    """Append-only log of events within a single agent task execution.
+
+    event_type vocabulary: started | tool_called | llm_response | hitl_gate |
+    hitl_resumed | completed | failed | retried.
+
+    detail carries structured context: tool name, token counts, error message,
+    approval_id for HITL gates, etc. Never update — always append.
+    """
+
+    __tablename__ = "agent_task_events"
+    __table_args__ = (
+        Index("ix_agent_task_events_task_ts", "agent_task_id", "created_at"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    client_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False
+    )
+    agent_task_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("agent_tasks.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    event_type: Mapped[str] = mapped_column(String(64), nullable=False)
+    detail: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+# ---------------------------------------------------------------------------
+# Agent Report — formal work product produced by an agent task or run
+# ---------------------------------------------------------------------------
+
+
+class AgentReport(Base):
+    """Structured output envelope produced by an agent after completing work.
+
+    report_type identifies the workflow that generated it, e.g.:
+    "communication_sweep" | "morning_standup" | "cob_workday" |
+    "meeting_prep" | "finance_pulse" | "travel_horizon_scan".
+
+    An AgentReport may be promoted to a Client Artifact (artifact_id FK) once
+    it passes HITL review. Until then it lives here as the agent's raw output.
+    """
+
+    __tablename__ = "agent_reports"
+    __table_args__ = (
+        Index("ix_agent_reports_client_agent", "client_id", "agent"),
+        Index("ix_agent_reports_client_type", "client_id", "report_type"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    client_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False
+    )
+    workflow_run_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("workflow_runs.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    agent_task_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("agent_tasks.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    agent: Mapped[str] = mapped_column(String(64), nullable=False)
+    report_type: Mapped[str] = mapped_column(String(128), nullable=False)
+    summary: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    data: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    artifact_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("artifacts.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        server_onupdate=func.now(),
+        nullable=False,
+    )
+
+
+# ---------------------------------------------------------------------------
+# PAC/PTQ — buffer between inbound signals and committed execution work
+#
+# Flow (runs as workflow.pac_ptq_review, nightly + event-driven, Khadijah):
+#
+#   normalized_items / provider_events / agent_reports
+#           │
+#           ▼
+#   pending_action_candidates  ←── idempotency_key dedupe
+#     status: pending → scoring → incubating → converting → converted
+#                                           ↘ disqualified / purged
+#           │
+#           ▼
+#   qualification_checks  ←── one row per score pass
+#     recommendation → decided_outcome (HITL can override)
+#           │
+#           ▼
+#   pac_events  ←── append-only lifecycle log
+#           │
+#           ▼ (on "convert")
+#   workflow_runs → agent_tasks → artifacts → Client Universe
+#
+# ---------------------------------------------------------------------------
+
+
+class PendingActionCandidate(Base):
+    """Possible work buffered before PTQ decides if it becomes committed work.
+
+    source_type identifies the originating record kind:
+      "normalized_item" | "provider_event" | "agent_report" | "manual"
+    source_id is the UUID of that record (polymorphic — no FK enforced).
+
+    idempotency_key prevents duplicate PACs for the same underlying signal.
+    Format: "{source_type}:{source_id}" or a provider-native key when the
+    signal arrives before normalization.
+
+    status vocabulary:
+      pending → scoring → incubating → converting → converted
+                                    ↘ disqualified | purged
+
+    incubate_until: when set, the PTQ cron skips this PAC until the datetime
+    passes, then re-scores it. Supports "check back in 3 days" incubation.
+
+    resolved_workflow_run_id: set when outcome is "convert"; links the PAC
+    to the workflow run that executed the promoted work.
+    """
+
+    __tablename__ = "pending_action_candidates"
+    __table_args__ = (
+        UniqueConstraint(
+            "client_id", "idempotency_key", name="uq_pac_client_idempotency"
+        ),
+        Index("ix_pac_client_status", "client_id", "status"),
+        Index("ix_pac_client_originator", "client_id", "originator_agent"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    client_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False
+    )
+    originator_agent: Mapped[str] = mapped_column(String(64), nullable=False)
+    source_type: Mapped[str] = mapped_column(String(64), nullable=False)
+    source_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), nullable=True
+    )
+    idempotency_key: Mapped[str] = mapped_column(String(255), nullable=False)
+    title: Mapped[str] = mapped_column(String(512), nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="pending")
+    score_data: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    resolution_outcome: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    resolved_workflow_run_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("workflow_runs.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    incubate_until: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    resolved_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        server_onupdate=func.now(),
+        nullable=False,
+    )
+
+
+class QualificationCheck(Base):
+    """One PTQ scoring pass against a PendingActionCandidate.
+
+    check_type vocabulary:
+      "initial"            — first score after PAC creation
+      "rescore"            — periodic re-evaluation of an incubating PAC
+      "promotion_tripwire" — triggered when a scoring vector crosses a threshold
+      "expiry_review"      — end-of-incubation review before purge decision
+
+    score_snapshot captures scoring vectors at the time of this check:
+      { time_urgency, relationship_gravity, milestone_alignment,
+        repeated_touches, risk, explicit_language, source_reliability }
+
+    recommendation is the system's proposed outcome. decided_outcome is what
+    actually happened — they differ when a human overrides the recommendation.
+    decided_by is null for system-decided outcomes.
+    """
+
+    __tablename__ = "qualification_checks"
+    __table_args__ = (
+        Index("ix_qual_checks_pac", "pac_id"),
+        Index("ix_qual_checks_client_ts", "client_id", "created_at"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    client_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False
+    )
+    pac_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("pending_action_candidates.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    check_type: Mapped[str] = mapped_column(String(64), nullable=False)
+    score_snapshot: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    recommendation: Mapped[str] = mapped_column(String(32), nullable=False)
+    rationale: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    decided_outcome: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    decided_by: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    decided_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class PacEvent(Base):
+    """Append-only lifecycle log for a PendingActionCandidate.
+
+    event_type vocabulary:
+      created | scored | incubated | rescored | tripwire_fired |
+      promoted | converted | redirected | disqualified | purged | hitl_override
+
+    detail carries context relevant to the event: score delta, override reason,
+    target workflow_run_id on convert, redirect target on redirect, etc.
+    Never update — always append.
+    """
+
+    __tablename__ = "pac_events"
+    __table_args__ = (
+        Index("ix_pac_events_pac_ts", "pac_id", "created_at"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    client_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False
+    )
+    pac_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("pending_action_candidates.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    event_type: Mapped[str] = mapped_column(String(64), nullable=False)
+    detail: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
