@@ -96,6 +96,42 @@ class Profile(Base):
     user: Mapped[User] = relationship(back_populates="profile")
 
 
+class InviteToken(Base):
+    """Single-use, time-limited invite for onboarding a user (new or existing tenant).
+
+    Opaque tokens are stored as SHA-256 hashes; the raw token is returned once at
+    creation. See auth router docstring for why we use a table vs signed JWT-only.
+    """
+
+    __tablename__ = "invite_tokens"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, nullable=False, index=True)
+    email: Mapped[str] = mapped_column(String(320), nullable=False)
+    role: Mapped[str] = mapped_column(String(32), nullable=False, default="client")
+    # Join existing tenant when set; null means register creates a new tenant.
+    tenant_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=True
+    )
+    new_tenant_slug: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    new_tenant_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    used_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    used_by_user_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    created_by_user_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    tenant: Mapped[Optional[Tenant]] = relationship(foreign_keys=[tenant_id])
+
+
 # ---------------------------------------------------------------------------
 # Client Context — named operational context per client tenant
 # ---------------------------------------------------------------------------
