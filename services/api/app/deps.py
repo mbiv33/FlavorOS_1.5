@@ -15,6 +15,7 @@ from app.adapters import (
     ComposioAdapter,
     GBrainAdapter,
     GBrainCliAdapter,
+    InProcessOrchestratorAdapter,
     LocalFileGBrainAdapter,
     OrchestratorAdapter,
     RealComposioAdapter,
@@ -144,5 +145,12 @@ def get_gbrain(settings: Annotated[Settings, Depends(get_settings)]) -> GBrainAd
     return _gbrain_stub
 
 
-def get_orchestrator() -> OrchestratorAdapter:
+_in_process_orchestrator: OrchestratorAdapter = InProcessOrchestratorAdapter()
+
+
+def get_orchestrator(
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> OrchestratorAdapter:
+    if settings.orchestrator_adapter == "in_process":
+        return _in_process_orchestrator
     return _orchestrator

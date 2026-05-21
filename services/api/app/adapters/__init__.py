@@ -21,7 +21,11 @@ from app.adapters.gmail_outbound import (
     apply_send_result,
     get_gmail_outbound_adapter,
 )
-from app.adapters.orchestrator import OrchestratorAdapter, StubOrchestratorAdapter
+from app.adapters.orchestrator import (
+    InProcessOrchestratorAdapter,
+    OrchestratorAdapter,
+    StubOrchestratorAdapter,
+)
 
 __all__ = [
     "ComposioAdapter",
@@ -37,6 +41,7 @@ __all__ = [
     "StubGmailOutboundAdapter",
     "apply_send_result",
     "get_gmail_outbound_adapter",
+    "InProcessOrchestratorAdapter",
     "OrchestratorAdapter",
     "StubOrchestratorAdapter",
 ]
