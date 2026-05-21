@@ -40,6 +40,7 @@ class Settings(BaseSettings):
     anthropic_api_key: str = ""
     gbrain_adapter: str = "stub"
     gbrain_store_dir: str = ".gbrain/flavoros-ingest"
+    gbrain_cli_path: str = "gbrain"
 
     @field_validator("database_url")
     @classmethod

@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 from app.adapters import (
     ComposioAdapter,
     GBrainAdapter,
+    GBrainCliAdapter,
     LocalFileGBrainAdapter,
     OrchestratorAdapter,
     RealComposioAdapter,
@@ -113,6 +114,7 @@ _composio_stub: ComposioAdapter = StubComposioAdapter()
 _composio_real_cache: dict[str, ComposioAdapter] = {}
 _gbrain_stub: GBrainAdapter = StubGBrainAdapter()
 _gbrain_file_cache: dict[str, GBrainAdapter] = {}
+_gbrain_cli_cache: dict[str, GBrainAdapter] = {}
 _orchestrator: OrchestratorAdapter = StubOrchestratorAdapter()
 
 
@@ -127,6 +129,12 @@ def get_composio(settings: Annotated[Settings, Depends(get_settings)]) -> Compos
 
 
 def get_gbrain(settings: Annotated[Settings, Depends(get_settings)]) -> GBrainAdapter:
+    if settings.gbrain_adapter == "cli":
+        if settings.gbrain_cli_path not in _gbrain_cli_cache:
+            _gbrain_cli_cache[settings.gbrain_cli_path] = GBrainCliAdapter(
+                cli_path=settings.gbrain_cli_path
+            )
+        return _gbrain_cli_cache[settings.gbrain_cli_path]
     if settings.gbrain_adapter == "local_file":
         if settings.gbrain_store_dir not in _gbrain_file_cache:
             _gbrain_file_cache[settings.gbrain_store_dir] = LocalFileGBrainAdapter(

@@ -7,7 +7,7 @@ Swap in real implementations via ``deps.py`` dependency overrides.
 """
 
 from app.adapters.composio import ComposioAdapter, RealComposioAdapter, StubComposioAdapter
-from app.adapters.gbrain import GBrainAdapter, LocalFileGBrainAdapter, StubGBrainAdapter
+from app.adapters.gbrain import GBrainAdapter, GBrainCliAdapter, LocalFileGBrainAdapter, StubGBrainAdapter
 from app.adapters.gmail_outbound import (
     GmailOutboundAdapter,
     OutboundSendResult,
@@ -23,6 +23,7 @@ __all__ = [
     "RealComposioAdapter",
     "StubComposioAdapter",
     "GBrainAdapter",
+    "GBrainCliAdapter",
     "LocalFileGBrainAdapter",
     "StubGBrainAdapter",
     "GmailOutboundAdapter",
