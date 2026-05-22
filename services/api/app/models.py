@@ -331,6 +331,9 @@ class OutboundAction(Base):
     payload_json: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     idempotency_key: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     last_error_summary: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    scheduled_send_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     executed_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True
     )

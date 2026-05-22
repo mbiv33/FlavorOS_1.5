@@ -16,6 +16,7 @@ from sqlalchemy import create_engine, event
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from app.adapters.gmail_outbound import StubGmailOutboundAdapter, set_gmail_outbound_adapter
 from app.config import Settings
 from app.database import Base
 from app.deps import get_db, get_settings
@@ -39,6 +40,14 @@ def _set_sqlite_pragma(dbapi_conn, _connection_record):
 
 
 TestSession = sessionmaker(bind=TEST_ENGINE, autoflush=False, autocommit=False)
+
+
+@pytest.fixture(autouse=True)
+def stub_gmail_outbound_adapter() -> Generator[None, None, None]:
+    """Tests always use stub send; ignore COMPOSIO_API_KEY from the host env."""
+    set_gmail_outbound_adapter(StubGmailOutboundAdapter())
+    yield
+    set_gmail_outbound_adapter(StubGmailOutboundAdapter())
 
 
 @pytest.fixture(autouse=True)
@@ -134,7 +143,10 @@ def client(db: Session, settings: Settings) -> TestClient:
 
     app.dependency_overrides[get_db] = _override_get_db
     app.dependency_overrides[get_settings] = lambda: settings
-    return TestClient(app)
+    with TestClient(app) as test_client:
+        # Lifespan may wire Composio when COMPOSIO_API_KEY is set in the shell env.
+        set_gmail_outbound_adapter(StubGmailOutboundAdapter())
+        yield test_client
 
 
 @pytest.fixture()

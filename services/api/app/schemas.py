@@ -230,6 +230,7 @@ class OutboundActionRead(BaseModel):
     payload_json: Optional[dict]
     idempotency_key: Optional[str]
     last_error_summary: Optional[str]
+    scheduled_send_at: Optional[datetime] = None
     executed_at: Optional[datetime]
     execution_result_json: Optional[dict]
     created_at: datetime

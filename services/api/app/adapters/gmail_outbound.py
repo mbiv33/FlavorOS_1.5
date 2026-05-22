@@ -163,12 +163,28 @@ def set_gmail_outbound_adapter(adapter: GmailOutboundAdapter) -> None:
 def apply_send_result(
     outbound: OutboundAction, result: OutboundSendResult | SendDraftResult,
 ) -> None:
-    outbound.status = "executed"
-    outbound.executed_at = datetime.now(timezone.utc)
+    now = datetime.now(timezone.utc)
+    outbound.updated_at = now
+    if isinstance(result, SendDraftResult):
+        success = result.success
+        external_id = result.external_result_id
+        receipt_status = result.receipt_status
+        summary = result.response_summary or (result.error or "send failed")
+    else:
+        success = True
+        external_id = result.external_result_id
+        receipt_status = result.receipt_status
+        summary = result.response_summary
     outbound.execution_result_json = {
         "provider": outbound.provider,
-        "external_result_id": result.external_result_id,
-        "receipt_status": result.receipt_status,
-        "response_summary": result.response_summary,
+        "external_result_id": external_id,
+        "receipt_status": receipt_status,
+        "response_summary": summary,
     }
-    outbound.updated_at = datetime.now(timezone.utc)
+    if success:
+        outbound.status = "executed"
+        outbound.executed_at = now
+        outbound.last_error_summary = None
+    else:
+        outbound.status = "failed"
+        outbound.last_error_summary = summary[:500]

@@ -182,6 +182,7 @@ def test_approve_comms_creates_outbound_executed(
     auth_headers_a: dict,
     monkeypatch: pytest.MonkeyPatch,
 ):
+    monkeypatch.setenv("OUTBOUND_INLINE_EXECUTE_ON_APPROVE", "true")
     monkeypatch.setenv("OUTBOUND_DEFER_EXECUTION", "false")
     _make_gmail_connection(db, tenant_a)
     art = _make_comms_draft(db, tenant_a)
@@ -293,6 +294,7 @@ def test_outbound_execution_failure(
     auth_headers_a: dict,
     monkeypatch: pytest.MonkeyPatch,
 ):
+    monkeypatch.setenv("OUTBOUND_INLINE_EXECUTE_ON_APPROVE", "true")
     monkeypatch.setenv("OUTBOUND_DEFER_EXECUTION", "false")
     _make_gmail_connection(db, tenant_a)
     art = _make_comms_draft(db, tenant_a)
@@ -378,6 +380,7 @@ def test_execute_on_executed_returns_409(
     auth_headers_a: dict,
     monkeypatch: pytest.MonkeyPatch,
 ):
+    monkeypatch.setenv("OUTBOUND_INLINE_EXECUTE_ON_APPROVE", "true")
     monkeypatch.setenv("OUTBOUND_DEFER_EXECUTION", "false")
     _make_gmail_connection(db, tenant_a)
     art = _make_comms_draft(db, tenant_a)
@@ -398,6 +401,29 @@ def test_execute_on_executed_returns_409(
     )
     assert again.status_code == 409
     assert "executed" in again.json()["detail"]
+
+
+def test_execute_retries_failed_outbound(
+    client: TestClient,
+    db: Session,
+    tenant_a: Tenant,
+    auth_headers_a: dict,
+):
+    _make_gmail_connection(db, tenant_a)
+    art = _make_comms_draft(db, tenant_a)
+    appr = _make_comms_approval(db, tenant_a, art.id)
+    outbound = _make_outbound(db, tenant_a, appr, status="failed")
+    outbound.last_error_summary = "composio rejected"
+    db.add(outbound)
+    db.commit()
+
+    execute = client.post(
+        f"/outbound-actions/{outbound.id}/execute",
+        headers=auth_headers_a,
+    )
+    assert execute.status_code == 200
+    assert execute.json()["status"] == "executed"
+    assert execute.json()["last_error_summary"] is None
 
 
 def _make_gcal_connection(db: Session, tenant: Tenant) -> ProviderConnection:

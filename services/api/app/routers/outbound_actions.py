@@ -114,7 +114,12 @@ def execute_outbound_action(outbound_id: uuid.UUID, tu: TenantUser, db: DB):
             status_code=status.HTTP_409_CONFLICT,
             detail="Outbound action already executed",
         )
-    if outbound.status != "queued":
+    if outbound.status == "failed":
+        outbound.status = "queued"
+        outbound.last_error_summary = None
+        outbound.execution_result_json = None
+        outbound.updated_at = datetime.now(timezone.utc)
+    elif outbound.status != "queued":
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"Cannot execute outbound in status {outbound.status}",

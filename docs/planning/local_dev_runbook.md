@@ -94,6 +94,16 @@ SMOKE_OUTBOUND_DEFER=1 ./scripts/smoke-vertical-slice.sh
 
 Expect `queued` in the decide response and in `GET /outbound-actions`. Default demo/dev should leave defer **off** so approve → executed remains the investor path.
 
+**Batch send windows (10:00 / 13:00 / 16:00 local):** by default, approved communication drafts enqueue with `scheduled_send_at` and stay `queued` until dispatch. Run due sends manually or on cron:
+
+```bash
+cd services/api
+source .venv/bin/activate
+PYTHONPATH=. python scripts/dispatch_outbound_due.py
+```
+
+Optional env: `OUTBOUND_DEFAULT_TIMEZONE`, `OUTBOUND_BATCH_HOURS=10,13,16`, `OUTBOUND_INLINE_EXECUTE_ON_APPROVE=true` to restore inline send on approve (demo/investor path).
+
 ## Start API
 
 From `services/api` with venv active:

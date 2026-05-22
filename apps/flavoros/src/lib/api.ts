@@ -88,6 +88,7 @@ export type OutboundActionRead = {
   payload_json: Record<string, unknown> | null;
   idempotency_key: string | null;
   last_error_summary: string | null;
+  scheduled_send_at: string | null;
   executed_at: string | null;
   execution_result_json: Record<string, unknown> | null;
   created_at: string;
@@ -224,6 +225,40 @@ export async function getUniverseReadiness(
 
 export async function listArtifacts(session: FlavorOSSession): Promise<ArtifactRead[]> {
   return apiRequest<ArtifactRead[]>("/artifacts", session);
+}
+
+export type ArtifactCreatePayload = {
+  kind: "client" | "sigma";
+  title: string;
+  body?: string | null;
+  meta?: Record<string, unknown> | null;
+  status?: "draft" | "ready";
+};
+
+export async function createArtifact(
+  session: FlavorOSSession,
+  body: ArtifactCreatePayload,
+): Promise<ArtifactRead> {
+  return apiRequest<ArtifactRead>("/artifacts", session, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export type ApprovalCreatePayload = {
+  artifact_id: string;
+  governed_action: string;
+  reason?: string | null;
+};
+
+export async function createApproval(
+  session: FlavorOSSession,
+  body: ApprovalCreatePayload,
+): Promise<ApprovalRead> {
+  return apiRequest<ApprovalRead>("/approvals", session, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
 }
 
 export async function listApprovals(

@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.adapters.gmail_outbound import apply_send_result, get_gmail_outbound_adapter
 from app.models import Approval, Artifact, AuditEvent, OutboundAction, ProviderConnection, User
+from app.workflows.outbound_schedule import schedule_metadata
 
 COMMUNICATIONS_SEND_GOVERNED_ACTION = "send_communication_draft"
 COMMUNICATIONS_PROVIDER = "gmail"
@@ -94,12 +95,27 @@ def _audit_outbound(
     )
 
 
+def communications_use_batch_schedule() -> bool:
+    """Production comms sends queue for 10/13/16 local windows unless explicitly overridden."""
+    if os.environ.get("OUTBOUND_INLINE_EXECUTE_ON_APPROVE", "").lower() in (
+        "1",
+        "true",
+        "yes",
+    ):
+        return False
+    if os.environ.get("OUTBOUND_INLINE_EXECUTE", "").lower() in ("1", "true", "yes"):
+        return False
+    return True
+
+
 def create_outbound_for_approval(
     db: Session,
     *,
     approval: Approval,
     artifact: Artifact,
     connection: ProviderConnection,
+    scheduled_send_at: datetime | None = None,
+    scheduled_label: str | None = None,
 ) -> OutboundAction:
     meta = artifact.meta or {}
     target = {
@@ -107,6 +123,8 @@ def create_outbound_for_approval(
         "subject": meta.get("subject") or artifact.title,
         "thread_id": meta.get("thread_id"),
     }
+    if scheduled_label:
+        target["scheduled_label"] = scheduled_label
     payload = {
         "body": artifact.body,
         "subject": target.get("subject"),
@@ -127,6 +145,7 @@ def create_outbound_for_approval(
         target_reference_json=target,
         payload_json=payload,
         idempotency_key=f"approval:{approval.id}",
+        scheduled_send_at=scheduled_send_at,
     )
     db.add(outbound)
     db.flush()
@@ -222,8 +241,18 @@ def enqueue_for_approval(
     if connection is None:
         raise ValueError("No connected Gmail provider for this client")
 
+    scheduled_at, scheduled_label = schedule_metadata(
+        db,
+        client_id=approval.client_id,
+        user_id=user.id,
+    )
     outbound = create_outbound_for_approval(
-        db, approval=approval, artifact=artifact, connection=connection
+        db,
+        approval=approval,
+        artifact=artifact,
+        connection=connection,
+        scheduled_send_at=scheduled_at,
+        scheduled_label=scheduled_label,
     )
     _audit_outbound(
         db,
@@ -231,6 +260,10 @@ def enqueue_for_approval(
         actor_id=user.id,
         action="outbound.queued",
         outbound=outbound,
+        extra={
+            "scheduled_send_at": scheduled_at.isoformat(),
+            "scheduled_label": scheduled_label,
+        },
     )
     return outbound
 
@@ -260,6 +293,34 @@ def maybe_enqueue_and_execute(
     user: User,
 ) -> OutboundAction:
     outbound = enqueue_for_approval(db, approval=approval, user=user)
+    if communications_use_batch_schedule():
+        return outbound
     if _should_inline_execute() and outbound.status == "queued":
         execute_outbound_with_audit(db, outbound=outbound, user=user)
     return outbound
+
+
+def dispatch_due_outbound_actions(
+    db: Session,
+    *,
+    as_of: datetime | None = None,
+    limit: int = 100,
+) -> list[OutboundAction]:
+    """Execute queued comms outbounds whose scheduled_send_at is due (batch dispatcher)."""
+    now = as_of or datetime.now(timezone.utc)
+    rows = db.execute(
+        select(OutboundAction)
+        .where(
+            OutboundAction.status == "queued",
+            OutboundAction.provider == COMMUNICATIONS_PROVIDER,
+            OutboundAction.scheduled_send_at.isnot(None),
+            OutboundAction.scheduled_send_at <= now,
+        )
+        .order_by(OutboundAction.scheduled_send_at.asc())
+        .limit(limit)
+    ).scalars().all()
+    dispatched: list[OutboundAction] = []
+    for outbound in rows:
+        execute_outbound(db, outbound, actor_id=None, client_id=outbound.client_id)
+        dispatched.append(outbound)
+    return dispatched

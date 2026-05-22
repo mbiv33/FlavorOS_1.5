@@ -8,7 +8,13 @@ import { PileRow } from "@/components/PileRow";
 import { Card } from "@/components/Card";
 import { StatusChip } from "@/components/StatusChip";
 import { formatOutboundExecutionSnippet, mapOutboundStatusToChip } from "@/lib/mappers";
-import { loadSession, pullBackOutboundAction } from "@/lib/api";
+import {
+  createApproval,
+  createArtifact,
+  executeOutboundAction,
+  loadSession,
+  pullBackOutboundAction,
+} from "@/lib/api";
 import { useCommunicationsData } from "@/lib/hooks/useCommunicationsData";
 
 export default function CommunicationsPage() {
@@ -23,6 +29,68 @@ export default function CommunicationsPage() {
     handleAfterDecide,
   } = useCommunicationsData();
   const [pullingId, setPullingId] = useState<string | null>(null);
+  const [executingId, setExecutingId] = useState<string | null>(null);
+  const [composerTo, setComposerTo] = useState("");
+  const [composerSubject, setComposerSubject] = useState("");
+  const [composerBody, setComposerBody] = useState("");
+  const [composerBusy, setComposerBusy] = useState(false);
+  const [composerMessage, setComposerMessage] = useState<string | null>(null);
+
+  async function handleExecuteRetry(outboundId: string) {
+    const session = loadSession();
+    if (!session) return;
+    setExecutingId(outboundId);
+    try {
+      await executeOutboundAction(session, outboundId);
+      refresh();
+    } finally {
+      setExecutingId(null);
+    }
+  }
+
+  async function handlePrepareDraft() {
+    const session = loadSession();
+    if (!session) return;
+    const to = composerTo.trim();
+    const subject = composerSubject.trim();
+    const body = composerBody.trim();
+    if (!to || !subject || !body) {
+      setComposerMessage("To, subject, and body are required.");
+      return;
+    }
+    setComposerBusy(true);
+    setComposerMessage(null);
+    try {
+      const artifact = await createArtifact(session, {
+        kind: "client",
+        title: subject,
+        body,
+        status: "ready",
+        meta: {
+          artifact_type: "draft_email",
+          channel: "email",
+          to,
+          subject,
+        },
+      });
+      await createApproval(session, {
+        artifact_id: artifact.id,
+        governed_action: "send_communication_draft",
+        reason: "Client email draft prepared from Communications composer.",
+      });
+      setComposerTo("");
+      setComposerSubject("");
+      setComposerBody("");
+      setComposerMessage(
+        "Draft submitted for approval. After you approve, it queues for the next 10:00, 13:00, or 16:00 send window.",
+      );
+      refresh();
+    } catch (err) {
+      setComposerMessage(err instanceof Error ? err.message : "Could not prepare draft.");
+    } finally {
+      setComposerBusy(false);
+    }
+  }
 
   async function handlePullBack(outboundId: string) {
     const session = loadSession();
@@ -77,6 +145,7 @@ export default function CommunicationsPage() {
                   {outboundActions.slice(0, 8).map((o) => {
                     const executionSnippet = formatOutboundExecutionSnippet(o);
                     const canPullBack = o.status === "queued";
+                    const canRetry = o.status === "failed";
                     return (
                       <li
                         key={o.id}
@@ -100,6 +169,16 @@ export default function CommunicationsPage() {
                               className="rounded-md border border-border-strong px-2 py-1 text-xs font-medium hover:bg-surface-muted disabled:opacity-40"
                             >
                               {pullingId === o.id ? "Pulling…" : "Pull back"}
+                            </button>
+                          ) : null}
+                          {canRetry ? (
+                            <button
+                              type="button"
+                              disabled={executingId === o.id}
+                              onClick={() => handleExecuteRetry(o.id)}
+                              className="rounded-md border border-border-strong px-2 py-1 text-xs font-medium hover:bg-surface-muted disabled:opacity-40"
+                            >
+                              {executingId === o.id ? "Retrying…" : "Retry"}
                             </button>
                           ) : null}
                           <StatusChip status={mapOutboundStatusToChip(o.status)} />
@@ -150,6 +229,8 @@ export default function CommunicationsPage() {
                     <input
                       type="text"
                       placeholder="Pick a contact"
+                      value={composerTo}
+                      onChange={(e) => setComposerTo(e.target.value)}
                       className="flex-1 rounded-md border border-border-strong bg-surface-muted px-3 py-1.5 text-sm outline-none focus:border-ring"
                     />
                   </div>
@@ -158,19 +239,32 @@ export default function CommunicationsPage() {
                     <input
                       type="text"
                       placeholder="What's this about?"
+                      value={composerSubject}
+                      onChange={(e) => setComposerSubject(e.target.value)}
                       className="flex-1 rounded-md border border-border-strong bg-surface-muted px-3 py-1.5 text-sm outline-none focus:border-ring"
                     />
                   </div>
                   <textarea
                     placeholder="Write a draft. Sinclair will prepare it for your approval — nothing sends without you."
+                    value={composerBody}
+                    onChange={(e) => setComposerBody(e.target.value)}
                     className="h-40 w-full resize-none rounded-md border border-border-strong bg-surface-muted p-3 text-sm outline-none focus:border-ring"
                   />
+                  {composerMessage ? (
+                    <p className="text-xs text-muted-strong">{composerMessage}</p>
+                  ) : null}
                   <div className="flex items-center justify-between">
                     <p className="text-xs text-muted">
-                      Submitting creates a draft → approval, never a direct send.
+                      Approve queues for the next 10:00, 13:00, or 16:00 send window (your
+                      timezone).
                     </p>
-                    <button className="rounded-md bg-accent px-4 py-1.5 text-xs font-medium text-accent-foreground hover:opacity-90">
-                      Prepare draft
+                    <button
+                      type="button"
+                      disabled={composerBusy}
+                      onClick={handlePrepareDraft}
+                      className="rounded-md bg-accent px-4 py-1.5 text-xs font-medium text-accent-foreground hover:opacity-90 disabled:opacity-50"
+                    >
+                      {composerBusy ? "Preparing…" : "Prepare draft"}
                     </button>
                   </div>
                 </div>

@@ -46,9 +46,23 @@ export function mapOutboundStatusToChip(status: OutboundStatus): CardStatus {
 export function formatOutboundExecutionSnippet(
   outbound: Pick<
     OutboundActionRead,
-    "status" | "last_error_summary" | "execution_result_json"
+    | "status"
+    | "last_error_summary"
+    | "execution_result_json"
+    | "target_reference_json"
+    | "scheduled_send_at"
   >,
 ): string | null {
+  if (outbound.status === "queued") {
+    const label = outbound.target_reference_json?.scheduled_label;
+    if (typeof label === "string" && label) {
+      return `Scheduled ${label}`;
+    }
+    if (outbound.scheduled_send_at) {
+      return `Scheduled ${new Date(outbound.scheduled_send_at).toLocaleString()}`;
+    }
+    return "Queued for next send window";
+  }
   if (outbound.status === "failed") {
     return outbound.last_error_summary ?? "Execution failed";
   }
