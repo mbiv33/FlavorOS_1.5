@@ -35,15 +35,35 @@
 |---|---|---|---|---|---|---|
 | — | — | — | — | — | — | *(none — claim one lane from Ready lanes below)* |
 
+## Client DNA track (lanes W–Z)
+
+**Status:** Vertical slice (steps 1–5) is **complete**. Client DNA adoption is **post-MVP enrichment** — independent of merge/hardening lanes **R, S, T, V**.
+
+| Lane | Goal | Allowed paths | Depends on |
+|------|------|---------------|------------|
+| **W** | DNA canon & storage design | `docs/**` only | — |
+| **X** | Account sweep MVP | `services/api/app/workflows/`, `services/api/app/skills/`, `adapters/orchestrator.py`, `routers/providers.py`, `alembic/` | W |
+| **Y** | Parse & synthesize | `services/api/app/skills/`, `adapters/gbrain.py`, `models.py`, `alembic/`, workflows | X |
+| **Z** | HITL verify & adoption | `services/api/app/routers/`, `apps/flavoros/src/app/admin/**`, `admin-api.ts`, workflows | Y |
+
+**Canon:** [`docs/workflows/client_dna_adoption_model.md`](../workflows/client_dna_adoption_model.md), [`client_dna_adoption_build_plan.md`](./client_dna_adoption_build_plan.md). **TODOS:** TODO-7–10.
+
+**Product rule:** Onboarding wizard completes before historical DNA sweeps; Lane T does not subsume sweeps/parse (see TODO-2b scope note).
+
+**Collision:** Lane **X** owns new `account_sweep` paths in `providers.py`; Lane **V** owns per-message dedup + async first-sync only — coordinate if both touch sync in one session.
+
 ## Ready lanes (unlocked — pick one)
 
 | Lane | Blocked by | Status | Notes |
 |---|---|---|---|
-| R — Merge deploy-api.yml | Nothing | Ready | Cherry-pick `6fa9549` from `origin/parallel/lane-p-deploy`; 1 file, no conflicts expected |
-| S — Merge invite/registration | Nothing | Ready | Cherry-pick `cc0f5cf` from `origin/parallel/lane-q-invite`; resolve conflicts on `models.py`/`auth.py` |
-| T — Full client_onboarding skill | Lane S (optional) | Ready | Expand `skills/client_onboarding.py` to create universe + fan-out (TODO-2b) |
-| U — Real Gmail send | Nothing | Ready | `ComposioGmailOutboundAdapter` calling `GMAIL_SEND_EMAIL` (TODO-4) |
+| R — Merge deploy-api.yml | Nothing | **Done** | Cherry-picked `6fa9549` onto main (`c608062`) — 2026-05-22 |
+| S — Merge invite/registration | Nothing | **Done** | Cherry-picked `cc0f5cf` onto main (`d0bf663`); no conflicts — 2026-05-22 |
+| T — Full client_onboarding skill | Lane S (optional) | Ready | Orchestration-only: universe + fan-out (TODO-2b); not DNA sweeps |
 | V — Sync dedup + async | Nothing | Ready | Per-message ProviderEvent rows + migrate inline sync to orchestrator (TODO-5/6) |
+| W — DNA canon & storage | Nothing | Ready | Docs only — `client_dna_adoption_*` model + Phase 8 (TODO-7) |
+| X — Account sweep MVP | Lane W | Ready | `account_sweep` + SyncCheckpoint windows; 180d Gmail+Calendar (TODO-8) |
+| Y — Parse & synthesize | Lane X | Ready | `client_dna_parse`, GBrain `client_dna_candidate` (TODO-9) |
+| Z — HITL verify & adoption | Lane Y | Ready | Admin DNA queue + `client_dna_adoption` (TODO-10) |
 
 ## Coordination checklist (every agent, every session)
 
@@ -63,7 +83,7 @@ Check Ready lanes, then claim one lane under Active parallel lanes before editin
 You may ONLY edit paths listed for your lane or obviously-related files needed to complete it.
 Do NOT touch apps/flavoros/src/lib/api.ts, (client) routes, or services/api/ unless your lane explicitly requires it.
 Admin-only work should stay on admin-api.ts surfaces.
-Context: next_session_handoff.md, build_roadmap_assessment.md, current_build_plan.md.
+Context: next_session_handoff.md, build_roadmap_assessment.md, current_build_plan.md, client_dna_adoption_build_plan.md.
 When done: move your lane out of Active parallel lanes, update the Completed lanes archive if needed, and append a timestamped Session log row.
 ```
 
@@ -101,6 +121,7 @@ When done: move your lane out of Active parallel lanes, update the Completed lan
 | P — GitHub Actions auto-deploy | Cursor agent | `done` | `parallel/lane-p-deploy` | `.github/workflows/deploy-api.yml` | — | `6fa9549` on `origin/parallel/lane-p-deploy` |
 | N — Provider stabilization (schema) | Cursor agent | `superseded` | `parallel/lane-n-provider` | `20260521_0006/0007` migrations, PAC/PTQ/sync models | — | Migrations already in main via Phase 2 commit `9b77ce3`; branch can be deleted |
 | Q — User invite/registration | Cursor agent | `pending-merge` | `parallel/lane-q-invite` | `0008`, auth invite routes, tests | — | `cc0f5cf`; needs cherry-pick with conflict resolution (Lane S) |
+| U — Real Gmail send | Session | `done` | — | `gmail_outbound.py`, `main.py` wiring | — | `ComposioGmailOutboundAdapter` + `GMAIL_SEND_EMAIL` (TODO-4 done 2026-05-22) |
 
 ### Lane I sub-lanes (complete)
 
@@ -118,6 +139,9 @@ When done: move your lane out of Active parallel lanes, update the Completed lan
 
 | Timestamp | Agent | Lane | Action |
 |---|---|---|---|
+| 2026-05-22 | Claude Code | S | **Lane S done:** cherry-picked `cc0f5cf` → `d0bf663`; invite_tokens migration 0008; 53 tests pass; run `alembic upgrade head` on VPS |
+| 2026-05-22 | Claude Code | R | **Lane R done:** cherry-picked `6fa9549` → `c608062`; `deploy-api.yml` on main; triggers on `services/api/**` push; secrets `SSH_HOST`/`SSH_USER`/`SSH_PRIVATE_KEY` required in GitHub |
+| 2026-05-22 | Cursor agent | Planning | Client DNA adoption canon: `client_dna_adoption_model.md`, `client_dna_adoption_build_plan.md`, Phase 8 stub; lanes W–Z + TODO-7–10; U archived done |
 | 2026-05-22 | Claude (main session) | Planning | Refreshed all 3 planning docs to reflect Phases 2–7 complete; renamed active lanes to R/S/T/U/V; assessed P/N/Q branch status |
 | 2026-05-21 | Cursor agent | P/N/Q | Pushed lane branches: deploy `6fa9549`, provider schema `7d3a6fc`, invites `cc0f5cf`; `uv.lock` not committed |
 | 2026-05-21 | User + agent | O | **Lane O done:** prod onboarding verified at https://flavoros.vercel.app/onboarding — page messages, buttons, and step advance work after OAuth |

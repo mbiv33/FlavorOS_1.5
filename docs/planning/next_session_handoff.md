@@ -1,6 +1,6 @@
 # Next Session Handoff
 
-**Last updated:** 2026-05-22 (Phases 2–7 complete; orchestrator live; planning docs refreshed)  
+**Last updated:** 2026-05-22 (Phases 2–7 complete; Client DNA track W–Z documented; U/Gmail send done; Lane R merged; Lane S/invite-registration merged — run `alembic upgrade head` on VPS)  
 **Purpose:** Single entry point for a new agent session. Read this first, then the linked docs.
 
 ---
@@ -57,39 +57,39 @@ Before first commit: update your lane row in [parallel_lanes_tracker.md](./paral
 
 ## Ready work (pick one lane per session)
 
-#### R — Merge Lane P (GitHub Actions deploy-api.yml)
-
-**Paths:** `.github/workflows/deploy-api.yml`  
-**Goal:** Cherry-pick `6fa9549` from `origin/parallel/lane-p-deploy` onto `main` — adds the single workflow file that auto-deploys the API to VPS on push to main.  
-**Context:** Lane P is complete (one new file only). Main has moved far ahead; no conflict expected since the file is net-new.  
-**Verify:** After merge, trigger a push and confirm `systemctl status flavoros-api` reflects the new code on the VPS.
-
-#### S — Merge Lane Q (invite/registration) with conflict resolution
-
-**Paths:** `services/api/alembic/versions/0008_invite_tokens.py`, `services/api/app/routers/auth.py`, `services/api/app/schemas.py`, `services/api/app/models.py`, `services/api/tests/test_auth_invites.py`  
-**Goal:** Cherry-pick `cc0f5cf` from `origin/parallel/lane-q-invite` onto `main` and resolve conflicts.  
-**Context:** Lane Q added invite-only registration (`invite_tokens` table, hashed tokens, scoped invite endpoints). Main has significantly extended `models.py` and `auth.py` since the branch diverged — expect merge conflicts there. The migration and test file are net-new and should apply cleanly.  
-**After merge:** Run `alembic upgrade head` locally (migration `0008`), then `pytest tests/test_auth_invites.py`.
-
 #### T — TODO-2b: Full client_onboarding orchestration
 
 **Paths:** `services/api/app/skills/client_onboarding.py`, `docs/workflows/client_onboarding_model.md`, seed skills  
 **Goal:** Expand the `client_onboarding` skill from summary-only into real multi-step: create governed Client Universe contexts, set provider expectations, fan out to `morning_standup_seed` + `travel_research_seed`.  
 **Context:** The skill currently reads existing contexts/providers and writes a confirmation artifact. It does not yet create a governed universe or chain seed workflows. See `TODOS.md` TODO-2b.
 
-#### U — TODO-4: Real Gmail send via Composio
-
-**Paths:** `services/api/app/adapters/gmail_outbound.py`, `services/api/app/adapters/composio.py`  
-**Goal:** Replace `StubGmailOutboundAdapter` with a real `ComposioGmailOutboundAdapter` calling `GMAIL_SEND_EMAIL`.  
-**Context:** Approval → approve → draft marked `queued` → nothing actually sends. Closes MVP step 7 functionally.  
-**Requires:** `COMPOSIO_API_KEY` in env (already set on VPS); `gmail.send` OAuth scope must be included in the Composio app.
-
 #### V — TODO-5/6: Provider sync hardening (dedup + async)
 
 **Paths:** `services/api/app/routers/providers.py`, `services/api/app/workflows/provider_first_sync.py`  
 **Goal:**  
-- TODO-5: per-message `ProviderEvent` rows with idempotency key `”{provider_connection_id}:gmail:{message_id}”` (replace the one-blob approach)  
+- TODO-5: per-message `ProviderEvent` rows with idempotency key `"{provider_connection_id}:gmail:{message_id}"` (replace the one-blob approach)  
 - TODO-6: migrate `providers.py` inline `process_provider_first_sync` call to launch via orchestrator (removes the last blocking HTTP request path)
+
+**Note:** Coordinate with DNA **Lane X** if both touch `providers.py` — V owns dedup/async; X owns `account_sweep` paths.
+
+---
+
+### Client DNA adoption track (lanes W–Z)
+
+Post-MVP enrichment after governed onboarding. **Does not block** lanes R, S, T, V.
+
+| Lane | Goal | Allowed paths | Depends on |
+|------|------|---------------|------------|
+| **W** | DNA canon & storage design | `docs/**` only | — |
+| **X** | Account sweep MVP (180d Gmail+Calendar first) | `workflows/`, `skills/`, `orchestrator.py`, `routers/providers.py`, `alembic/` | W |
+| **Y** | Parse & synthesize (`client_dna_candidate`, SIGMA `client_dna`) | `skills/`, `adapters/gbrain.py`, `models.py`, `alembic/`, workflows | X |
+| **Z** | HITL verify & adoption | `routers/`, `apps/flavoros/.../admin/**`, `admin-api.ts`, workflows | Y |
+
+**Docs:** [`docs/workflows/client_dna_adoption_model.md`](../workflows/client_dna_adoption_model.md), [`client_dna_adoption_build_plan.md`](./client_dna_adoption_build_plan.md). **TODOS:** TODO-7 through TODO-10.
+
+**Sequencing:** App onboarding completes first; historical sweeps launch explicitly afterward (Lane T remains orchestration-only for `client_onboarding` — see TODO-2b scope note in `TODOS.md`).
+
+**Done (not a ready lane):** Lane **U** (real Gmail send) shipped 2026-05-22. Lane **R** (auto-deploy) shipped 2026-05-22 (`c608062`). Lane **S** (invite/registration) shipped 2026-05-22 (`d0bf663`) — run `alembic upgrade head` on VPS to apply migration 0008.
 
 ---
 
@@ -104,20 +104,18 @@ flowchart TD
   gmail_send[Lane U: Real Gmail send]
   sync_harden[Lane V: Sync dedup + async]
 
-  start --> merge_p
   start --> merge_q
   merge_q --> onboarding_skill
-  merge_p --> gmail_send
-  gmail_send --> sync_harden
+  start --> sync_harden
 ```
 
 | Week | Focus | Outcome |
 |---|---|---|
-| 1 | Lane R — Cherry-pick deploy-api.yml | Auto-deploy on push to main (no more SSH) |
+| 1 | ~~Lane R~~ — done (2026-05-22) | Auto-deploy on push to main ✓ |
 | 1 | Lane S — Cherry-pick + resolve invite/reg | New clients can be invited and self-register |
 | 1–2 | Lane T — Full client_onboarding skill | Governed Client Universe created end-to-end at onboarding |
-| 2 | Lane U — Real Gmail send | Approved drafts actually land in recipient's Gmail |
 | 2–3 | Lane V — Sync dedup + async | Incremental sync safe; no more blocking HTTP |
+| 3+ | Lanes W→Z (optional) | Client DNA adoption after onboarding baseline (see build plan) |
 
 ---
 
@@ -221,11 +219,11 @@ Current reality (as of 2026-05-22):
 
 Your assignment:
 Choose one follow-on lane and stay inside it:
-1. Lane R — Cherry-pick deploy-api.yml onto main (1 file, fast)
-2. Lane S — Cherry-pick invite/registration with conflict resolution
-3. Lane T — Full client_onboarding orchestration (TODO-2b)
-4. Lane U — Real Gmail send via Composio (TODO-4)
-5. Lane V — Provider sync dedup + async LLM call (TODO-5/6)
+1. Lane T — Full client_onboarding orchestration (TODO-2b)
+3. Lane V — Provider sync dedup + async LLM call (TODO-5/6)
+4. Lanes W–Z — Client DNA adoption (TODO-7–10; see client_dna_adoption_build_plan.md)
+
+(Lane R done 2026-05-22 — deploy-api.yml on main; Lane U done 2026-05-22 — Gmail send on main)
 
 IMPORTANT: Always explain the problem + approach before writing code. Wait for confirmation.
 

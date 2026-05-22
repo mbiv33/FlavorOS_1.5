@@ -21,6 +21,7 @@ dependencies = [
   "bcrypt>=4.0.0,<5",
   "composio-core>=0.7.0,<1",
   "anthropic>=0.40.0,<1",
+  "openai>=1.50.0,<2",
 ]
 
 [project.optional-dependencies]

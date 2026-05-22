@@ -411,16 +411,16 @@ def test_processor_llm_path_uses_sinclair_response(db: Session, tenant_a: Tenant
     """When NormalizedItem has items and Sinclair succeeds, artifact body = LLM response."""
     run = _make_workflow_run_with_items(db, tenant_a, _FAKE_ITEMS)
 
-    mock_response = MagicMock()
-    mock_response.content = [MagicMock(text="Two emails need attention: Q2 review and an invoice.")]
+    from app.llm import LLMResponse
 
-    with (
-        patch("app.workflows.provider_first_sync.get_settings") as mock_settings,
-        patch("anthropic.Anthropic") as mock_anthropic,
-    ):
-        mock_settings.return_value.anthropic_api_key = "test-key"
-        mock_anthropic.return_value.messages.create.return_value = mock_response
+    mock_resp = LLMResponse(
+        text="Two emails need attention: Q2 review and an invoice.",
+        input_tokens=100,
+        model="anthropic/claude-sonnet-4-6",
+        provider="openrouter",
+    )
 
+    with patch("app.workflows.provider_first_sync.call_llm", return_value=mock_resp):
         process_provider_first_sync(db, run.id)
 
     artifact = db.execute(
@@ -431,17 +431,20 @@ def test_processor_llm_path_uses_sinclair_response(db: Session, tenant_a: Tenant
     assert artifact.meta["items_count"] == 2
 
 
-def test_processor_llm_fallback_on_anthropic_error(db: Session, tenant_a: Tenant):
-    """When Sinclair raises, processor still creates artifact with canned body (no exception)."""
+def test_processor_llm_fallback_on_no_provider(db: Session, tenant_a: Tenant):
+    """When call_llm returns text=None, processor still creates artifact with canned body."""
     run = _make_workflow_run_with_items(db, tenant_a, _FAKE_ITEMS)
 
-    with (
-        patch("app.workflows.provider_first_sync.get_settings") as mock_settings,
-        patch("anthropic.Anthropic") as mock_anthropic,
-    ):
-        mock_settings.return_value.anthropic_api_key = "test-key"
-        mock_anthropic.return_value.messages.create.side_effect = Exception("API error")
+    from app.llm import LLMResponse
 
+    mock_resp = LLMResponse(
+        text=None,
+        input_tokens=0,
+        model="anthropic/claude-sonnet-4-6",
+        provider="none",
+    )
+
+    with patch("app.workflows.provider_first_sync.call_llm", return_value=mock_resp):
         process_provider_first_sync(db, run.id)
 
     artifact = db.execute(

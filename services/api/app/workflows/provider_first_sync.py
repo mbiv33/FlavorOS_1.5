@@ -23,7 +23,7 @@ from datetime import datetime, timezone
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.config import get_settings
+from app.llm import call_llm
 from app.models import AgentTask, Approval, Artifact, NormalizedItem, WorkflowRun
 from app.services.client_universe import get_envelope
 
@@ -66,40 +66,27 @@ def _canned_artifact(provider: str, provider_label: str) -> tuple[str, str]:
 
 
 def _call_sinclair(items: list[dict], provider: str = "gmail") -> str | None:
-    """Call Claude to summarize provider items. Returns None on any failure."""
-    settings = get_settings()
-    if not settings.anthropic_api_key:
-        return None
-
-    try:
-        import anthropic  # lazy: keeps module importable if package absent in dev
-
-        if provider == "googlecalendar":
-            message_list = "\n".join(
-                f"- {item.get('summary', '(no title)')}: "
-                f"{item.get('start', '')} to {item.get('end', '')}"
-                for item in items
-            )
-            content = f"Here are {len(items)} upcoming calendar events:\n{message_list}"
-        else:
-            message_list = "\n".join(
-                f"- {item.get('subject', '(no subject)')}: {item.get('snippet', '')}"
-                for item in items
-            )
-            content = f"Here are {len(items)} Gmail messages:\n{message_list}"
-
-        client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
-        response = client.messages.create(
-            model="claude-sonnet-4-6",
-            max_tokens=256,
-            timeout=30.0,
-            system=_sinclair_system_for_provider(provider),
-            messages=[{"role": "user", "content": content}],
+    """Call LLM as Sinclair to summarize provider items. Returns None on failure."""
+    if provider == "googlecalendar":
+        message_list = "\n".join(
+            f"- {item.get('summary', '(no title)')}: "
+            f"{item.get('start', '')} to {item.get('end', '')}"
+            for item in items
         )
-        return response.content[0].text if response.content else None
-    except Exception as exc:
-        logger.warning("Sinclair LLM call failed (using canned text): %s", exc)
-        return None
+        content = f"Here are {len(items)} upcoming calendar events:\n{message_list}"
+    else:
+        message_list = "\n".join(
+            f"- {item.get('subject', '(no subject)')}: {item.get('snippet', '')}"
+            for item in items
+        )
+        content = f"Here are {len(items)} Gmail messages:\n{message_list}"
+
+    resp = call_llm(
+        system=_sinclair_system_for_provider(provider),
+        content=content,
+        max_tokens=256,
+    )
+    return resp.text
 
 
 def process_provider_first_sync(db: Session, workflow_run_id: uuid.UUID) -> None:

@@ -21,7 +21,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.config import get_settings
+from app.llm import call_llm
 from app.models import (
     AgentReport,
     AgentTask,
@@ -67,27 +67,9 @@ def _emit(
 
 
 def _call_khadijah(content: str) -> tuple[str | None, int]:
-    """Call Claude as Khadijah. Returns (text, input_tokens)."""
-    settings = get_settings()
-    if not settings.anthropic_api_key:
-        return None, 0
-    try:
-        import anthropic
-
-        client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
-        response = client.messages.create(
-            model="claude-sonnet-4-6",
-            max_tokens=512,
-            timeout=30.0,
-            system=_KHADIJAH_SYSTEM,
-            messages=[{"role": "user", "content": content}],
-        )
-        text = response.content[0].text if response.content else None
-        tokens = getattr(response.usage, "input_tokens", 0)
-        return text, tokens
-    except Exception as exc:
-        logger.warning("Khadijah LLM call failed: %s", exc)
-        return None, 0
+    """Call LLM as Khadijah. Returns (text, input_tokens)."""
+    resp = call_llm(system=_KHADIJAH_SYSTEM, content=content)
+    return resp.text, resp.input_tokens
 
 
 @register_skill("morning_standup")
@@ -165,7 +147,7 @@ async def morning_standup(*, db: Session, task: AgentTask) -> dict[str, Any]:
         task,
         "llm_response",
         {
-            "model": "claude-sonnet-4-6",
+            "model": "anthropic/claude-sonnet-4-6",
             "input_tokens": input_tokens,
             "chars": len(llm_text) if llm_text else 0,
         },

@@ -37,6 +37,7 @@ class Settings(BaseSettings):
     api_skip_startup_seed: bool = False
     composio_api_key: str = ""
     composio_redirect_uri: str = ""
+    openrouter_api_key: str = ""
     anthropic_api_key: str = ""
     gbrain_adapter: str = "stub"
     gbrain_store_dir: str = ".gbrain/flavoros-ingest"
@@ -62,10 +63,11 @@ class Settings(BaseSettings):
 
     @field_validator("anthropic_api_key")
     @classmethod
-    def anthropic_key_required_in_prod(cls, v: str, info) -> str:
+    def llm_key_required_in_prod(cls, v: str, info) -> str:
         env = (info.data or {}).get("api_env", "development")
-        if not v and env == "production":
-            raise ValueError("ANTHROPIC_API_KEY must be set in production")
+        openrouter = (info.data or {}).get("openrouter_api_key", "")
+        if not v and not openrouter and env == "production":
+            raise ValueError("OPENROUTER_API_KEY or ANTHROPIC_API_KEY must be set in production")
         return v
 
     @field_validator("composio_api_key")

@@ -1,16 +1,21 @@
-# Lane P: auto-deploy API to Hostinger VPS on push to main.
-# Does not modify jobs in ci.yml or api-integration-tests.yml.
+# Auto-deploy API to Hostinger VPS on push to main.
 #
-# Required GitHub repository secrets (Settings → Secrets and variables → Actions):
-#   SSH_HOST          — VPS hostname or IP (e.g. 2.24.65.59)
-#   SSH_USER          — SSH login user (e.g. root)
-#   SSH_PRIVATE_KEY   — PEM private key for SSH (full key including BEGIN/END lines)
+# Required GitHub repository secrets (Settings > Secrets and variables > Actions):
+#   SSH_HOST           — VPS hostname or IP
+#   SSH_USER           — SSH login user
+#   SSH_PRIVATE_KEY    — PEM private key for SSH
+#   DATABASE_URL       — Postgres connection string
+#   JWT_SECRET         — JWT signing secret
+#   OPENROUTER_API_KEY — OpenRouter API key (primary LLM provider)
+#   ANTHROPIC_API_KEY  — Anthropic API key (fallback LLM provider)
+#   COMPOSIO_API_KEY   — Composio API key
 #
 # Optional:
-#   SSH_KNOWN_HOSTS   — output of `ssh-keyscan -H <host>`; omit to skip strict host check
+#   SSH_KNOWN_HOSTS    — output of `ssh-keyscan -H <host>`
 #
-# VPS layout (manual reference):
+# VPS layout:
 #   Deploy path: /opt/flavoros/api/repo
+#   Env file:    /etc/flavoros/api.env (written by this workflow)
 #   systemd:     flavoros-api
 #   Health:      https://api.flavoros.cc/health
 
@@ -42,14 +47,47 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           known_hosts: ${{ secrets.SSH_KNOWN_HOSTS }}
           script_stop: true
+          envs: DATABASE_URL,JWT_SECRET,OPENROUTER_API_KEY,ANTHROPIC_API_KEY,COMPOSIO_API_KEY
           script: |
             set -euo pipefail
+
+            # Write env file from GitHub Secrets
+            mkdir -p /etc/flavoros
+            cat > /etc/flavoros/api.env << ENVEOF
+            API_ENV=production
+            DATABASE_URL=${DATABASE_URL}
+            JWT_SECRET=${JWT_SECRET}
+            OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+            ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+            COMPOSIO_API_KEY=${COMPOSIO_API_KEY}
+            COMPOSIO_REDIRECT_URI=https://api.flavoros.cc/providers/callback
+            API_ORIGINS=https://flavoros.vercel.app
+            ORCHESTRATOR_ADAPTER=in_process
+            ENVEOF
+            chmod 600 /etc/flavoros/api.env
+
+            # Pull latest code
             cd /opt/flavoros/api/repo
             git fetch origin main
             git checkout main
             git pull --ff-only origin main
+
+            # Install new dependencies if needed
+            cd services/api
+            .venv/bin/pip install -q -e . 2>/dev/null || true
+
+            # Run migrations
+            .venv/bin/alembic upgrade head
+
+            # Restart and verify
             systemctl restart flavoros-api
             systemctl is-active --quiet flavoros-api
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          COMPOSIO_API_KEY: ${{ secrets.COMPOSIO_API_KEY }}
 
       - name: Verify production health
         run: curl -sf --retry 5 --retry-delay 3 --retry-all-errors https://api.flavoros.cc/health

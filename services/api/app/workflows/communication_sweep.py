@@ -18,7 +18,7 @@ from datetime import datetime, timezone
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.config import get_settings
+from app.llm import call_llm
 from app.models import AgentTask, Approval, Artifact, NormalizedItem, WorkflowRun
 from app.services.client_universe import get_envelope
 
@@ -42,39 +42,27 @@ def _sinclair_sweep_system(provider: str) -> str:
 
 
 def _call_sinclair_sweep(items: list[dict], provider: str = "gmail") -> str | None:
-    """Call Claude to summarize new provider items. Returns None on any failure."""
-    settings = get_settings()
-    if not settings.anthropic_api_key:
-        return None
-    try:
-        import anthropic
-
-        if provider == "googlecalendar":
-            lines = "\n".join(
-                f"- {i.get('summary', '(no title)')}: "
-                f"{i.get('start', '')} to {i.get('end', '')}"
-                for i in items
-            )
-            content = f"Here are {len(items)} new calendar events:\n{lines}"
-        else:
-            lines = "\n".join(
-                f"- {i.get('subject', '(no subject)')}: {i.get('snippet', '')}"
-                for i in items
-            )
-            content = f"Here are {len(items)} new Gmail messages:\n{lines}"
-
-        client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
-        response = client.messages.create(
-            model="claude-sonnet-4-6",
-            max_tokens=256,
-            timeout=30.0,
-            system=_sinclair_sweep_system(provider),
-            messages=[{"role": "user", "content": content}],
+    """Call LLM as Sinclair to summarize new provider items. Returns None on failure."""
+    if provider == "googlecalendar":
+        lines = "\n".join(
+            f"- {i.get('summary', '(no title)')}: "
+            f"{i.get('start', '')} to {i.get('end', '')}"
+            for i in items
         )
-        return response.content[0].text if response.content else None
-    except Exception as exc:
-        logger.warning("Sinclair sweep LLM call failed (using canned text): %s", exc)
-        return None
+        content = f"Here are {len(items)} new calendar events:\n{lines}"
+    else:
+        lines = "\n".join(
+            f"- {i.get('subject', '(no subject)')}: {i.get('snippet', '')}"
+            for i in items
+        )
+        content = f"Here are {len(items)} new Gmail messages:\n{lines}"
+
+    resp = call_llm(
+        system=_sinclair_sweep_system(provider),
+        content=content,
+        max_tokens=256,
+    )
+    return resp.text
 
 
 def process_communication_sweep(db: Session, workflow_run_id: uuid.UUID) -> None:
