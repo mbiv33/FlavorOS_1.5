@@ -82,6 +82,15 @@ pnpm dlx vercel deploy --prod --yes
 
 If Vercel becomes limiting, the app can still run on a VPS with Node.js 20+, pnpm 9, `pnpm --filter flavoros build`, `pnpm --filter flavoros start`, and a Caddy or nginx reverse proxy to the Next.js process.
 
+## API Deploy (Hostinger VPS — auto-deploy)
+
+- **Production API:** `https://api.flavoros.cc` (Hostinger VPS `2.24.65.59`, Cloudflare tunnel, systemd `flavoros-api`).
+- **Auto-deploy:** `.github/workflows/deploy-api.yml` runs on every push to `main` touching `services/api/**`. It SSHes to the VPS, writes `/etc/flavoros/api.env` from GitHub Secrets, pulls code, installs deps, runs `alembic upgrade head`, restarts the service, and health-checks `/health`.
+- **Secrets are the single source of truth.** All runtime config lives in **GitHub repo Secrets** (Settings → Secrets → Actions), not hand-edited on the VPS. The deploy rewrites `/etc/flavoros/api.env` every run, so never edit that file by hand — change the GitHub Secret and re-deploy.
+- **Required secrets:** `SSH_HOST`, `SSH_USER`, `SSH_PRIVATE_KEY`, `DATABASE_URL`, `JWT_SECRET`, `OPENROUTER_API_KEY`, `ANTHROPIC_API_KEY`, `COMPOSIO_API_KEY`. Optional: `SSH_FINGERPRINT`.
+- **LLM provider:** agents call `app/llm.py:call_llm()` — **OpenRouter primary** (`OPENROUTER_API_KEY`, OpenAI-compatible API, model `anthropic/claude-sonnet-4-6`), Anthropic fallback (`ANTHROPIC_API_KEY`). Per-skill model selection is planned.
+- **Manual deploy (fallback):** `ssh root@2.24.65.59`, `cd /opt/flavoros/api/repo && git pull && cd services/api && .venv/bin/alembic upgrade head && systemctl restart flavoros-api`.
+
 ## Design System
 
 - **Source of truth:** [`DESIGN.md`](DESIGN.md) (visual tokens, typography, motion, component skin rules).
