@@ -57,12 +57,6 @@ Before first commit: update your lane row in [parallel_lanes_tracker.md](./paral
 
 ## Ready work (pick one lane per session)
 
-#### T — TODO-2b: Full client_onboarding orchestration
-
-**Paths:** `services/api/app/skills/client_onboarding.py`, `docs/workflows/client_onboarding_model.md`, seed skills  
-**Goal:** Expand the `client_onboarding` skill from summary-only into real multi-step: create governed Client Universe contexts, set provider expectations, fan out to `morning_standup_seed` + `travel_research_seed`.  
-**Context:** The skill currently reads existing contexts/providers and writes a confirmation artifact. It does not yet create a governed universe or chain seed workflows. See `TODOS.md` TODO-2b.
-
 #### V — TODO-5/6: Provider sync hardening (dedup + async)
 
 **Paths:** `services/api/app/routers/providers.py`, `services/api/app/workflows/provider_first_sync.py`  
@@ -219,11 +213,10 @@ Current reality (as of 2026-05-22):
 
 Your assignment:
 Choose one follow-on lane and stay inside it:
-1. Lane T — Full client_onboarding orchestration (TODO-2b)
-3. Lane V — Provider sync dedup + async LLM call (TODO-5/6)
-4. Lanes W–Z — Client DNA adoption (TODO-7–10; see client_dna_adoption_build_plan.md)
+1. Lane V — Provider sync dedup + async LLM call (TODO-5/6)
+2. Lanes W–Z — Client DNA adoption (TODO-7–10; see client_dna_adoption_build_plan.md)
 
-(Lane R done 2026-05-22 — deploy-api.yml on main; Lane U done 2026-05-22 — Gmail send on main)
+(Lanes R, S, T, U + OpenRouter all done 2026-05-22. Parallel Cursor outbound work — "Finish client email outbound" — is uncommitted in the tree; its migration `20260522_0008` must set down_revision→`0008` before commit.)
 
 IMPORTANT: Always explain the problem + approach before writing code. Wait for confirmation.
 

@@ -58,7 +58,7 @@
 |---|---|---|---|
 | R — Merge deploy-api.yml | Nothing | **Done** | Cherry-picked `6fa9549` onto main (`c608062`) — 2026-05-22 |
 | S — Merge invite/registration | Nothing | **Done** | Cherry-picked `cc0f5cf` onto main (`d0bf663`); no conflicts — 2026-05-22 |
-| T — Full client_onboarding skill | Lane S (optional) | Ready | Orchestration-only: universe + fan-out (TODO-2b); not DNA sweeps |
+| T — Full client_onboarding skill | Lane S (optional) | **Done** | Provider expectations + seed fan-out + readiness (`c99f993`); contexts created upstream — 2026-05-22 |
 | V — Sync dedup + async | Nothing | Ready | Per-message ProviderEvent rows + migrate inline sync to orchestrator (TODO-5/6) |
 | W — DNA canon & storage | Nothing | Ready | Docs only — `client_dna_adoption_*` model + Phase 8 (TODO-7) |
 | X — Account sweep MVP | Lane W | Ready | `account_sweep` + SyncCheckpoint windows; 180d Gmail+Calendar (TODO-8) |
@@ -139,6 +139,8 @@ When done: move your lane out of Active parallel lanes, update the Completed lan
 
 | Timestamp | Agent | Lane | Action |
 |---|---|---|---|
+| 2026-05-22 | Claude Code | T | **Lane T done:** `client_onboarding` orchestration (`c99f993`) — provider_expectations + seed fan-out + readiness; 4 tests. Note: parallel Cursor outbound work uncommitted in tree (migration `20260522_0008` needs down_revision→`0008`) |
+| 2026-05-22 | Claude Code | OpenRouter | `app/llm.py` `call_llm()` OpenRouter-primary/Anthropic-fallback; all 10 skills refactored; deploy writes `/etc/flavoros/api.env` from Secrets |
 | 2026-05-22 | Claude Code | S | **Lane S done:** cherry-picked `cc0f5cf` → `d0bf663`; invite_tokens migration 0008; 53 tests pass; run `alembic upgrade head` on VPS |
 | 2026-05-22 | Claude Code | R | **Lane R done:** cherry-picked `6fa9549` → `c608062`; `deploy-api.yml` on main; triggers on `services/api/**` push; secrets `SSH_HOST`/`SSH_USER`/`SSH_PRIVATE_KEY` required in GitHub |
 | 2026-05-22 | Cursor agent | Planning | Client DNA adoption canon: `client_dna_adoption_model.md`, `client_dna_adoption_build_plan.md`, Phase 8 stub; lanes W–Z + TODO-7–10; U archived done |
