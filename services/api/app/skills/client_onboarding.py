@@ -1,17 +1,20 @@
 """Client Onboarding skill — Khadijah.
 
-Creates a governed Client Universe and initial provider readiness plan.
-Runs once at onboarding time.
-
-This is the initial implementation — it reads the current Client Universe
-state, generates a readiness summary, and emits a sigma artifact for
-agent reference. Full multi-step onboarding orchestration (context creation,
-provider expectations, seed workflow chaining) is a Phase 7 deliverable.
+Orchestrates the governed Client Universe setup at onboarding time:
+1. Reads existing contexts + provider connections (contexts are created
+   upstream at onboarding-save; this skill does not re-create them).
+2. Sets provider expectations (one KV row per connected provider).
+3. Generates an LLM orientation summary as a sigma artifact + HITL gate.
+4. Fans out to the seed workflows (morning_standup_seed,
+   travel_research_seed) to prime the agents for their first real runs.
+5. Records onboarding readiness with the child run IDs.
 
 Output:
 - AgentReport (Khadijah onboarding output)
 - Artifact (kind=sigma, internal agent reference)
 - Approval (HITL gate: client confirms onboarding context is correct)
+- provider_expectations + readiness KV rows
+- child seed WorkflowRuns (fanned out, non-blocking)
 """
 
 from __future__ import annotations
@@ -35,10 +38,65 @@ from app.models import (
     ProviderConnection,
     WorkflowRun,
 )
-from app.services.client_universe import get_envelope
+from app.services.client_universe import get_envelope, upsert_entry
 from app.skills import register_skill
 
 logger = logging.getLogger(__name__)
+
+# Seed workflows fanned out at the end of onboarding to prime the agents.
+_SEED_WORKFLOWS: tuple[str, ...] = ("morning_standup_seed", "travel_research_seed")
+
+# Expected scope per provider — written to provider_expectations KV so agents
+# know what each connection is for.
+_PROVIDER_SCOPE: dict[str, str] = {
+    "gmail": "inbox triage and communications drafting",
+    "googlecalendar": "schedule review and calendar holds",
+}
+
+
+def _set_provider_expectations(
+    db: Session,
+    client_id: uuid.UUID,
+    providers: list[ProviderConnection],
+) -> int:
+    """Write one provider_expectations KV row per connected provider."""
+    for p in providers:
+        upsert_entry(
+            db,
+            client_id=client_id,
+            category="provider_expectations",
+            key=p.provider,
+            value={
+                "provider": p.provider,
+                "status": p.status,
+                "expected_scope": _PROVIDER_SCOPE.get(
+                    p.provider, "general assistant support"
+                ),
+                "account_alias": p.account_alias,
+            },
+        )
+    db.flush()
+    return len(providers)
+
+
+async def _launch_seed_workflows(client_id: uuid.UUID) -> list[str]:
+    """Fan out to seed workflows. Returns launched child run IDs.
+
+    Each launch opens its own DB session, commits, and schedules dispatch,
+    so it is independent of the parent skill's session. Guarded: a failure
+    logs and is skipped so onboarding never breaks on fan-out.
+    """
+    from app.adapters.orchestrator import InProcessOrchestratorAdapter
+
+    orchestrator = InProcessOrchestratorAdapter()
+    child_run_ids: list[str] = []
+    for workflow_type in _SEED_WORKFLOWS:
+        try:
+            result = await orchestrator.launch(client_id, workflow_type)
+            child_run_ids.append(str(result.run_id))
+        except Exception as exc:
+            logger.warning("Onboarding fan-out to %s failed: %s", workflow_type, exc)
+    return child_run_ids
 
 _KHADIJAH_ONBOARDING_SYSTEM = (
     "You are Khadijah, FlavorOS conductor agent. "
@@ -137,7 +195,7 @@ async def client_onboarding(*, db: Session, task: AgentTask) -> dict[str, Any]:
         task,
         "llm_response",
         {
-            "model": "claude-sonnet-4-6",
+            "model": "anthropic/claude-sonnet-4-6",
             "input_tokens": input_tokens,
             "chars": len(llm_text) if llm_text else 0,
         },
@@ -206,6 +264,36 @@ async def client_onboarding(*, db: Session, task: AgentTask) -> dict[str, Any]:
 
     _emit(db, task, "hitl_gate", {"approval_id": str(approval.id)})
 
+    # Set provider expectations — one KV row per connected provider.
+    expectations_count = _set_provider_expectations(db, client_id, list(providers))
+    _emit(
+        db,
+        task,
+        "tool_called",
+        {"tool": "set_provider_expectations", "count": expectations_count},
+    )
+
+    # Fan out to seed workflows to prime the agents (non-blocking, guarded).
+    child_run_ids = await _launch_seed_workflows(client_id)
+    _emit(db, task, "fan_out", {"seed_workflows": _SEED_WORKFLOWS, "child_run_ids": child_run_ids})
+
+    # Record onboarding readiness with the fan-out result.
+    upsert_entry(
+        db,
+        client_id=client_id,
+        category="readiness",
+        key="onboarding",
+        value={
+            "status": "orchestrated",
+            "contexts": len(contexts),
+            "providers": len(providers),
+            "provider_expectations": expectations_count,
+            "seed_run_ids": child_run_ids,
+            "completed_at": datetime.now(timezone.utc).isoformat(),
+        },
+    )
+    db.flush()
+
     run = db.execute(
         select(WorkflowRun).where(WorkflowRun.id == run_id)
     ).scalar_one_or_none()
@@ -216,6 +304,8 @@ async def client_onboarding(*, db: Session, task: AgentTask) -> dict[str, Any]:
             "artifact_id": str(artifact.id),
             "approval_id": str(approval.id),
             "report_id": str(report.id),
+            "provider_expectations": expectations_count,
+            "seed_run_ids": child_run_ids,
         }
         db.flush()
 
@@ -226,4 +316,6 @@ async def client_onboarding(*, db: Session, task: AgentTask) -> dict[str, Any]:
         "onboarding_chars": len(onboarding_body),
         "contexts": len(contexts),
         "providers": len(providers),
+        "provider_expectations": expectations_count,
+        "seed_run_ids": child_run_ids,
     }
