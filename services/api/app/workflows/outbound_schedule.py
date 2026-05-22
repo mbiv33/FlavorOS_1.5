@@ -9,7 +9,7 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import Profile, Tenant
+from app.models import Profile
 
 # Local send windows: 10am, 1pm, 4pm
 DEFAULT_BATCH_HOURS = (10, 13, 16)

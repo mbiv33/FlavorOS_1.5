@@ -83,9 +83,6 @@ export function formatOutboundExecutionSnippet(
     if (receipt) return receipt;
     if (externalId) return externalId;
   }
-  if (outbound.status === "queued") {
-    return null;
-  }
   if (outbound.last_error_summary) {
     return outbound.last_error_summary;
   }
