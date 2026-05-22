@@ -11,7 +11,7 @@
 #   COMPOSIO_API_KEY   — Composio API key
 #
 # Optional:
-#   SSH_KNOWN_HOSTS    — output of `ssh-keyscan -H <host>`
+#   SSH_FINGERPRINT    — SSH host fingerprint (sha256 format)
 #
 # VPS layout:
 #   Deploy path: /opt/flavoros/api/repo
@@ -45,7 +45,7 @@ jobs:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          known_hosts: ${{ secrets.SSH_KNOWN_HOSTS }}
+          fingerprint: ${{ secrets.SSH_FINGERPRINT }}
           script_stop: true
           envs: DATABASE_URL,JWT_SECRET,OPENROUTER_API_KEY,ANTHROPIC_API_KEY,COMPOSIO_API_KEY
           script: |
