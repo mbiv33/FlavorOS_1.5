@@ -28,8 +28,15 @@ from sqlalchemy import select
 import app.skills as skill_registry
 
 # Import all skill modules so their @register_skill decorators run.
+import app.skills.client_onboarding  # noqa: F401
 import app.skills.cob_workday  # noqa: F401
+import app.skills.comms_calendar  # noqa: F401
 import app.skills.morning_standup  # noqa: F401
+import app.skills.morning_standup_seed  # noqa: F401
+import app.skills.projects_review  # noqa: F401
+import app.skills.sinclair_comms_sweep  # noqa: F401
+import app.skills.sinclair_provider_review  # noqa: F401
+import app.skills.travel_research_seed  # noqa: F401
 from app.database import SessionLocal
 from app.models import AgentTask, AgentTaskEvent
 

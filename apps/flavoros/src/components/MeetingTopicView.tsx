@@ -3,6 +3,7 @@
 import { Header } from "@/components/Header";
 import { Card, CardMeta, CardTitle } from "@/components/Card";
 import { ApprovalCard } from "@/components/ApprovalCard";
+import { WorkflowLaunchButton } from "@/components/WorkflowLaunchButton";
 import {
   MEETING_DEFINITIONS,
   MEETING_SECTIONS,
@@ -11,9 +12,20 @@ import {
 import { useMeetingsData } from "@/lib/hooks/useMeetingsData";
 import type { InboxItem } from "@/lib/fixtures";
 
+// Map meeting topics to the workflow that prepares them
+const MEETING_WORKFLOW_MAP: Record<MeetingTopic, string | null> = {
+  communications: "communication_sweep",
+  calendar: "comms_calendar",
+  travel: null,
+  projects: "projects_review",
+  "reports-artifacts": null,
+  general: null,
+};
+
 export function MeetingTopicView({ topic }: { topic: MeetingTopic }) {
   const def = MEETING_DEFINITIONS[topic];
   const sections = MEETING_SECTIONS[topic];
+  const workflowType = MEETING_WORKFLOW_MAP[topic];
   const { inboxItems, loading, error } = useMeetingsData();
 
   const attention = inboxItems.filter(
@@ -29,6 +41,7 @@ export function MeetingTopicView({ topic }: { topic: MeetingTopic }) {
         attention={attention}
         loading={loading}
         error={error}
+        workflowType={workflowType}
       />
     </>
   );
@@ -40,12 +53,14 @@ function MeetingBody({
   attention,
   loading,
   error,
+  workflowType,
 }: {
   sections: string[];
   defTitle: string;
   attention: InboxItem[];
   loading: boolean;
   error: string | null;
+  workflowType: string | null;
 }) {
   return (
     <div className="flex-1 overflow-y-auto px-6 py-6">
@@ -58,6 +73,7 @@ function MeetingBody({
           sections={sections}
           defTitle={defTitle}
           attention={attention}
+          workflowType={workflowType}
         />
       )}
     </div>
@@ -68,10 +84,12 @@ function MeetingGrid({
   sections,
   defTitle,
   attention,
+  workflowType,
 }: {
   sections: string[];
   defTitle: string;
   attention: InboxItem[];
+  workflowType: string | null;
 }) {
   return (
     <div className="mx-auto grid max-w-5xl gap-6 lg:grid-cols-[220px_1fr]">
@@ -91,6 +109,17 @@ function MeetingGrid({
             </li>
           ))}
         </ul>
+        {workflowType ? (
+          <div className="mt-4 border-t border-border pt-4">
+            <WorkflowLaunchButton
+              workflowType={workflowType}
+              label="Prepare Meeting"
+              labelDone="Meeting Ready"
+              className="w-full rounded-md bg-accent px-3 py-1.5 text-xs font-medium text-accent-foreground hover:opacity-90 disabled:opacity-50"
+            />
+            <p className="mt-1.5 text-xs text-muted">Ask the agent to prepare now.</p>
+          </div>
+        ) : null}
       </aside>
       <div className="space-y-4">
         <Card>

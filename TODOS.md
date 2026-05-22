@@ -1,6 +1,6 @@
 # FlavorOS TODOS
 
-**Last updated:** 2026-05-19 — generated from /plan-ceo-review (First Real User milestone)
+**Last updated:** 2026-05-22 — TODO-2 (Real orchestrator) substantially landed; see status below.
 
 ---
 
@@ -26,20 +26,44 @@
 
 ## P2 — Post-first-real-user
 
-### TODO-2: Real orchestrator — replace StubOrchestratorAdapter
+### TODO-2: Real orchestrator — replace StubOrchestratorAdapter — ✅ SUBSTANTIALLY DONE (2026-05-22)
 
 **What:** Replace `StubOrchestratorAdapter` in `services/api/app/adapters/orchestrator.py` with a durable multi-step agent runtime. Khadijah, Sinclair, and Regine should actually execute as LLM-backed agents, not return instant "completed" stubs.
 
 **Why:** Every workflow currently "completes" in 0ms with placeholder output. The inline `process_provider_first_sync` trick (Phase 1 workaround) is not extensible. Real briefings, real project reviews, real morning standup workflows require an orchestrator that can handle multi-step execution, retries, and human-in-the-loop gates.
 
-**Where to start:** `services/api/app/adapters/orchestrator.py` — the `OrchestratorAdapter` protocol is well-defined. `docs/architecture/agent_runtime_contracts.md`, `docs/workflows/`. `current_build_plan.md` Phase 6.
+**What landed:** Chose a custom in-process async executor (no Temporal/LangGraph) — `InProcessOrchestratorAdapter` is now the active default (`ORCHESTRATOR_ADAPTER=in_process`). `dispatch_task` runs LLM-backed skills via `asyncio.create_task`, writing AgentTaskEvent / AgentReport / Artifact / Approval rows.
 
-**Pros:** Unlocks the full MVP value proposition — actual AI agents doing real work for the client.
-**Cons:** Large scope (~2-3 weeks human / ~3-4 days CC); risk of breaking the existing demo loop during migration; requires deciding on orchestration framework (custom, Temporal, LangGraph, etc.).
+- **All 9 workflow types** are mapped in `_WORKFLOW_TASK_MAP` and have registered skills:
+  - `morning_standup`, `cob_workday` (pre-existing, Khadijah)
+  - `provider_first_sync_review`, `communication_sweep_review` (Sinclair) — `skills/sinclair_provider_review.py`, `skills/sinclair_comms_sweep.py`
+  - `morning_standup_seed` (Khadijah), `travel_research_seed` (Regine) — onboarding seed skills
+  - `comms_calendar` (Sinclair), `projects_review` (Khadijah) — meeting workflows
+  - `client_onboarding` (Khadijah) — initial implementation (see remaining work below)
+- **Front-end launch + polling wired:** `lib/api.ts` (`launchWorkflow`, `getWorkflowRun`), `lib/hooks/useWorkflowLaunch.ts` (2s polling to terminal state), `components/WorkflowLaunchButton.tsx`. "Prepare Briefing" / "Prepare Meeting" buttons live on `/briefings/[type]` and meeting topic surfaces.
+- Verified: all 9 skills registered, task-map→skill coverage 100%, TypeScript clean, Next.js build passing.
 
-**Effort:** human ~2-3 weeks / CC ~3-4 days
-**Priority:** P2
+**Remaining (tracked as TODO-2b below):** full `client_onboarding` multi-step orchestration (context creation, provider expectation seeding, chaining the seed workflows). Current onboarding skill writes a summary + HITL confirm only. Retries/backoff and a non-asyncio durable queue are also still open.
+
+**Where to start (for follow-ups):** `services/api/app/adapters/orchestrator.py`, `services/api/app/executor.py`, `services/api/app/skills/`.
+
+**Effort:** human ~2-3 weeks / CC ~3-4 days → **core delivered in 1 CC session**
+**Priority:** P2 → core done
 **Depends on:** First Real User milestone (Composio wired, real data flowing)
+
+---
+
+### TODO-2b: Full client_onboarding orchestration
+
+**What:** Expand `skills/client_onboarding.py` from the current summary-only implementation into a real multi-step onboarding workflow: create governed Client Universe contexts, set provider expectations, and chain the `morning_standup_seed` + `travel_research_seed` workflows.
+
+**Why:** Onboarding is the entry-point workflow and the most complex. The initial skill only reads existing contexts/providers and writes a confirmation artifact — it does not yet *create* the governed universe or fan out to seed workflows.
+
+**Where to start:** `services/api/app/skills/client_onboarding.py`, `docs/workflows/client_onboarding_model.md`, the seed skills as fan-out targets.
+
+**Effort:** human ~3-4 days / CC ~4-6h
+**Priority:** P2
+**Depends on:** TODO-2 (done)
 
 ---
 
@@ -108,3 +132,5 @@
 **Effort:** human ~1 day / CC ~2h
 **Priority:** P3
 **Depends on:** First Real User milestone complete; real orchestrator (TODO-2) may make this moot
+
+**Status note (2026-05-22):** Orchestrator-launched workflows now run off-thread via `asyncio.create_task(dispatch_task(...))` in `InProcessOrchestratorAdapter.launch`, and the front-end polls for completion. The remaining blocking path is the **inline** `process_provider_first_sync(db, workflow_run.id)` call in `routers/providers.py` — that one still blocks the request. Migrating provider sync to launch via the orchestrator (workflow_type `provider_first_sync`) instead of the inline processor would close this.

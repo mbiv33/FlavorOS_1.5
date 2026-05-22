@@ -65,7 +65,9 @@ async def launch_workflow(
     Poll ``GET /workflows/{run_id}`` to track progress.
 
     Supported workflow_types:
-      morning_standup, cob_workday, provider_first_sync, communication_sweep
+      morning_standup, cob_workday, provider_first_sync, communication_sweep,
+      client_onboarding, morning_standup_seed, travel_research_seed,
+      comms_calendar, projects_review
     """
     tenant, _ = tu
     result = await orchestrator.launch(

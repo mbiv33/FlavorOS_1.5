@@ -6,12 +6,20 @@ import { useParams } from "next/navigation";
 import { Header } from "@/components/Header";
 import { Card, CardMeta, CardTitle } from "@/components/Card";
 import { ApprovalCard } from "@/components/ApprovalCard";
+import { WorkflowLaunchButton } from "@/components/WorkflowLaunchButton";
 import {
   BRIEFING_DEFINITIONS,
   BRIEFING_SECTIONS,
   isBriefingType,
+  type BriefingType,
 } from "@/lib/briefings-config";
 import { useBriefingsData } from "@/lib/hooks/useBriefingsData";
+
+const BRIEFING_WORKFLOW_MAP: Record<BriefingType, string | null> = {
+  "morning-standup": "morning_standup",
+  "cob-work-day": "cob_workday",
+  goodnight: null, // goodnight is client → agent; no server workflow yet
+};
 
 export default function BriefingScreen() {
   const params = useParams();
@@ -20,7 +28,9 @@ export default function BriefingScreen() {
 
   const b = BRIEFING_DEFINITIONS[typeParam];
   const sections = BRIEFING_SECTIONS[typeParam];
-  const { attentionItems, loading, error } = useBriefingsData();
+  const { attentionItems, loading, error, refresh } = useBriefingsData();
+
+  const workflowType = BRIEFING_WORKFLOW_MAP[typeParam];
 
   const highlightItems = attentionItems
     .filter((i) => i.pile === "urgent" || i.pile === "needs-attention")
@@ -52,6 +62,21 @@ export default function BriefingScreen() {
                 </li>
               ))}
             </ul>
+
+            {workflowType ? (
+              <div className="mt-4 border-t border-border pt-4">
+                <WorkflowLaunchButton
+                  workflowType={workflowType}
+                  label="Prepare Briefing"
+                  labelDone="Briefing Ready"
+                  onComplete={() => refresh()}
+                  className="w-full rounded-md bg-accent px-3 py-1.5 text-xs font-medium text-accent-foreground hover:opacity-90 disabled:opacity-50"
+                />
+                <p className="mt-1.5 text-xs text-muted">
+                  Ask the agent to prepare now.
+                </p>
+              </div>
+            ) : null}
           </aside>
 
           <div className="space-y-4">

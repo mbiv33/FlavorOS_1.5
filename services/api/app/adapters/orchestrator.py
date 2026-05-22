@@ -191,6 +191,26 @@ class InProcessOrchestratorAdapter:
             "agent": "sinclair",
             "task_type": "communication_sweep_review",
         },
+        "client_onboarding": {
+            "agent": "khadijah",
+            "task_type": "client_onboarding",
+        },
+        "morning_standup_seed": {
+            "agent": "khadijah",
+            "task_type": "morning_standup_seed",
+        },
+        "travel_research_seed": {
+            "agent": "regine",
+            "task_type": "travel_research_seed",
+        },
+        "comms_calendar": {
+            "agent": "sinclair",
+            "task_type": "comms_calendar",
+        },
+        "projects_review": {
+            "agent": "khadijah",
+            "task_type": "projects_review",
+        },
     }
 
     async def list_workflows(self) -> list[WorkflowDefinition]:

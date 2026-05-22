@@ -297,6 +297,55 @@ export async function listContexts(
   return apiRequest<ClientContext[]>("/contexts", session);
 }
 
+// ---------------------------------------------------------------------------
+// Workflow launch + status polling
+// ---------------------------------------------------------------------------
+
+export type WorkflowStatus =
+  | "queued"
+  | "running"
+  | "completed"
+  | "failed"
+  | "cancelled";
+
+export type WorkflowLaunchResponse = {
+  run_id: string;
+  status: WorkflowStatus;
+  workflow_type: string;
+};
+
+export type WorkflowRunRead = {
+  id: string;
+  client_id: string;
+  workflow_type: string;
+  agent: string | null;
+  status: WorkflowStatus;
+  input_data: Record<string, unknown> | null;
+  output_data: Record<string, unknown> | null;
+  error: string | null;
+  started_at: string | null;
+  completed_at: string | null;
+  created_at: string;
+};
+
+export async function launchWorkflow(
+  session: FlavorOSSession,
+  workflowType: string,
+  inputData?: Record<string, unknown>,
+): Promise<WorkflowLaunchResponse> {
+  return apiRequest<WorkflowLaunchResponse>("/workflows/launch", session, {
+    method: "POST",
+    body: JSON.stringify({ workflow_type: workflowType, input_data: inputData ?? null }),
+  });
+}
+
+export async function getWorkflowRun(
+  session: FlavorOSSession,
+  runId: string,
+): Promise<WorkflowRunRead> {
+  return apiRequest<WorkflowRunRead>(`/workflows/${runId}`, session);
+}
+
 export async function login(input: {
   tenantSlug: string;
   email: string;
