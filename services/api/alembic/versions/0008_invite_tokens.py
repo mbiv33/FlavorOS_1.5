@@ -9,7 +9,7 @@ from alembic import op
 from sqlalchemy.dialects import postgresql
 
 revision: str = "0008"
-down_revision: Union[str, Sequence[str], None] = "0007"
+down_revision: Union[str, Sequence[str], None] = ("0007", "20260521_0007")
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
