@@ -40,6 +40,62 @@ class UserPublic(BaseModel):
     model_config = {"from_attributes": True}
 
 
+# ---------------------------------------------------------------------------
+# Invite / registration (invite-only onboarding)
+# ---------------------------------------------------------------------------
+
+InviteRole = Literal["client", "developer_admin"]
+InviteMode = Literal["new_tenant", "join_tenant"]
+
+
+class InviteCreateRequest(BaseModel):
+    """Create a single-use invite. Provide tenant_slug to join an existing tenant,
+    or new_tenant_slug + new_tenant_name to provision a new tenant at registration."""
+
+    email: str = Field(..., min_length=3, max_length=320)
+    role: InviteRole = "client"
+    tenant_slug: Optional[str] = Field(
+        None,
+        min_length=1,
+        max_length=64,
+        description="Join this existing tenant (mutually exclusive with new_tenant_*).",
+    )
+    new_tenant_slug: Optional[str] = Field(None, min_length=1, max_length=64)
+    new_tenant_name: Optional[str] = Field(None, min_length=1, max_length=255)
+    expires_in_hours: Optional[int] = Field(None, ge=1, le=720)
+
+    @field_validator("email")
+    @classmethod
+    def normalize_email(cls, v: str) -> str:
+        return v.strip().lower()
+
+
+class InviteCreateResponse(BaseModel):
+    token: str
+    expires_at: datetime
+    email: str
+    role: InviteRole
+    mode: InviteMode
+    tenant_slug: Optional[str] = None
+    tenant_name: Optional[str] = None
+
+
+class InviteValidateResponse(BaseModel):
+    valid: bool
+    email: str
+    role: InviteRole
+    mode: InviteMode
+    tenant_slug: Optional[str] = None
+    tenant_name: Optional[str] = None
+    expires_at: datetime
+
+
+class RegisterRequest(BaseModel):
+    token: str = Field(..., min_length=16)
+    password: str = Field(..., min_length=8, max_length=128)
+    display_name: Optional[str] = Field(None, min_length=1, max_length=255)
+
+
 class ProfileRead(BaseModel):
     id: uuid.UUID
     client_id: uuid.UUID
