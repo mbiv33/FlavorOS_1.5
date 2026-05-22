@@ -1,6 +1,6 @@
 # FlavorOS TODOS
 
-**Last updated:** 2026-05-22 — TODO-2 (Real orchestrator) substantially landed; see status below.
+**Last updated:** 2026-05-22 — TODO-2 (Real orchestrator) done; TODO-4 (Real Gmail send) done.
 
 ---
 
@@ -84,20 +84,13 @@
 
 ---
 
-### TODO-4: Real Gmail send via Composio outbound
+### TODO-4: Real Gmail send via Composio outbound — ✅ DONE (2026-05-22)
 
-**What:** Replace `StubGmailOutboundAdapter` with a real implementation that calls `composio.execute_action("GMAIL_SEND_EMAIL", ...)`. Approved communication drafts actually land in the recipient's Gmail.
+**What:** `ComposioGmailOutboundAdapter` added to `services/api/app/adapters/gmail_outbound.py`. Wired at startup in `main.py` lifespan when `COMPOSIO_API_KEY` is set. `composio_user_id` stored in `OutboundAction.payload_json` at enqueue time.
 
-**Why:** Currently the approval flow records that a draft was approved and shows `queued` status, but nothing is actually sent. The write-back loop (MVP step 7) is proven structurally but not functionally.
+**Calls:** `Action.GMAIL_SEND_EMAIL` with `recipient_email`, `subject`, `message_body` params via `composio_user_id` entity routing.
 
-**Where to start:** `services/api/app/adapters/gmail_outbound.py` — the `GmailOutboundAdapter` protocol is defined; add a `ComposioGmailOutboundAdapter` class. Depends on `COMPOSIO_API_KEY` being wired (CE2 from First Real User milestone).
-
-**Pros:** Closes the full loop — client approves, email sends. This is the "it actually does something" moment.
-**Cons:** Risk of sending real emails to real people; requires gmail.send OAuth scope (include during Composio OAuth app setup in First Real User milestone to avoid re-authorization later).
-
-**Effort:** human ~2h / CC ~45min
-**Priority:** P2
-**Depends on:** First Real User milestone (Composio adapter wired, OAuth scope includes gmail.send)
+**Note:** Requires `gmail.send` OAuth scope in the Composio app. If the connected account was authorized without that scope, re-authorization will be needed. Param names (`recipient_email`, `message_body`) should be verified against the running SDK version if sends fail — check Composio action schema with `python -c "from composio import Action; help(Action.GMAIL_SEND_EMAIL)"`.
 
 ---
 

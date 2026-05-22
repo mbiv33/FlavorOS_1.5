@@ -2,7 +2,7 @@
 
 ## Status
 
-**Last updated:** 2026-05-21 EDT
+**Last updated:** 2026-05-22 EDT
 
 This file memorializes a **point-in-time execution assessment** (May 2026): where the repo stands relative to the MVP proof loop, what actually blocks shipping, and the recommended build order for the next 2–4 weeks.
 
@@ -18,23 +18,29 @@ It does **not** replace the canonical development plan. If anything here conflic
 
 ## Executive Summary
 
-*Updated 2026-05-21 EDT after VPS deployment, Client Universe wiring, and onboarding rewrite.*
+*Updated 2026-05-22 EDT after Phases 2–7 complete.*
 
-FlavorOS has crossed the **first production deployment milestone**:
+FlavorOS has crossed the **real orchestrator milestone**:
 
 - **VPS deployed:** API live at `https://api.flavoros.cc` (Hostinger VPS, Cloudflare tunnel, systemd, Postgres with 7 migrations).
 - **Frontend deployed:** `https://flavoros.vercel.app` pointing at production API.
-- **Client Universe wired:** Onboarding saves contexts, provider connections, and universe envelope through the real API.
-- **Onboarding rewritten:** Sequential single-connection form with progress bar, server-side state hydration, dev reset support.
-- **Demo vertical slice + post-slice lanes A through M complete.**
+- **Phases 2–7 complete on `main`:**
+  - Phase 2: full DB schema (sync checkpoints, PAC/PTQ, AgentTaskEvent, AgentReport)
+  - Phase 3: GBrain CLI adapter, admin `/system-health` endpoint
+  - Phase 5: incremental sync cursors (SyncCheckpoint), re-sync → `communication_sweep` routing
+  - Phase 6: `InProcessOrchestratorAdapter`, async executor, Khadijah `morning_standup` + `cob_workday` skills, `/workflows/launch`
+  - Phase 7: all 9 workflow skills registered; Sinclair `provider_first_sync_review`, `communication_sweep_review`, `comms_calendar`; Khadijah `morning_standup_seed`, `projects_review`, `client_onboarding`; Regine `travel_research_seed`; `WorkflowLaunchButton` + "Prepare" on briefing/meeting surfaces; front-end 2s polling to terminal state
+- **Demo vertical slice + post-slice lanes A through M, O complete.**
 - **Communications write-back** proven end-to-end.
+- **Onboarding connect-advance bug fixed** (prod verified 2026-05-21).
 
-The bottleneck has shifted to **production UX polish and deployment automation**:
+The bottleneck has shifted to **integration depth and invite-based multi-user**:
 
-- **Onboarding connect-advance bug** — step 3 doesn't properly advance after OAuth return in production (Lane O — high priority).
-- **Manual VPS deploys** — no CI/CD yet; pushes require SSH + git pull + systemctl restart (Lane P).
-- **Provider hardening** — real Gmail send, dedup, async LLM, SDK timeout still open (Lane N).
-- **Agent runtime** remains stub + inline processor (not durable multi-step workflows).
+- **GitHub Actions auto-deploy** — `deploy-api.yml` ready on `origin/parallel/lane-p-deploy`; needs cherry-pick (Lane R — fast, 1 file).
+- **User invite/registration** — `invite_tokens` + routes + tests ready on `origin/parallel/lane-q-invite`; needs cherry-pick with conflict resolution (Lane S).
+- **Real Gmail send** — `StubGmailOutboundAdapter` still in place; approved drafts don't actually send (TODO-4, Lane U).
+- **Provider sync hardening** — per-message dedup and async first-sync LLM call still open (TODO-5/6, Lane V).
+- **Full `client_onboarding` orchestration** — skill exists but only writes a summary; does not create governed universe or fan-out to seed workflows (TODO-2b, Lane T).
 
 **Next agents:** read [`next_session_handoff.md`](./next_session_handoff.md) before claiming work.
 
@@ -47,28 +53,30 @@ The bottleneck has shifted to **production UX polish and deployment automation**
 | Layer | Status | Notes |
 |---|---|---|
 | **Client UI shells** | Strong | Command Center, briefings, meetings, channels, admin exist; match MVP IA |
-| **API + Postgres** | Substantial | Auth, onboarding, profiles, universe, artifacts, approvals, workflows, providers, audit |
+| **API + Postgres** | Substantial | Auth, onboarding, profiles, universe, artifacts, approvals, workflows, providers, audit, PAC/PTQ, AgentEvents |
 | **UI → API (hero path)** | Done (slice) | Login, onboarding, Command Center, LeftNav, Settings use `api.ts` |
 | **UI → API (admin)** | Done (Lane C) | `/admin` via `admin-api.ts` + list endpoints; `SessionGuard` on admin layout |
 | **UI → API (channels)** | Done (Lane I) | Client channel surfaces + Command Center widgets use shared channel loaders/mappers |
-| **Onboarding** | Done (bug) | Sequential form with progress bar; server hydration; connect-advance bug in step 3 |
-| **Provider ingestion** | Done (demo) | Inline `process_provider_first_sync` → artifact + pending approval |
-| **Agent runtime** | Stub + inline | `StubOrchestratorAdapter`; demo loop in `provider_first_sync.py` |
+| **Onboarding** | Done | Sequential form with progress bar; server hydration; connect-advance fixed (prod verified) |
+| **Provider ingestion** | Done (Phase 5) | Incremental sync cursors; SyncCheckpoint; first sync → `provider_first_sync`; re-sync → `communication_sweep` |
+| **Agent runtime** | Done (Phases 6–7) | `InProcessOrchestratorAdapter` live; all 9 skills registered; fire-and-forget via `asyncio.create_task` |
+| **Workflow launch UI** | Done (Phase 7) | `WorkflowLaunchButton` + 2s polling hook; "Prepare" buttons on briefing/meeting surfaces |
 | **Write-back** | Done (narrow slice) | Lane J shipped communications-first outbound actions + admin/client visibility |
-| **VPS production** | Done | API at api.flavoros.cc; manual deploy; GitHub Actions CD not yet wired |
+| **VPS production** | Done | API at api.flavoros.cc; manual deploy; `deploy-api.yml` pending merge (Lane R) |
 | **Client Universe** | Done | Onboarding → contexts → provider connections → universe envelope |
+| **User invite/registration** | Pending merge | `0008` migration + routes + tests on `origin/parallel/lane-q-invite` (Lane S) |
 
 ### Phase Alignment (`current_build_plan.md`)
 
 | Phase | Plan status | Assessment |
 |---|---|---|
 | 1 — Visualization & surfaces | Done (MVP breadth) | Command Center, admin, settings, and client channel pages are live on API data |
-| 2 — Database & storage | Done (demo scope) | Models + CRUD; hero surfaces consume API |
-| 3 — Integrations | Partial | Composio boundary + provider routes; prod OAuth matrix deferred |
-| 4 — Onboarding | Done (production, bug) | Sequential flow + progress bar deployed; connect-advance bug in step 3 |
-| 5 — Provider ingestion | Done (demo scope) | First-sync → inbox loop closed |
-| 6 — Agent workflows | Partial | Inline processor only; real orchestration deferred |
-| 7 — Write-back | Done (demo scope) | Communications-first proof exists; broader channel/provider depth deferred |
+| 2 — Database & storage | Done (`9b77ce3`) | Full schema: sync checkpoints, PAC/PTQ, AgentTaskEvent, AgentReport, migrations 0006–0007 |
+| 3 — Integrations | Done (`23da10b`) | GBrain CLI adapter; admin `/system-health`; Composio boundary stable |
+| 4 — Onboarding | Done | Sequential flow + progress bar; connect-advance fixed and prod-verified |
+| 5 — Provider ingestion | Done (`b6071ea`) | Incremental sync cursors; SyncCheckpoint; re-sync → `communication_sweep` routing |
+| 6 — Agent workflows | Done (`251cf66`) | `InProcessOrchestratorAdapter`; async executor; Khadijah skills; `/workflows/launch` |
+| 7 — Real orchestrator | Done (`1ef6e4e`) | All 9 workflow skills; front-end launch + 2s polling; "Prepare" buttons live |
 
 ---
 
@@ -77,14 +85,14 @@ The bottleneck has shifted to **production UX polish and deployment automation**
 From `current_build_plan.md`, the MVP must prove:
 
 1. Useful client and admin surfaces render. — **Yes**
-2. Client, provider, workflow, artifact, approval, and audit state persist durably. — **Yes (demo path)**
-3. Google Workspace (and boundaries) connect through approved adapters. — **Partial (demo OAuth)**
-4. A client is onboarded into a governed Client Universe. — **Yes (demo scope)**
-5. Provider events are captured, normalized, and routed. — **Partial (first sync)**
-6. Agents produce workflow runs, artifacts, approvals, and completion summaries. — **Yes (inline demo loop)**
-7. Approved actions can write back channel-correctly. — **Yes (communications-first demo path)**
+2. Client, provider, workflow, artifact, approval, and audit state persist durably. — **Yes (full schema: Phase 2)**
+3. Google Workspace (and boundaries) connect through approved adapters. — **Partial (real Composio OAuth; `gmail.send` scope / real send not yet wired)**
+4. A client is onboarded into a governed Client Universe. — **Yes (demo scope; full `client_onboarding` orchestration pending Lane T)**
+5. Provider events are captured, normalized, and routed. — **Yes (Phase 5: incremental sync + communication_sweep)**
+6. Agents produce workflow runs, artifacts, approvals, and completion summaries. — **Yes (Phase 6–7: all 9 skills live)**
+7. Approved actions can write back channel-correctly. — **Structural yes; Gmail still stubbed (TODO-4 / Lane U)**
 
-**Achieved:** steps 1–7 for **one demo tenant** on the hero path. **Next proof:** harden the outbound execution path and broaden it deliberately.
+**Achieved:** steps 1–7 structurally proven. **Next proof:** real Gmail send, invite-based multi-user, and full client_onboarding orchestration.
 
 ---
 
@@ -111,25 +119,23 @@ From `current_build_plan.md`, the MVP must prove:
 - `apps/flavoros/src/components/GoalsStrip.tsx`, `MiniCalendar.tsx`
 - shared `useChannelData` + per-surface config/hook pattern
 
-### Remaining: production UX + deployment
+### Remaining: branch merges (fast)
 
-- **Onboarding connect-advance bug** — step 3 doesn't advance after OAuth return (Lane O, high priority)
-- **GitHub Actions auto-deploy** — manual VPS deploy is fragile (Lane P)
-- **Real Gmail send** — wire `ComposioGmailOutboundAdapter` calling `GMAIL_SEND_EMAIL` (TODO-4)
-- **User invite/registration** — `invite_tokens` table, invite endpoints (TODO-3 / Lane Q)
+- **Lane R** — cherry-pick `deploy-api.yml` onto main (1 file, no conflicts expected)
+- **Lane S** — cherry-pick invite/registration (`0008` migration + auth routes + tests) with conflict resolution on `models.py`/`auth.py`
+
+### Remaining: integration depth
+
+- **Real Gmail send** — wire `ComposioGmailOutboundAdapter` calling `GMAIL_SEND_EMAIL` (TODO-4 / Lane U)
+- **Full `client_onboarding` skill** — create governed universe, set expectations, fan-out to seed workflows (TODO-2b / Lane T)
+- **Per-message ProviderEvent dedup** — per-message rows with idempotency keys (TODO-5 / Lane V)
+- **Async first-sync LLM call** — migrate inline `process_provider_first_sync` to launch via orchestrator (TODO-6 / Lane V)
 
 ### Remaining: production hardening
 
-- Per-message ProviderEvent dedup (TODO-5)
-- Async LLM call off request thread (TODO-6)
-- Composio SDK HTTP timeout
-- Full Composio OAuth matrix
-- Extract outbound execution from the inline demo loop
-
-### Remaining: platform depth
-
-- Real orchestrator / multi-agent tasks (not stub-only)
-- Broader write-back coverage beyond communications-first slice
+- Composio SDK HTTP timeout (critical gap — no timeout set on client init)
+- Full Composio OAuth matrix (beyond Gmail)
+- Retry/backoff in executor for failed skills
 
 ### What is now done but should not be re-done
 
@@ -143,38 +149,33 @@ From `current_build_plan.md`, the MVP must prove:
 
 ## Recommended Build Order (Next 2–4 Weeks)
 
-*Supersedes the pre-slice ordering below for **new** work. Steps 1–5 and post-slice lanes A–J are complete.*
+*Supersedes the pre-Phase-7 ordering. Phases 2–7 and lanes A–O are complete.*
 
-### 1. Fix onboarding connect-advance bug (Lane O — ~1 day)
+### 1. Merge lane branches (Lanes R + S — 1 day combined)
 
-- Debug why step 3 doesn't advance after OAuth completes in new tab
-- Test with `?reset=1` to wipe state and restart flow end-to-end
-- Verify all 4 steps work in production (Vercel + VPS)
+- **Lane R:** `git cherry-pick 6fa9549` — adds `deploy-api.yml` (1 file, fast)
+- **Lane S:** `git cherry-pick cc0f5cf` + resolve conflicts on `models.py` / `auth.py` — adds invite/registration
 
-### 2. Wire GitHub Actions auto-deploy (Lane P — ~0.5 day)
+### 2. Real Gmail send (Lane U — ~0.5 day)
 
-- `.github/workflows/deploy-api.yml`: SSH into VPS on push to main
-- `git pull && systemctl restart flavoros-api` on the VPS
-- Health check after deploy
+- Replace `StubGmailOutboundAdapter` with `ComposioGmailOutboundAdapter` calling `GMAIL_SEND_EMAIL`
+- Test: approve a communication draft in production, confirm the email lands
 
-### 3. Provider stabilization (Lane N — 2–3 days)
+### 3. Full client_onboarding orchestration (Lane T — 2–3 days)
 
-- TODO-4: wire real Gmail send (`GMAIL_SEND_EMAIL`)
-- TODO-5: per-message dedup
-- TODO-6: async LLM call
-- Composio SDK timeout
+- Expand `skills/client_onboarding.py` to create governed Client Universe contexts, set provider expectations, fan-out to seed workflows
+- Verify via `?reset=1` + workflow launch in production
 
-### 4. User invite/registration (Lane Q — 2–3 days)
+### 4. Provider sync hardening (Lane V — 1–2 days)
 
-- `invite_tokens` table + migration
-- Invite endpoints
-- Self-registration flow
+- Per-message `ProviderEvent` rows with idempotency keys (TODO-5)
+- Migrate inline `process_provider_first_sync` call to orchestrator dispatch (TODO-6)
 
 ### 5. Only then expand breadth again
 
-- Richer orchestrator/runtime behavior
 - GBrain follow-on work
-- Broader outbound coverage
+- Broader write-back coverage (Calendar, Docs)
+- Retry/backoff in executor
 
 ### Explicitly defer
 
@@ -202,14 +203,15 @@ Plus post-slice: **admin** live lists, **settings** wired, **API tests** for cor
 
 | If your goal is… | Build through… |
 |---|---|
-| Something you can **show** this month | Steps 1–5 — **done** |
+| Something you can **show** this month | Steps 1–7 — **done**; all 9 workflow skills live |
 | **Internal operator alpha** | Admin read path — **done** (Lane C); polish optional |
-| **Broader client UX** | Lane I — **done** |
-| **Full MVP demo loop** | Steps 1–7 — **done** |
-| **Production onboarding** | Lane O — fix connect-advance bug |
-| **Automated deploys** | Lane P — GitHub Actions CD for VPS |
-| **Real email sending** | Lane N — wire `GMAIL_SEND_EMAIL` via Composio |
-| **Multi-user** | Lane Q — invite tokens + registration |
+| **Broader client UX** | Lane I — **done**; briefing/meeting launch — **done** (Phase 7) |
+| **Full MVP demo loop** | Steps 1–7 — **done** structurally |
+| **Automated deploys** | Lane R — cherry-pick `deploy-api.yml` (1 file) |
+| **Multi-user / invite** | Lane S — cherry-pick invite/registration |
+| **Real email sending** | Lane U — wire `GMAIL_SEND_EMAIL` via `ComposioGmailOutboundAdapter` |
+| **Governed onboarding workflow** | Lane T — full `client_onboarding` skill with universe creation |
+| **Safe incremental sync** | Lane V — per-message dedup + async LLM call |
 
 ---
 
@@ -319,4 +321,5 @@ When starting implementation in a new agent session, point the agent at:
 - Initial capture: product review + repo inspection (May 2026).
 - **2026-05-19:** Updated after vertical slice steps 1–5 and post-slice lanes A through J.
 - **2026-05-21:** Updated after VPS deployment, Client Universe wiring, and onboarding rewrite.
+- **2026-05-22:** Updated after Phases 2–7 complete (real orchestrator, all 9 skills, front-end launch). Lane N superseded by Phase commits; lanes P/Q pending cherry-pick as R/S.
 - Intended as a durable handoff for humans and coding agents.

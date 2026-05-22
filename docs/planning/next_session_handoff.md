@@ -1,6 +1,6 @@
 # Next Session Handoff
 
-**Last updated:** 2026-05-21 (VPS deployed, Client Universe wired, onboarding rewrite)  
+**Last updated:** 2026-05-22 (Phases 2–7 complete; orchestrator live; planning docs refreshed)  
 **Purpose:** Single entry point for a new agent session. Read this first, then the linked docs.
 
 ---
@@ -57,35 +57,39 @@ Before first commit: update your lane row in [parallel_lanes_tracker.md](./paral
 
 ## Ready work (pick one lane per session)
 
-#### O — Fix onboarding connect-advance bug (HIGH PRIORITY)
+#### R — Merge Lane P (GitHub Actions deploy-api.yml)
 
-**Paths:** `apps/flavoros/src/app/onboarding/page.tsx`, `services/api/app/routers/onboarding.py`, `services/api/app/schemas.py`  
-**Goal:** Fix the remaining bug where the sequential onboarding flow doesn't properly advance to the next account after OAuth completes in a new tab  
-**Context:** Onboarding step 3 was rewritten as a sequential single-connection form with a progress bar. OAuth opens in a new tab while the current page advances. User reports it still doesn't work correctly — the page either doesn't advance or shows incorrect state after returning from OAuth.  
-**Backend changes already made:** `identity` is optional in `OnboardingSaveRequest`, `contexts` defaults to empty list, `DELETE /onboarding/reset` exists for dev testing (`?reset=1` query param)  
-**Test with:** `?reset=1` to wipe state, then walk through all 4 steps
+**Paths:** `.github/workflows/deploy-api.yml`  
+**Goal:** Cherry-pick `6fa9549` from `origin/parallel/lane-p-deploy` onto `main` — adds the single workflow file that auto-deploys the API to VPS on push to main.  
+**Context:** Lane P is complete (one new file only). Main has moved far ahead; no conflict expected since the file is net-new.  
+**Verify:** After merge, trigger a push and confirm `systemctl status flavoros-api` reflects the new code on the VPS.
 
-#### P — GitHub Actions auto-deploy for VPS
+#### S — Merge Lane Q (invite/registration) with conflict resolution
 
-**Paths:** `.github/workflows/deploy-api.yml` (new), VPS systemd  
-**Goal:** Wire CI/CD so pushes to `main` auto-deploy the API to the Hostinger VPS  
-**Context:** Currently manual: `ssh root@2.24.65.59`, `cd /opt/flavoros/api/repo && git pull && systemctl restart flavoros-api`  
-**VPS details:** Ubuntu 24.04, deploy path `/opt/flavoros/api/repo`, systemd service `flavoros-api`, Cloudflare tunnel handles routing
+**Paths:** `services/api/alembic/versions/0008_invite_tokens.py`, `services/api/app/routers/auth.py`, `services/api/app/schemas.py`, `services/api/app/models.py`, `services/api/tests/test_auth_invites.py`  
+**Goal:** Cherry-pick `cc0f5cf` from `origin/parallel/lane-q-invite` onto `main` and resolve conflicts.  
+**Context:** Lane Q added invite-only registration (`invite_tokens` table, hashed tokens, scoped invite endpoints). Main has significantly extended `models.py` and `auth.py` since the branch diverged — expect merge conflicts there. The migration and test file are net-new and should apply cleanly.  
+**After merge:** Run `alembic upgrade head` locally (migration `0008`), then `pytest tests/test_auth_invites.py`.
 
-#### N — Real provider stabilization (post-first-user)
+#### T — TODO-2b: Full client_onboarding orchestration
 
-**Paths:** `services/api/app/adapters/composio.py`, `services/api/app/routers/providers.py`, `services/api/tests/**`  
-**Goal:** harden the real Composio path now that one real user is connected
-- TODO-4: wire real Gmail send via `ComposioGmailOutboundAdapter` calling `GMAIL_SEND_EMAIL`
-- TODO-5: per-message ProviderEvent deduplication (`idempotency_key: “{provider_connection_id}:gmail:{message_id}”`)
-- TODO-6: move sync LLM call off request thread (`asyncio.to_thread`) — currently blocks HTTP for up to 30s
-- Verify `Action.GMAIL_FETCH_EMAILS` is the exact Composio SDK action name against current docs
-- Add Composio SDK HTTP timeout (`timeout=10.0` on client init — critical gap noted in eng review)
+**Paths:** `services/api/app/skills/client_onboarding.py`, `docs/workflows/client_onboarding_model.md`, seed skills  
+**Goal:** Expand the `client_onboarding` skill from summary-only into real multi-step: create governed Client Universe contexts, set provider expectations, fan out to `morning_standup_seed` + `travel_research_seed`.  
+**Context:** The skill currently reads existing contexts/providers and writes a confirmation artifact. It does not yet create a governed universe or chain seed workflows. See `TODOS.md` TODO-2b.
 
-#### Q — User invite/registration flow
+#### U — TODO-4: Real Gmail send via Composio
 
-**Paths:** `services/api/app/models.py`, `services/api/app/routers/auth.py`, `services/api/alembic/versions/`  
-**Goal:** `invite_tokens` table, invite endpoints, self-registration for new clients (TODO-3)
+**Paths:** `services/api/app/adapters/gmail_outbound.py`, `services/api/app/adapters/composio.py`  
+**Goal:** Replace `StubGmailOutboundAdapter` with a real `ComposioGmailOutboundAdapter` calling `GMAIL_SEND_EMAIL`.  
+**Context:** Approval → approve → draft marked `queued` → nothing actually sends. Closes MVP step 7 functionally.  
+**Requires:** `COMPOSIO_API_KEY` in env (already set on VPS); `gmail.send` OAuth scope must be included in the Composio app.
+
+#### V — TODO-5/6: Provider sync hardening (dedup + async)
+
+**Paths:** `services/api/app/routers/providers.py`, `services/api/app/workflows/provider_first_sync.py`  
+**Goal:**  
+- TODO-5: per-message `ProviderEvent` rows with idempotency key `”{provider_connection_id}:gmail:{message_id}”` (replace the one-blob approach)  
+- TODO-6: migrate `providers.py` inline `process_provider_first_sync` call to launch via orchestrator (removes the last blocking HTTP request path)
 
 ---
 
@@ -94,23 +98,26 @@ Before first commit: update your lane row in [parallel_lanes_tracker.md](./paral
 ```mermaid
 flowchart TD
   start[New session]
-  fix_onboard[Lane O: Fix onboarding connect bug]
-  auto_deploy[Lane P: GitHub Actions auto-deploy]
-  stabilize[Lane N: Provider stabilization]
-  invite[Lane Q: User invite flow]
+  merge_p[Lane R: Merge deploy workflow]
+  merge_q[Lane S: Merge invite/registration]
+  onboarding_skill[Lane T: client_onboarding full orchestration]
+  gmail_send[Lane U: Real Gmail send]
+  sync_harden[Lane V: Sync dedup + async]
 
-  start --> fix_onboard
-  fix_onboard --> auto_deploy
-  auto_deploy --> stabilize
-  stabilize --> invite
+  start --> merge_p
+  start --> merge_q
+  merge_q --> onboarding_skill
+  merge_p --> gmail_send
+  gmail_send --> sync_harden
 ```
 
 | Week | Focus | Outcome |
 |---|---|---|
-| 1 | Lane O — Fix onboarding connect-advance | Sequential onboarding works end-to-end in production |
-| 1 | Lane P — GitHub Actions auto-deploy | Push to main auto-deploys API to VPS |
-| 2 | Lane N — Provider stabilization | TODO-4/5/6, SDK timeout, real Gmail send |
-| 3+ | Lane Q — User invite/registration | New clients can be invited and self-register |
+| 1 | Lane R — Cherry-pick deploy-api.yml | Auto-deploy on push to main (no more SSH) |
+| 1 | Lane S — Cherry-pick + resolve invite/reg | New clients can be invited and self-register |
+| 1–2 | Lane T — Full client_onboarding skill | Governed Client Universe created end-to-end at onboarding |
+| 2 | Lane U — Real Gmail send | Approved drafts actually land in recipient's Gmail |
+| 2–3 | Lane V — Sync dedup + async | Incremental sync safe; no more blocking HTTP |
 
 ---
 
@@ -173,7 +180,13 @@ Local parity before deploy: [local_dev_runbook.md](./local_dev_runbook.md) → �
 | Settings hook | `apps/flavoros/src/lib/hooks/useSettingsData.ts` |
 | Command Center mappers | `apps/flavoros/src/lib/mappers.ts` |
 | Shared channel loader | `apps/flavoros/src/lib/hooks/useChannelData.ts` |
-| Sync processor | `services/api/app/workflows/provider_first_sync.py` |
+| Sync processor (first sync) | `services/api/app/workflows/provider_first_sync.py` |
+| Sync processor (re-sync) | `services/api/app/workflows/communication_sweep.py` |
+| Orchestrator adapter | `services/api/app/adapters/orchestrator.py` (`InProcessOrchestratorAdapter`) |
+| Async executor | `services/api/app/executor.py` (`dispatch_task`, `@register_skill`) |
+| Workflow skills | `services/api/app/skills/` — 9 registered skills |
+| Workflow launch hook | `apps/flavoros/src/lib/hooks/useWorkflowLaunch.ts` |
+| Workflow launch button | `apps/flavoros/src/components/WorkflowLaunchButton.tsx` |
 | Fixtures (types only) | `apps/flavoros/src/lib/fixtures.ts` — display arrays unused on client routes |
 | Production app | `https://flavoros.vercel.app` |
 | Production API | `https://api.flavoros.cc` (Hostinger VPS via Cloudflare tunnel) |
@@ -189,43 +202,43 @@ Copy this into a new implementation session:
 ```text
 Read docs/planning/next_session_handoff.md first, then docs/planning/build_roadmap_assessment.md and docs/planning/parallel_lanes_tracker.md.
 
-Current reality:
-- Vertical slice + post-slice lanes A through M are complete.
+Current reality (as of 2026-05-22):
+- Vertical slice + post-slice lanes A through M, O complete.
 - MVP demo proof loop complete for communications-first path.
+- Phases 2–7 complete on main:
+  - Phase 2: full DB schema (sync checkpoints, PAC/PTQ, AgentTaskEvent, AgentReport)
+  - Phase 3: GBrain CLI adapter, admin /system-health
+  - Phase 5: incremental sync cursors, re-sync → communication_sweep routing
+  - Phase 6: InProcessOrchestratorAdapter, async executor, Khadijah skills
+  - Phase 7: all 9 workflow skills live; WorkflowLaunchButton + "Prepare" on surfaces; front-end polling
 - One real user (marcus@bivinesgroup.com) connected via Composio OAuth.
 - VPS deployed: API live at https://api.flavoros.cc (Hostinger VPS, systemd, Cloudflare tunnel).
-- Frontend deployed: https://flavoros.vercel.app (Vercel, NEXT_PUBLIC_FLAVOROS_API_URL=https://api.flavoros.cc).
-- Client Universe wired: onboarding → contexts → provider connections → universe envelope.
-- Onboarding rewritten as sequential single-connection form with progress bar.
-- Known bug: onboarding step 3 connect-advance doesn't work correctly after OAuth return.
-- VPS deploy is manual (git pull + systemctl restart); GitHub Actions CD not yet wired.
-- DB at head: Alembic migrations 0001–0007.
+- Frontend deployed: https://flavoros.vercel.app.
+- DB at head: Alembic migrations 0001–0007 (+ 0008 pending via Lane S merge).
+- Onboarding connect-advance bug fixed (prod verified).
+- GitHub Actions deploy-api.yml ready to cherry-pick (origin/parallel/lane-p-deploy, 1 file).
+- Invite/registration ready to cherry-pick with conflict resolution (origin/parallel/lane-q-invite).
 
 Your assignment:
 Choose one follow-on lane and stay inside it:
-1. Lane O — Fix onboarding connect-advance bug (HIGH PRIORITY)
-2. Lane P — GitHub Actions auto-deploy for VPS
-3. Lane N — Stabilize real Composio path (TODO-4/5/6, SDK timeout)
-4. Lane Q — User invite/registration flow
+1. Lane R — Cherry-pick deploy-api.yml onto main (1 file, fast)
+2. Lane S — Cherry-pick invite/registration with conflict resolution
+3. Lane T — Full client_onboarding orchestration (TODO-2b)
+4. Lane U — Real Gmail send via Composio (TODO-4)
+5. Lane V — Provider sync dedup + async LLM call (TODO-5/6)
 
 IMPORTANT: Always explain the problem + approach before writing code. Wait for confirmation.
 
 Success target:
-- preserve the current outbound proof path
+- preserve the current outbound proof path and orchestrator behavior
 - do not regress pytest/tsc/smoke/manual E2E
-- test onboarding changes with ?reset=1 to wipe and restart
+- verify with: cd services/api && .venv/bin/python -m pytest -q; cd apps/flavoros && pnpm exec tsc --noEmit
 
 Scope guardrails:
-- do not destabilize the current communications-first flow
-- do not broaden multiple outbound lanes at once
-- keep the diff aligned with existing api/mappers/hooks patterns
+- do not destabilize the communications-first or orchestrator flows
+- keep the diff aligned with existing api/mappers/hooks/skills patterns
 
-Before editing:
-- confirm lane ownership in docs/planning/parallel_lanes_tracker.md
-- preserve existing user changes
-- verify with pytest, tsc --noEmit, scripts/smoke-vertical-slice.sh
-
-VPS manual deploy (until Lane P ships):
+VPS deploy (manual until Lane R merges):
   ssh root@2.24.65.59
   cd /opt/flavoros/api/repo && git pull && systemctl restart flavoros-api
 ```
@@ -274,7 +287,13 @@ Documented in [archive/build_vertical_slice_tasks.md](./archive/build_vertical_s
 | **First real user** | Done | Composio OAuth live, real Gmail synced, Sinclair LLM body, Command Center wired, 54 tests pass |
 | **VPS deploy** | Done | API at api.flavoros.cc, Hostinger VPS, Cloudflare tunnel, systemd service, Postgres + Alembic 0001–0007 |
 | **Client Universe (Cursor)** | Done | Wire Client Universe: onboarding save → contexts → provider connections → universe envelope |
-| **Onboarding rewrite** | Done (bug) | Sequential single-connection form with progress bar; server-side hydration; ?reset=1 dev reset; connect-advance bug remains |
+| **Onboarding rewrite + Lane O** | Done | Sequential single-connection form + progress bar; server-side hydration; `?reset=1`; connect-advance fixed and prod-verified |
+| **Phase 2 — DB schema** | Done (`9b77ce3`) | Sync checkpoints, PAC/PTQ, AgentTaskEvent, AgentReport models; migrations `20260521_0006`/`0007` |
+| **Phase 3 — GBrain adapter** | Done (`23da10b`) | GBrain CLI adapter + admin `/system-health` endpoint |
+| **Phase 5 — Provider ingestion** | Done (`b6071ea`) | Incremental sync cursors, SyncCheckpoint persistence, re-sync → `communication_sweep` routing |
+| **Phase 6 — In-process executor** | Done (`251cf66`) | `InProcessOrchestratorAdapter`, `executor.py`, `morning_standup` + `cob_workday` Khadijah skills, `/workflows/launch` |
+| **Phase 7 — Real orchestrator** | Done (`1ef6e4e`) | All 9 workflow skills mapped; Sinclair `provider_first_sync_review`, `communication_sweep_review`, `comms_calendar`; Khadijah `morning_standup_seed`, `projects_review`, `client_onboarding`; Regine `travel_research_seed`; `WorkflowLaunchButton` + "Prepare" buttons on briefing/meeting surfaces; front-end polling |
+| **Lane N — Provider schema** | Done (superseded) | Migrations `0006`/`0007` already in main via Phase 2 commit; branch can be deleted |
 
 ### Completed lane notes
 

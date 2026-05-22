@@ -111,6 +111,8 @@ def create_outbound_for_approval(
         "body": artifact.body,
         "subject": target.get("subject"),
         "to": target.get("to"),
+        # Stored so ComposioGmailOutboundAdapter can route to the right Composio entity at execute time.
+        "composio_user_id": connection.composio_user_id,
     }
     if meta.get("_force_failure"):
         payload["_force_failure"] = True

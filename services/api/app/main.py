@@ -23,6 +23,7 @@ from app.routers import (
     universe,
     workflows,
 )
+from app.adapters.gmail_outbound import ComposioGmailOutboundAdapter, set_gmail_outbound_adapter
 from app.seed import seed_if_empty
 
 logger = logging.getLogger(__name__)
@@ -31,6 +32,14 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     settings = get_settings()
+
+    # Wire real Gmail outbound adapter when Composio key is present.
+    if settings.composio_api_key:
+        set_gmail_outbound_adapter(ComposioGmailOutboundAdapter(settings.composio_api_key))
+        logger.info("Gmail outbound: ComposioGmailOutboundAdapter active")
+    else:
+        logger.info("Gmail outbound: StubGmailOutboundAdapter active (COMPOSIO_API_KEY not set)")
+
     if settings.api_skip_startup_seed:
         yield
         return

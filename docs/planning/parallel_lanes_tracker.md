@@ -39,7 +39,11 @@
 
 | Lane | Blocked by | Status | Notes |
 |---|---|---|---|
-| — | — | — | *(P, N, Q pushed 2026-05-21 — open PRs next)* |
+| R — Merge deploy-api.yml | Nothing | Ready | Cherry-pick `6fa9549` from `origin/parallel/lane-p-deploy`; 1 file, no conflicts expected |
+| S — Merge invite/registration | Nothing | Ready | Cherry-pick `cc0f5cf` from `origin/parallel/lane-q-invite`; resolve conflicts on `models.py`/`auth.py` |
+| T — Full client_onboarding skill | Lane S (optional) | Ready | Expand `skills/client_onboarding.py` to create universe + fan-out (TODO-2b) |
+| U — Real Gmail send | Nothing | Ready | `ComposioGmailOutboundAdapter` calling `GMAIL_SEND_EMAIL` (TODO-4) |
+| V — Sync dedup + async | Nothing | Ready | Per-message ProviderEvent rows + migrate inline sync to orchestrator (TODO-5/6) |
 
 ## Coordination checklist (every agent, every session)
 
@@ -95,8 +99,8 @@ When done: move your lane out of Active parallel lanes, update the Completed lan
 | O — Onboarding connect-advance | Cursor agent | `done` | Prod verified 2026-05-21: `flavoros.vercel.app/onboarding` — step 3 messages/buttons/advance after OAuth; `advanceToNextSlotFrom` + `preserveUiAdvance` |
 | Onboarding rewrite | Session | `done` | Sequential single-connection form + progress bar; server-side hydration; ?reset=1; connect-advance closed in Lane O |
 | P — GitHub Actions auto-deploy | Cursor agent | `done` | `parallel/lane-p-deploy` | `.github/workflows/deploy-api.yml` | — | `6fa9549` on `origin/parallel/lane-p-deploy` |
-| N — Provider stabilization (schema) | Cursor agent | `done` | `parallel/lane-n-provider` | `20260521_0006/0007` migrations, PAC/PTQ/sync models | — | `7d3a6fc`; runtime Gmail/SDK TODOs remain |
-| Q — User invite/registration | Cursor agent | `done` | `parallel/lane-q-invite` | `0008`, auth invite routes, tests | — | `cc0f5cf` |
+| N — Provider stabilization (schema) | Cursor agent | `superseded` | `parallel/lane-n-provider` | `20260521_0006/0007` migrations, PAC/PTQ/sync models | — | Migrations already in main via Phase 2 commit `9b77ce3`; branch can be deleted |
+| Q — User invite/registration | Cursor agent | `pending-merge` | `parallel/lane-q-invite` | `0008`, auth invite routes, tests | — | `cc0f5cf`; needs cherry-pick with conflict resolution (Lane S) |
 
 ### Lane I sub-lanes (complete)
 
@@ -114,6 +118,7 @@ When done: move your lane out of Active parallel lanes, update the Completed lan
 
 | Timestamp | Agent | Lane | Action |
 |---|---|---|---|
+| 2026-05-22 | Claude (main session) | Planning | Refreshed all 3 planning docs to reflect Phases 2–7 complete; renamed active lanes to R/S/T/U/V; assessed P/N/Q branch status |
 | 2026-05-21 | Cursor agent | P/N/Q | Pushed lane branches: deploy `6fa9549`, provider schema `7d3a6fc`, invites `cc0f5cf`; `uv.lock` not committed |
 | 2026-05-21 | User + agent | O | **Lane O done:** prod onboarding verified at https://flavoros.vercel.app/onboarding — page messages, buttons, and step advance work after OAuth |
 | 2026-05-21 | Cursor agent | O | Code: `advanceToNextSlotFrom` after `window.open`, `oauthAdvanceFromIndexRef` + `preserveUiAdvance` on refresh/poll; commits `6e0cb94`/`f23ecf9`; tsc clean |
