@@ -76,7 +76,7 @@ class ComposioGmailOutboundAdapter:
                 success=False,
                 external_result_id=None,
                 receipt_status="failed",
-                error="composio_user_id missing from outbound payload — cannot route to Composio entity",
+                error="composio_user_id missing from outbound payload",
             )
         if not to:
             return SendDraftResult(
@@ -100,8 +100,12 @@ class ComposioGmailOutboundAdapter:
             data = result if isinstance(result, dict) else {}
             successful = data.get("successful", True)
             if not successful:
-                error_msg = str(data.get("error") or data.get("data") or "Composio reported failure")
-                logger.warning("GMAIL_SEND_EMAIL failed for outbound %s: %s", outbound.id, error_msg)
+                error_msg = str(
+                    data.get("error") or data.get("data") or "Composio reported failure"
+                )
+                logger.warning(
+                    "GMAIL_SEND_EMAIL failed for outbound %s: %s", outbound.id, error_msg
+                )
                 return SendDraftResult(
                     success=False,
                     external_result_id=None,
@@ -156,7 +160,9 @@ def set_gmail_outbound_adapter(adapter: GmailOutboundAdapter) -> None:
     _default_adapter = adapter
 
 
-def apply_send_result(outbound: OutboundAction, result: OutboundSendResult | SendDraftResult) -> None:
+def apply_send_result(
+    outbound: OutboundAction, result: OutboundSendResult | SendDraftResult,
+) -> None:
     outbound.status = "executed"
     outbound.executed_at = datetime.now(timezone.utc)
     outbound.execution_result_json = {

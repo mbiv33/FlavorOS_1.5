@@ -133,5 +133,5 @@ def call_llm(
         if result is not None:
             return result
 
-    logger.warning("No LLM provider available (both OpenRouter and Anthropic unconfigured or failed)")
+    logger.warning("No LLM provider available (OpenRouter and Anthropic both unconfigured/failed)")
     return LLMResponse(text=None, input_tokens=0, model=model, provider="none")

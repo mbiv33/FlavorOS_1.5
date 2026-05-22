@@ -15,7 +15,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Annotated, Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from fastapi.security import HTTPAuthorizationCredentials
 from jose import jwt
 from passlib.context import CryptContext
 from sqlalchemy import select
@@ -230,7 +230,10 @@ def validate_invite(
     invite = _get_active_invite(db, token)
     tenant = _load_invite_tenant(db, invite)
     if invite.tenant_id is not None and tenant is None:
-        raise HTTPException(status_code=status.HTTP_410_GONE, detail="Invite tenant no longer exists")
+        raise HTTPException(
+            status_code=status.HTTP_410_GONE,
+            detail="Invite tenant no longer exists",
+        )
 
     return InviteValidateResponse(
         valid=True,
@@ -254,7 +257,10 @@ def register(
 
     if invite.tenant_id is not None:
         if tenant is None:
-            raise HTTPException(status_code=status.HTTP_410_GONE, detail="Invite tenant no longer exists")
+            raise HTTPException(
+            status_code=status.HTTP_410_GONE,
+            detail="Invite tenant no longer exists",
+        )
     else:
         assert invite.new_tenant_slug and invite.new_tenant_name
         taken = db.execute(

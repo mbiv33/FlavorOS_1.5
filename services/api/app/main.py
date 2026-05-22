@@ -7,6 +7,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.exc import OperationalError
 
+from app.adapters.gmail_outbound import ComposioGmailOutboundAdapter, set_gmail_outbound_adapter
 from app.config import get_settings, parse_origins
 from app.database import SessionLocal
 from app.routers import (
@@ -23,7 +24,6 @@ from app.routers import (
     universe,
     workflows,
 )
-from app.adapters.gmail_outbound import ComposioGmailOutboundAdapter, set_gmail_outbound_adapter
 from app.seed import seed_if_empty
 
 logger = logging.getLogger(__name__)
