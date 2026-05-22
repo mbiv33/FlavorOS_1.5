@@ -38,7 +38,13 @@ function initials(name: string): string {
     .toUpperCase();
 }
 
-export function LeftNav({ variant }: { variant: "client" | "admin" }) {
+export function LeftNav({
+  variant,
+  className = "",
+}: {
+  variant: "client" | "admin";
+  className?: string;
+}) {
   const pathname = usePathname() ?? "";
   const items = variant === "client" ? CLIENT_NAV : ADMIN_NAV;
   const [profile, setProfile] = useState<ProfileRead | null>(null);
@@ -55,7 +61,9 @@ export function LeftNav({ variant }: { variant: "client" | "admin" }) {
   const userInitials = displayName ? initials(displayName) : "…";
 
   return (
-    <nav className="flex h-full w-60 flex-col border-r border-border bg-surface">
+    <nav
+      className={`flex h-full w-60 shrink-0 flex-col border-r border-border bg-surface ${className}`}
+    >
       <div className="px-5 pb-3 pt-5">
         <Link href="/" className="block">
           <span className="text-base font-semibold tracking-tight text-foreground">

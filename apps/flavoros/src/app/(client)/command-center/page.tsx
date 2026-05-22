@@ -139,7 +139,7 @@ export default function CommandCenterPage() {
               </Link>
             }
           >
-            <div className="grid gap-4 md:grid-cols-[1fr_320px]">
+            <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1fr)_min(100%,280px)]">
               <div className="space-y-3">
                 {loading ? (
                   <p className="text-sm text-muted">Loading events…</p>

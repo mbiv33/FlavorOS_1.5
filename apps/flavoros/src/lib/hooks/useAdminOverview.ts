@@ -10,7 +10,7 @@ import {
 
 export function useAdminOverview() {
   const [overview, setOverview] = useState<AdminOverview | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasSession, setHasSession] = useState(false);
 
@@ -23,6 +23,7 @@ export function useAdminOverview() {
     }
 
     setHasSession(true);
+    setLoading(true);
     fetchAdminOverview(session)
       .then(setOverview)
       .catch((err) => {

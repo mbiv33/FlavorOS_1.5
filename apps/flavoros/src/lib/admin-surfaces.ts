@@ -128,7 +128,7 @@ export function formatTileMeta(
   overview: import("@/lib/admin-api").AdminOverview | null,
 ): string {
   if (!overview) {
-    return "Sign in to load live counts";
+    return "Counts unavailable";
   }
 
   switch (slug) {

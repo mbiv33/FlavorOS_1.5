@@ -16,7 +16,7 @@ export function MiniCalendar({
   highlightDates = [],
 }: MiniCalendarProps) {
   return (
-    <div className="rounded-xl border border-border bg-surface p-4">
+    <div className="min-w-0 rounded-xl border border-border bg-surface p-3 sm:p-4">
       <div className="mb-3 flex items-center justify-between">
         <button
           type="button"
@@ -34,7 +34,7 @@ export function MiniCalendar({
           ›
         </button>
       </div>
-      <div className="grid grid-cols-7 gap-y-1 text-center text-xs">
+      <div className="grid grid-cols-7 gap-x-0.5 gap-y-1 text-center text-[10px] sm:text-xs">
         {weekdays.map((d, i) => (
           <div key={`wd-${i}`} className="text-muted">
             {d}
@@ -47,7 +47,7 @@ export function MiniCalendar({
           return (
             <div key={i} className="flex items-center justify-center py-1">
               <span
-                className={`flex h-7 w-7 items-center justify-center rounded-full text-xs ${
+                className={`flex h-6 w-6 items-center justify-center rounded-full sm:h-7 sm:w-7 ${
                   isToday
                     ? "bg-accent font-semibold text-accent-foreground"
                     : isMarked
