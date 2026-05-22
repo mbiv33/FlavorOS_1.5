@@ -10,8 +10,10 @@
 #   ANTHROPIC_API_KEY  — Anthropic API key (fallback LLM provider)
 #   COMPOSIO_API_KEY   — Composio API key
 #
-# Optional:
-#   SSH_FINGERPRINT    — SSH host fingerprint (sha256 format)
+# The SSH connect step retries (4 attempts) to absorb the intermittent
+# port-22 dial timeouts seen between GitHub runners and the Hostinger box.
+# The env file is built with printf to a temp file and scp'd over, so secret
+# values never appear in command strings / logs.
 #
 # VPS layout:
 #   Deploy path: /opt/flavoros/api/repo
@@ -39,55 +41,60 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Deploy via SSH
-        uses: appleboy/ssh-action@v1.2.0
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          fingerprint: ${{ secrets.SSH_FINGERPRINT }}
-          script_stop: true
-          envs: DATABASE_URL,JWT_SECRET,OPENROUTER_API_KEY,ANTHROPIC_API_KEY,COMPOSIO_API_KEY
-          script: |
-            set -euo pipefail
-
-            # Write env file from GitHub Secrets
-            mkdir -p /etc/flavoros
-            cat > /etc/flavoros/api.env << ENVEOF
-            API_ENV=production
-            DATABASE_URL=${DATABASE_URL}
-            JWT_SECRET=${JWT_SECRET}
-            OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
-            ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
-            COMPOSIO_API_KEY=${COMPOSIO_API_KEY}
-            COMPOSIO_REDIRECT_URI=https://api.flavoros.cc/providers/callback
-            API_ORIGINS=https://flavoros.vercel.app
-            ORCHESTRATOR_ADAPTER=in_process
-            ENVEOF
-            chmod 600 /etc/flavoros/api.env
-
-            # Pull latest code
-            cd /opt/flavoros/api/repo
-            git fetch origin main
-            git checkout main
-            git pull --ff-only origin main
-
-            # Install new dependencies if needed
-            cd services/api
-            .venv/bin/pip install -q -e . 2>/dev/null || true
-
-            # Run migrations
-            .venv/bin/alembic upgrade head
-
-            # Restart and verify
-            systemctl restart flavoros-api
-            systemctl is-active --quiet flavoros-api
+      - name: Set up SSH key
         env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+
+      - name: Deploy via SSH (retry on transient connect failures)
+        uses: nick-fields/retry@v3
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           COMPOSIO_API_KEY: ${{ secrets.COMPOSIO_API_KEY }}
+        with:
+          timeout_minutes: 10
+          max_attempts: 4
+          retry_wait_seconds: 20
+          command: |
+            set -euo pipefail
+            SSH_OPTS="-i $HOME/.ssh/deploy_key -o StrictHostKeyChecking=no -o ConnectTimeout=60 -o ServerAliveInterval=15 -o ServerAliveCountMax=4"
+
+            # Build the env file locally (values go to a file, never to stdout/logs).
+            umask 077
+            ENV_FILE=$(mktemp)
+            printf 'API_ENV=production\n' >> "$ENV_FILE"
+            printf 'DATABASE_URL=%s\n' "$DATABASE_URL" >> "$ENV_FILE"
+            printf 'JWT_SECRET=%s\n' "$JWT_SECRET" >> "$ENV_FILE"
+            printf 'OPENROUTER_API_KEY=%s\n' "$OPENROUTER_API_KEY" >> "$ENV_FILE"
+            printf 'ANTHROPIC_API_KEY=%s\n' "$ANTHROPIC_API_KEY" >> "$ENV_FILE"
+            printf 'COMPOSIO_API_KEY=%s\n' "$COMPOSIO_API_KEY" >> "$ENV_FILE"
+            printf 'COMPOSIO_REDIRECT_URI=https://api.flavoros.cc/providers/callback\n' >> "$ENV_FILE"
+            printf 'API_ORIGINS=https://flavoros.vercel.app\n' >> "$ENV_FILE"
+            printf 'ORCHESTRATOR_ADAPTER=in_process\n' >> "$ENV_FILE"
+
+            # Ship the env file, then run the deploy script remotely.
+            scp $SSH_OPTS "$ENV_FILE" "$SSH_USER@$SSH_HOST:/tmp/flavoros-api.env"
+            ssh $SSH_OPTS "$SSH_USER@$SSH_HOST" "set -euo pipefail; \
+              mkdir -p /etc/flavoros; \
+              mv /tmp/flavoros-api.env /etc/flavoros/api.env; \
+              chmod 600 /etc/flavoros/api.env; \
+              cd /opt/flavoros/api/repo; \
+              git fetch origin main; \
+              git checkout main; \
+              git pull --ff-only origin main; \
+              cd services/api; \
+              .venv/bin/pip install -q -e . 2>/dev/null || true; \
+              .venv/bin/alembic upgrade head; \
+              systemctl restart flavoros-api; \
+              systemctl is-active --quiet flavoros-api"
 
       - name: Verify production health
         run: curl -sf --retry 5 --retry-delay 3 --retry-all-errors https://api.flavoros.cc/health
