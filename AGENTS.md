@@ -2,6 +2,16 @@
 
 **Shared vocabulary:** See [`docs/FLAVOROS_TAXONOMY.md`](docs/FLAVOROS_TAXONOMY.md) for canonical terms, outbound statuses, surfaces, and repo pointers before cross-cutting PRs.
 
+## API changes: Ruff before push (required)
+
+CI does **not** fail on `git push` — it fails on the **Lint (ruff)** step in `.github/workflows/ci.yml` when `services/api/**` changes. This has recurred across many agent sessions (import order I001, line length E501). **Before finishing any API work or telling the user a push is safe:**
+
+```bash
+cd services/api && .venv/bin/ruff check app/
+```
+
+Use `--fix` for imports, then re-run. Full context: [`docs/development/api_ci_ruff.md`](docs/development/api_ci_ruff.md).
+
 ## GBrain Configuration (configured by /setup-gbrain)
 - Mode: local-stdio
 - Engine: pglite

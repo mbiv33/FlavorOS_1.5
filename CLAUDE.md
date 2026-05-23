@@ -74,6 +74,15 @@ Two-layer rule — **always check this before implementing or creating files:**
 **When something only appears in Planned:** do not wire it — add it to `docs/architecture/planned_services.md` instead.  
 **`services/` contains only `services/api`** — one real deployable. Any new service lives in Planned until it has a Dockerfile and CI deploy step.
 
+### API local checks (match CI)
+
+From `services/api` after `pip install -e ".[dev]"`:
+
+```bash
+.venv/bin/ruff check app/    # required before push; see docs/development/api_ci_ruff.md
+.venv/bin/python -m pytest tests/ -v --tb=short
+```
+
 ## Deploy Configuration (Vercel)
 
 - **Platform:** Vercel
