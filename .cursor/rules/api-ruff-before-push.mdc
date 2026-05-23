@@ -1,0 +1,30 @@
+---
+description: Mandatory API Ruff check before any git commit or push that touches services/api
+alwaysApply: true
+---
+
+# API Ruff before commit/push (mandatory)
+
+When you **stage, commit, or push** any change under `services/api/**` (especially `services/api/app/**`), you **must** run this from the repo root **before** `git commit` or `git push`:
+
+```bash
+cd services/api && .venv/bin/ruff check app/
+```
+
+Equivalent from repo root: `pnpm api:lint`
+
+## Rules
+
+1. **Do not commit or push** API code until Ruff exits 0. `git push` can succeed while **GitHub Actions Lint (ruff)** still fails.
+2. After editing imports in routers or services, **re-run** Ruff (I001 import order is easy to break).
+3. Line length is **100** characters (E501). Break long strings and conditions manually; `--fix` does not fix all E501.
+4. Optional auto-fix for imports: `cd services/api && .venv/bin/ruff check app/ --fix`, then run again without `--fix`.
+
+## When this applies
+
+- Any commit that includes modified files under `services/api/app/`
+- Any commit that includes `services/api/pyproject.toml`, `services/api/uv.lock`, or workflow changes that might accompany API edits — still run Ruff if `app/` was touched in the same session or same commit batch
+
+Lockfile-only commits (`uv.lock` only, no `app/` changes) do not require Ruff, but if `app/` changed in the same commit, Ruff is required.
+
+Full reference: [`docs/development/api_ci_ruff.md`](../../docs/development/api_ci_ruff.md)

@@ -53,13 +53,16 @@ Defined in [`services/api/pyproject.toml`](../../services/api/pyproject.toml):
 - `line-length = 100`
 - `select = ["E", "F", "I", "UP"]` (includes **I** = isort import sorting)
 
-## For AI agents
+## For AI agents (commit/push gate)
 
-Before claiming an API branch is ready to push or opening a PR that touches `services/api/app/**`:
+Before **`git commit` or `git push`** that includes changes under `services/api/app/**`:
 
-1. Run `cd services/api && .venv/bin/ruff check app/` and fix until it passes.
-2. After editing imports in any router, re-run Ruff; do not assume import order is correct.
-3. Do not confuse "push failed" with "CI lint failed" — ask for the failing workflow step name.
+1. Run `cd services/api && .venv/bin/ruff check app/` (or `pnpm api:lint` from repo root) and fix until it passes.
+2. Do not stage or commit API app code until Ruff exits 0.
+3. After editing imports in any router, re-run Ruff; do not assume import order is correct.
+4. Do not confuse "push failed" with "CI lint failed" — ask for the failing workflow step name.
+
+Repo rule: [`.cursor/rules/api-ruff-before-push.mdc`](../../.cursor/rules/api-ruff-before-push.mdc) (`alwaysApply: true` in Cursor).
 
 ## Historical fix (2026-05)
 
