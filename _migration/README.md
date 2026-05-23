@@ -1,5 +1,9 @@
 # FlavorOS 1.5 Migration Intake
 
+> **STATUS: Legacy intake only. Nothing in this directory is wired to the running system.**  
+> Do not implement against any file here. Do not treat `intake/` as current architecture or migration-ready code.  
+> This directory will be deleted once the intake backlog is fully absorbed.
+
 This folder is the controlled intake area for reviewing selected material from the old FlavorOS root before anything is allowed into the real FlavorOS 1.5 repo structure.
 
 ## Purpose

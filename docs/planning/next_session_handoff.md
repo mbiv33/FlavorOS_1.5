@@ -1,6 +1,6 @@
 # Next Session Handoff
 
-**Last updated:** 2026-05-22 (Phases 2–7 complete; Client DNA track W–Z documented; U/Gmail send done; Lane R merged; Lane S/invite-registration merged — run `alembic upgrade head` on VPS)  
+**Last updated:** 2026-05-23 (repo cleanup complete: services/ down to api-only, gbrain scripts → scripts/gbrain/, stub services → docs/architecture/planned_services.md, root stubs workflows/personas/runtime/ removed, CLAUDE.md layer map added, handoff zones added; next: human DNA storage pick, Lane X)  
 **Purpose:** Single entry point for a new agent session. Read this first, then the linked docs.
 
 ---
@@ -26,6 +26,26 @@ Rule of thumb:
 ---
 
 **Slice lock:** `complete` — post-slice work is allowed; avoid drive-by edits to slice-owned files unless tasked.
+
+---
+
+## Before you start (3 steps)
+
+1. Read this file top-to-bottom.
+2. Open [parallel_lanes_tracker.md](./parallel_lanes_tracker.md) and claim your lane (set status to `in_progress`).
+3. Cross-check the **Coordinate zone** below against active lanes before touching any shared path.
+
+---
+
+## Repo zones
+
+| Zone | Paths | Rule |
+|---|---|---|
+| **Free** — edit without coordination | `docs/**`, `skills/**`, `agents/**`, `integrations/**`, `configs/**`, `governance/**`, `client_universe/**` | Spec/authored artifacts only; no runtime merge conflicts |
+| **Coordinate** — serialize with active lanes | `services/api/app/routers/providers.py`, `approvals.py`, `orchestrator.py`, `workflows/provider_first_sync.py`, `schemas.py`, `apps/flavoros/src/lib/api.ts`, `command-center/page.tsx`, `onboarding/page.tsx`, `ApprovalCard.tsx`, `SessionGuard.tsx` | Shared runtime — check parallel_lanes_tracker.md before touching |
+| **Human-only** — do not edit in agent sessions | `.github/workflows/deploy-api.yml`, `CLAUDE.md` (structural changes), `alembic/versions/` (new migrations need explicit task) | Deployment config and migration files; human must review before merge |
+| **Gbrain tooling** | `scripts/gbrain/` | Gbrain CI scripts; do not modify unless working on gbrain subsystem |
+| **Legacy intake** | `_migration/` | Not wired to running system — do not implement against anything here |
 
 ---
 
@@ -57,25 +77,27 @@ Before first commit: update your lane row in [parallel_lanes_tracker.md](./paral
 
 ## Ready work (pick one lane per session)
 
-#### V — TODO-5/6: Provider sync hardening (dedup + async)
+**Completed this session (2026-05-22):** Lane **V** (TODO-5/6), Lane **W** docs (TODO-7 partial — storage decision still human). **Working tree (uncommitted):** outbound scheduled send (`20260522_0008` migration + dispatch script + Communications UI).
 
-**Paths:** `services/api/app/routers/providers.py`, `services/api/app/workflows/provider_first_sync.py`  
-**Goal:**  
-- TODO-5: per-message `ProviderEvent` rows with idempotency key `"{provider_connection_id}:gmail:{message_id}"` (replace the one-blob approach)  
-- TODO-6: migrate `providers.py` inline `process_provider_first_sync` call to launch via orchestrator (removes the last blocking HTTP request path)
-
-**Note:** Coordinate with DNA **Lane X** if both touch `providers.py` — V owns dedup/async; X owns `account_sweep` paths.
+**Merged on main (prior sessions):** R (`deploy-api.yml`), S (invite/registration), T (`client_onboarding` orchestration), U (Gmail send via Composio).
 
 ---
 
+### Next up (human or agent)
+
+| Priority | Lane / item | Notes |
+|----------|-------------|--------|
+| 1 | **Human** — DNA storage model | Pick relational `client_dna_*` vs GBrain-only vs hybrid — see [`client_dna_adoption_build_plan.md`](./client_dna_adoption_build_plan.md) open decision table |
+| 2 | **X** — Account sweep MVP | Blocked on storage pick; then TODO-8 |
+| 3 | **Ops** — VPS `alembic upgrade head` for `20260522_0008` + outbound cron | After merge/commit of outbound + invite `0008` if not on VPS yet |
+| 4 | **Commit** — outbound scheduling + any API doc-only deltas | User did not request commit in autonomous session |
+
 ### Client DNA adoption track (lanes W–Z)
 
-Post-MVP enrichment after governed onboarding. **Does not block** lanes R, S, T, V.
-
-| Lane | Goal | Allowed paths | Depends on |
-|------|------|---------------|------------|
-| **W** | DNA canon & storage design | `docs/**` only | — |
-| **X** | Account sweep MVP (180d Gmail+Calendar first) | `workflows/`, `skills/`, `orchestrator.py`, `routers/providers.py`, `alembic/` | W |
+| Lane | Goal | Status |
+|------|------|--------|
+| **W** | DNA canon & storage design | **Done (docs)** — human must choose storage |
+| **X** | Account sweep MVP | Ready after human storage pick |
 | **Y** | Parse & synthesize (`client_dna_candidate`, SIGMA `client_dna`) | `skills/`, `adapters/gbrain.py`, `models.py`, `alembic/`, workflows | X |
 | **Z** | HITL verify & adoption | `routers/`, `apps/flavoros/.../admin/**`, `admin-api.ts`, workflows | Y |
 
@@ -92,24 +114,21 @@ Post-MVP enrichment after governed onboarding. **Does not block** lanes R, S, T,
 ```mermaid
 flowchart TD
   start[New session]
-  merge_p[Lane R: Merge deploy workflow]
-  merge_q[Lane S: Merge invite/registration]
-  onboarding_skill[Lane T: client_onboarding full orchestration]
-  gmail_send[Lane U: Real Gmail send]
-  sync_harden[Lane V: Sync dedup + async]
+  storage[Human: DNA storage pick]
+  sweep[Lane X: Account sweep]
+  dna[Lanes Y then Z]
 
-  start --> merge_q
-  merge_q --> onboarding_skill
-  start --> sync_harden
+  start --> storage
+  storage --> sweep
+  sweep --> dna
 ```
 
 | Week | Focus | Outcome |
 |---|---|---|
-| 1 | ~~Lane R~~ — done (2026-05-22) | Auto-deploy on push to main ✓ |
-| 1 | Lane S — Cherry-pick + resolve invite/reg | New clients can be invited and self-register |
-| 1–2 | Lane T — Full client_onboarding skill | Governed Client Universe created end-to-end at onboarding |
-| 2–3 | Lane V — Sync dedup + async | Incremental sync safe; no more blocking HTTP |
-| 3+ | Lanes W→Z (optional) | Client DNA adoption after onboarding baseline (see build plan) |
+| Done (2026-05-22) | R, S, T, U, V, W (docs) | Deploy, invite, onboarding orchestration, Gmail send, sync dedup + async |
+| Next | Human storage decision | Unblocks Lane X migrations |
+| Next | Lane X → Y → Z | Client DNA adoption implementation |
+| Ops | Commit outbound scheduling + VPS alembic/cron | See working tree + migration `20260522_0008` |
 
 ---
 
@@ -213,10 +232,11 @@ Current reality (as of 2026-05-22):
 
 Your assignment:
 Choose one follow-on lane and stay inside it:
-1. Lane V — Provider sync dedup + async LLM call (TODO-5/6)
-2. Lanes W–Z — Client DNA adoption (TODO-7–10; see client_dna_adoption_build_plan.md)
+1. **Human** — DNA storage model (TODO-7 acceptance; blocks Lane X)
+2. Lane X — Account sweep MVP (TODO-8)
+3. Lanes Y–Z — Parse/synthesize and HITL adoption (TODO-9/10)
 
-(Lanes R, S, T, U + OpenRouter all done 2026-05-22. Parallel Cursor outbound work — "Finish client email outbound" — is uncommitted in the tree; its migration `20260522_0008` must set down_revision→`0008` before commit.)
+(Lanes R, S, T, U, V, W docs done 2026-05-22. Outbound scheduled send is in the working tree — commit + VPS alembic/cron when ready.)
 
 IMPORTANT: Always explain the problem + approach before writing code. Wait for confirmation.
 
@@ -259,7 +279,7 @@ Documented in [archive/build_vertical_slice_tasks.md](./archive/build_vertical_s
 3. See real artifacts and pending approvals on Command Center
 4. Approve or reject with audit trail
 
-**Key implementation:** inline `process_provider_first_sync` after sync commit; stub orchestrator unchanged.
+**Key implementation (historical):** early slice used inline `process_provider_first_sync` after sync; current code dispatches `provider_first_sync_review` off the HTTP thread (Lane V).
 
 ### Post-slice completed lanes
 

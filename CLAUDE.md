@@ -52,6 +52,28 @@ Using gstack skills: After install, skills like /qa, /ship, /review, /investigat
 and /browse are available. Use /browse for all web browsing.
 Use ~/.claude/skills/gstack/... for gstack file paths (the global path).
 
+## Repo Layer Map
+
+Two-layer rule — **always check this before implementing or creating files:**
+
+| Concept | Authored spec (canon) | Runtime code | Planned (not wired) |
+|---|---|---|---|
+| Skills | `skills/<name>/` | `services/api/app/skills/` | — |
+| Workflows | `docs/workflows/` | `services/api/app/workflows/` | — |
+| Agents | `agents/<name>/` (YAML, SOUL.md, protocols) | `services/api/app/adapters/orchestrator.py` | — |
+| Personas | `agents/<name>/personas/` | — | — |
+| Integrations | `integrations/<name>/` (spec) | `services/api/app/adapters/` | — |
+| Planned services | `docs/architecture/planned_services.md` | — | All future microservices live here until real Dockerfile exists |
+| Configs | `configs/` (YAML) | API settings loaded via env | — |
+| Governance | `governance/` | Enforced in `services/api/app/routers/` | — |
+| Client universe | `client_universe/` (schemas, clients) | `services/api/app/routers/` (tenant endpoints) | — |
+| Tooling / CI scripts | `scripts/` (FlavorOS), `scripts/gbrain/` (gbrain) | — | — |
+
+**When implementing:** use the Runtime code column.  
+**When authoring behavior, personas, or skill specs:** use the Authored spec column.  
+**When something only appears in Planned:** do not wire it — add it to `docs/architecture/planned_services.md` instead.  
+**`services/` contains only `services/api`** — one real deployable. Any new service lives in Planned until it has a Dockerfile and CI deploy step.
+
 ## Deploy Configuration (Vercel)
 
 - **Platform:** Vercel
