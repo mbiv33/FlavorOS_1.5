@@ -1,6 +1,6 @@
 # FlavorOS Taxonomy
 
-**Last updated:** 2026-05-19 15:30 EDT
+**Last updated:** 2026-05-23 EDT
 
 Canonical shared vocabulary for FlavorOS 1.5. Use these terms consistently in PRs, tests, UI copy, admin surfaces, and planning docs.
 
@@ -223,26 +223,30 @@ Not MVP interaction primitives: persistent chat, right rail, voice-first, live t
 
 Quick pointers for post-slice work (aligned with [`planning/next_session_handoff.md`](planning/next_session_handoff.md)).
 
-| Area | Path |
-|---|---|
-| Next.js app | `apps/flavoros/` |
-| Client API + session | `apps/flavoros/src/lib/api.ts` |
-| Admin API (operator only) | `apps/flavoros/src/lib/admin-api.ts` |
-| Admin surfaces config | `apps/flavoros/src/lib/admin-surfaces.ts` |
-| Mappers | `apps/flavoros/src/lib/mappers.ts` |
-| Shared channel loader | `apps/flavoros/src/lib/hooks/useChannelData.ts` |
-| Communications page | `apps/flavoros/src/app/(client)/communications/` |
-| Calendar page | `apps/flavoros/src/app/(client)/calendar/` |
-| Command Center | `apps/flavoros/src/app/(client)/command-center/` |
-| FastAPI service | `services/api/` |
-| Provider-first sync | `services/api/app/workflows/provider_first_sync.py` |
-| Approvals | `services/api/app/routers/approvals.py` |
-| Communications outbound | `services/api/app/workflows/communications_outbound.py` |
-| Smoke script | `scripts/smoke-vertical-slice.sh` |
-| API integration CI | `.github/workflows/api-integration-tests.yml` |
-| Local dev | `docs/planning/local_dev_runbook.md` |
-| GBrain subsystem | `subsystems/gbrain/` |
-| Production app | `https://flavoros.vercel.app` |
+> **Two-layer rule:** For the full authored-spec vs runtime-code mapping see `CLAUDE.md` § "Repo Layer Map". This section is path pointers only.
+
+| Area | Path | Notes |
+|---|---|---|
+| Next.js app | `apps/flavoros/` | Only deployable frontend |
+| Client API + session | `apps/flavoros/src/lib/api.ts` | |
+| Admin API (operator only) | `apps/flavoros/src/lib/admin-api.ts` | |
+| Admin surfaces config | `apps/flavoros/src/lib/admin-surfaces.ts` | |
+| Mappers | `apps/flavoros/src/lib/mappers.ts` | |
+| Shared channel loader | `apps/flavoros/src/lib/hooks/useChannelData.ts` | |
+| Communications page | `apps/flavoros/src/app/(client)/communications/` | |
+| Calendar page | `apps/flavoros/src/app/(client)/calendar/` | |
+| Command Center | `apps/flavoros/src/app/(client)/command-center/` | |
+| FastAPI service | `services/api/` | Only item in `services/` — all other services are planned, not running |
+| Planned future services | `docs/architecture/planned_services.md` | Extraction targets with trigger criteria |
+| Provider-first sync | `services/api/app/workflows/provider_first_sync.py` | |
+| Approvals | `services/api/app/routers/approvals.py` | |
+| Communications outbound | `services/api/app/workflows/communications_outbound.py` | |
+| FlavorOS scripts | `scripts/` | Operational helpers, smoke tests, agent deploy |
+| GBrain CI scripts | `scripts/gbrain/` | GBrain-internal tooling (moved from `services/`) |
+| API integration CI | `.github/workflows/api-integration-tests.yml` | |
+| Local dev | `docs/planning/local_dev_runbook.md` | |
+| GBrain subsystem | `subsystems/gbrain/` | Git submodule |
+| Production app | `https://flavoros.vercel.app` | |
 
 **High-collision shared files** (coordinate in tracker before parallel edits): `providers.py`, `approvals.py`, `orchestrator.py`, `provider_first_sync.py`, `schemas.py`, `api.ts` (auth/session), `command-center/page.tsx`, `ApprovalCard.tsx`, `SessionGuard.tsx`.
 
