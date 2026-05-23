@@ -1,26 +1,18 @@
 # FlavorOS TODOS
 
-**Last updated:** 2026-05-22 — TODO-2 (Real orchestrator) done; TODO-4 (Real Gmail send) done.
+**Last updated:** 2026-05-22 — TODO-5/6 done (Lane V); TODO-7 docs done (storage pick human); outbound scheduling in working tree; R/S/T/U merged.
 
 ---
 
 ## P1 — Blocks first real client demo
 
-### TODO-1: Deploy services/api to a real cloud host
+### TODO-1: Deploy services/api to a real cloud host — done
 
 **What:** Move `services/api` from localhost-only to a deployed host (Railway, Fly.io, or Hostinger VPS already in use for agent bundles).
 
-**Why:** A local tunnel works for solo developer testing but breaks the moment a real client accesses the app from a different machine. NEXT_PUBLIC_FLAVOROS_API_URL must point somewhere always-on.
+**Status:** VPS deploy complete — API live at `https://api.flavoros.cc` (Hostinger VPS, Cloudflare tunnel, systemd `flavoros-api`). Re-deploy when shipping API changes; Lane R adds GitHub Actions auto-deploy on push to `main`.
 
-**Where to start:** `docs/planning/local_dev_runbook.md` for the current local setup. The CLAUDE.md VPS fallback section for the deployment pattern. The API is a standard FastAPI app with Postgres — Railway or Fly.io will auto-detect it from `pyproject.toml`.
-
-**Pros:** Unlocks real client demos without tunnel setup; removes dependency on developer's laptop being on; enables Vercel front-end to hit a stable API URL.
-
-**Cons:** Adds infrastructure cost and maintenance surface; Postgres must be provisioned separately or migrated.
-
-**Effort:** human ~2h / CC ~30min
-**Priority:** P1
-**Depends on:** Nothing (can do before or after Composio wiring)
+**Where to start:** `docs/planning/vps_deploy_runbook.md`, `scripts/deploy-vps.sh`, `docs/planning/parallel_lanes_tracker.md` (VPS deploy row in completed archive).
 
 ---
 
@@ -59,6 +51,8 @@
 
 **Why:** Onboarding is the entry-point workflow and the most complex. The initial skill only reads existing contexts/providers and writes a confirmation artifact — it does not yet *create* the governed universe or fan out to seed workflows.
 
+**Scope note:** Superseded **in scope** by DNA **Lane W** canon for relationship to **TODO-7** (historical sweeps and four-domain parse are not part of TODO-2b). **Lane T** remains orchestration-only unless product merges T into W. DNA sweeps start after onboarding readiness — see [`docs/workflows/client_dna_adoption_model.md`](docs/workflows/client_dna_adoption_model.md).
+
 **Where to start:** `services/api/app/skills/client_onboarding.py`, `docs/workflows/client_onboarding_model.md`, the seed skills as fan-out targets.
 
 **Effort:** human ~3-4 days / CC ~4-6h
@@ -94,9 +88,11 @@
 
 ---
 
-### TODO-5: Per-message ProviderEvent deduplication for re-sync
+### TODO-5: Per-message ProviderEvent deduplication for re-sync — ✅ DONE (2026-05-22)
 
 **What:** When re-sync is implemented, move from storing all email items in a single `NormalizedItem.data["items"]` array to creating one `ProviderEvent` + `NormalizedItem` row per email message, with a unique idempotency key per message.
+
+**Done:** `sync_provider` in `services/api/app/routers/providers.py` creates per-message rows with idempotency `"{provider_connection_id}:{provider}:{message_id}"`; batch sync event uses separate key; tests in `tests/test_provider_first_sync.py`.
 
 **Why:** The current First Real User implementation stores the sync result in one `NormalizedItem.data["items"]` — which gets overwritten on every sync. A re-sync path needs per-message deduplication so the same email isn't shown twice after a second "Sync" click.
 
@@ -111,19 +107,67 @@
 
 ---
 
-### TODO-6: Move sync LLM call off the request thread
+### TODO-6: Move sync LLM call off the request thread — ✅ DONE (2026-05-22)
 
-**What:** Run `process_provider_first_sync` asynchronously instead of blocking the FastAPI event loop. Use `asyncio.to_thread(process_provider_first_sync, db, workflow_run.id)` or move to a background task queue.
+**What:** Run provider sync review asynchronously instead of blocking the FastAPI event loop on the LLM path.
+
+**Done:** HTTP sync no longer calls inline `process_provider_first_sync`; schedules `provider_first_sync_review` / `communication_sweep_review` via `asyncio.create_task(dispatch_task)`. Client polls workflow run for artifact. `record_provider_sync_completion` + GBrain ingest still run synchronously on HTTP thread after dispatch is scheduled.
 
 **Why:** The current sync handler blocks the event loop for 3-7s (Composio HTTP fetch + Anthropic LLM call). At one concurrent user this is fine; at 10+ concurrent syncs the server throughput degrades. This was a deliberate tradeoff for the First Real User milestone.
 
-**Where to start:** `services/api/app/routers/providers.py:331` — the inline `process_provider_first_sync(db, workflow_run.id)` call. Wrap with `await asyncio.to_thread(...)` or dispatch to a Celery/ARQ background worker.
-
-**Pros:** Sync endpoint returns immediately; client gets faster feedback; server stays responsive under concurrency.
-**Cons:** Background execution means the artifact isn't guaranteed ready when the sync HTTP response arrives — the client would need a polling or websocket pattern to know when the artifact is ready.
+**Pros:** Sync endpoint returns quickly; LLM review runs off-thread; server stays responsive under concurrency.
+**Cons:** Artifact not ready in the HTTP response — client polls workflow run (implemented).
 
 **Effort:** human ~1 day / CC ~2h
 **Priority:** P3
 **Depends on:** First Real User milestone complete; real orchestrator (TODO-2) may make this moot
 
-**Status note (2026-05-22):** Orchestrator-launched workflows now run off-thread via `asyncio.create_task(dispatch_task(...))` in `InProcessOrchestratorAdapter.launch`, and the front-end polls for completion. The remaining blocking path is the **inline** `process_provider_first_sync(db, workflow_run.id)` call in `routers/providers.py` — that one still blocks the request. Migrating provider sync to launch via the orchestrator (workflow_type `provider_first_sync`) instead of the inline processor would close this.
+
+---
+
+## P3 — Client DNA adoption (post-MVP enrichment)
+
+Parallel lanes **W–Z** — see [`docs/planning/parallel_lanes_tracker.md`](docs/planning/parallel_lanes_tracker.md) and [`docs/planning/client_dna_adoption_build_plan.md`](docs/planning/client_dna_adoption_build_plan.md). **Does not block** lanes R, S, T, V.
+
+### TODO-7: DNA canon & storage design (Lane W) — docs ✅ / storage decision ⏳ human
+
+**What:** Finalize workflow model + build plan; Phase 8 stub in `current_build_plan.md`; decide relational `client_dna_*` tables vs GBrain-only pre-verify.
+
+**Done (2026-05-22):** Canon docs updated; open decision table (relational vs GBrain-only vs hybrid) in [`docs/planning/client_dna_adoption_build_plan.md`](docs/planning/client_dna_adoption_build_plan.md) — **agents must not pick an option**.
+
+**Human required:** Choose storage option before Lane X (migrations).
+
+**Allowed paths:** `docs/**` only.
+
+**Effort:** human ~1 day / CC ~2h  
+**Depends on:** Nothing
+
+### Outbound scheduled send (working tree, 2026-05-22)
+
+**What:** `scheduled_send_at` on `outbound_actions`; `scripts/dispatch_outbound_due.py`; Communications schedule UI; migration `20260522_0008` (`down_revision` = invite migration `0008`).
+
+**Human:** Commit/merge, VPS `alembic upgrade head`, cron for due dispatch.
+
+### TODO-8: Account sweep MVP (Lane X)
+
+**What:** `account_sweep` workflow, per-window `SyncCheckpoint`, 180d Gmail + Calendar first.
+
+**Depends on:** TODO-7. Coordinate with Lane V on `providers.py` — X owns sweep paths; V owns dedup/async first-sync.
+
+**Where to start:** `services/api/app/workflows/`, `adapters/orchestrator.py`, `routers/providers.py`
+
+### TODO-9: Parse & synthesize (Lane Y)
+
+**What:** `client_dna_parse` skill; GBrain ingest `client_dna_candidate`; `store_sigma` with `sigma_type=client_dna`.
+
+**Depends on:** TODO-8. Non-stub GBrain (`GBRAIN_ADAPTER=cli`) required for full synthesis in target envs.
+
+**Where to start:** `services/api/app/skills/`, `adapters/gbrain.py`, `models.py`, `alembic/`
+
+### TODO-10: HITL verify & adoption (Lane Z)
+
+**What:** Admin DNA review queue; 3× unverified purge/cross-reference; `client_dna_adoption` workflow after acceptance.
+
+**Depends on:** TODO-9
+
+**Where to start:** `services/api/app/routers/`, `apps/flavoros/src/app/admin/**`, `admin-api.ts`, workflows
