@@ -166,10 +166,17 @@ Parallel lanes **W–Z** — see [`docs/planning/parallel_lanes_tracker.md`](doc
 
 **Where to start:** `services/api/app/skills/`, `adapters/gbrain.py`, `models.py`, `alembic/`
 
-### TODO-10: HITL verify & adoption (Lane Z)
+### TODO-10: HITL verify & adoption (Lane Z) — ✅ DONE (2026-05-23)
 
 **What:** Admin DNA review queue; 3× unverified purge/cross-reference; `client_dna_adoption` workflow after acceptance.
 
-**Depends on:** TODO-9
+**What landed:**
+- `workflows/client_dna_adoption.py` — `adopt_candidate` (store_sigma + GBrain ingest, status=adopted) and `reject_candidate` (3× purge threshold, AuditEvent writes)
+- `routers/dna.py` — GET /dna/candidates (domain/status filter), GET /dna/candidates/{id}, POST .../accept, POST .../reject — all tenant-scoped, 409 on non-pending
+- `main.py` — wired `dna.router`
+- `admin-api.ts` — `ClientDnaCandidateRead` type, `listDnaCandidates`, `acceptDnaCandidate`, `rejectDnaCandidate`
+- `admin-surfaces.ts` — added `dna` tile + surface spec
+- `DnaCandidatePanel.tsx` — domain-filter chips, per-row Accept/Reject buttons, optimistic removal after action
+- `AdminSurfacePanel.tsx` — routes `surface==="dna"` to `DnaCandidatePanel`
 
-**Where to start:** `services/api/app/routers/`, `apps/flavoros/src/app/admin/**`, `admin-api.ts`, workflows
+**Depends on:** TODO-9
