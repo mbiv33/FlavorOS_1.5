@@ -35,25 +35,26 @@ This plan phases DNA work across **lanes W–Z**, explicitly **parallel to and n
 
 **Allowed paths:** `docs/**` only.
 
-### Open decision: DNA candidate storage (human only)
+### Storage decision: Hybrid — LOCKED (2026-05-23)
 
-**Do not implement either option in code until a human owner selects one.**
+**Decision owner:** Marcus Bivines  
+**Rationale:** The Client Universe is a full, owned copy of the client's world — not a pull-on-demand cache. CU DB (Postgres) is the authoritative structured store. GBrain is the synthesis and memory layer. DNA candidates must be queryable Postgres rows pre-HITL (to support the admin review queue, `verification_attempts` counter, and purge enforcement). Post-accept promotion writes to GBrain via `store_sigma` so the verified DNA becomes durable client memory. GBrain-only (Option B) was ruled out because the HITL queue still requires SQL-queryable rows regardless.
 
-| Option | Pros | Cons |
-|--------|------|------|
-| **A — Relational `client_dna_*` tables** | Queryable in Postgres; admin review queues without GBrain CLI; FK to `client_id` / `workflow_run_id`; aligns with existing Artifact/Approval patterns; easier compliance/audit exports. | New migrations + routers; dual-write risk if GBrain also holds truth; more schema churn during MVP. |
-| **B — GBrain-only pre-verify** | Matches SIGMA / memory-first canon; fewer API tables; faster to ship parse/synthesize skills that already call `gbrain.ingest`. | Admin HITL needs GBrain search or heavy JSON blobs in Postgres anyway; harder to enforce row-level tenancy in SQL; local dev depends on `GBRAIN_ADAPTER=cli`. |
-| **Hybrid (recommended in docs, not chosen)** | Candidates in Postgres (`client_dna_candidate` rows) + promotion via GBrain `store_sigma` after accept — matches “candidates in DB, memory in GBrain” line in the workflow model. | Two systems to keep consistent; needs clear promotion transaction boundaries. |
-
-**Agent action:** Document options only. Mark TODO-7 acceptance “storage decision pending human.”
+**Promotion rule:**
+```
+pre-HITL:  client_dna_candidate rows in Postgres
+           (status=pending | rejected | accepted, verification_attempts counter)
+post-accept: store_sigma(sigma_type=”client_dna”) → GBrain durable memory
+             client_dna_candidate.status = “adopted”, row retained for audit trail
+```
 
 **Acceptance criteria:**
 
 - [x] Every diagram box has `workflow_type`, agent owner, and storage layer in the workflow model doc.
 - [x] Product rule documented: onboarding completes before historical sweeps; explicit launch of DNA track.
 - [x] Collision matrix with lanes T and V signed off in tracker.
-- [ ] **Human:** pick storage option A, B, or hybrid (blocks Lane X migrations).
-- [ ] Written promotion rule after pick: where candidates live pre-HITL vs post-accept durable memory.
+- [x] **Human:** Hybrid selected — Postgres pre-HITL, GBrain post-accept (2026-05-23).
+- [x] Promotion rule written above: candidates live in Postgres until accepted; adoption writes to GBrain.
 
 **Effort:** human ~1 day / CC ~2h  
 **Depends on:** Nothing  

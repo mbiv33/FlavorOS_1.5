@@ -1,5 +1,7 @@
 # GBrain Integration
 
+**See also:** [`client_universe_memory_system.md`](./client_universe_memory_system.md) — two-hemisphere model (CU DB + IPM), preparation-over-retrieval principle, chron-driven sync loop.
+
 ## Definition
 
 GBrain is the ingestion, indexing, memory maintenance, retrieval, context preparation, and SIGMA state subsystem for FlavorOS.

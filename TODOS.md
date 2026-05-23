@@ -129,13 +129,15 @@
 
 Parallel lanes **W–Z** — see [`docs/planning/parallel_lanes_tracker.md`](docs/planning/parallel_lanes_tracker.md) and [`docs/planning/client_dna_adoption_build_plan.md`](docs/planning/client_dna_adoption_build_plan.md). **Does not block** lanes R, S, T, V.
 
-### TODO-7: DNA canon & storage design (Lane W) — docs ✅ / storage decision ⏳ human
+### TODO-7: DNA canon & storage design (Lane W) — ✅ DONE (2026-05-23)
 
 **What:** Finalize workflow model + build plan; Phase 8 stub in `current_build_plan.md`; decide relational `client_dna_*` tables vs GBrain-only pre-verify.
 
-**Done (2026-05-22):** Canon docs updated; open decision table (relational vs GBrain-only vs hybrid) in [`docs/planning/client_dna_adoption_build_plan.md`](docs/planning/client_dna_adoption_build_plan.md) — **agents must not pick an option**.
+**Done:** Canon docs updated; **Hybrid selected** — Postgres `client_dna_candidate` rows pre-HITL, `store_sigma` to GBrain post-accept. Promotion rule documented. See [`docs/planning/client_dna_adoption_build_plan.md`](docs/planning/client_dna_adoption_build_plan.md).
 
-**Human required:** Choose storage option before Lane X (migrations).
+**Memory architecture canonized:** Two-hemisphere model (CU DB + IPM), preparation-over-retrieval principle, and chron-driven sync loop documented in [`docs/architecture/client_universe_memory_system.md`](docs/architecture/client_universe_memory_system.md).
+
+**Unblocks:** Lane X (account sweep MVP, migrations).
 
 **Allowed paths:** `docs/**` only.
 
