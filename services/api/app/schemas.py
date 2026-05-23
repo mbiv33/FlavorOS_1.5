@@ -580,3 +580,26 @@ class AuditEventCreate(BaseModel):
     resource_type: Optional[str] = Field(None, max_length=64)
     resource_id: Optional[uuid.UUID] = None
     detail: Optional[dict] = None
+
+
+class ClientDnaCandidateRead(BaseModel):
+    id: uuid.UUID
+    client_id: uuid.UUID
+    workflow_run_id: Optional[uuid.UUID]
+    source_item_id: Optional[uuid.UUID]
+    domain: str
+    status: str
+    verification_attempts: int
+    confidence: Optional[float]
+    sweep_window: Optional[str]
+    content: str
+    gbrain_record_id: Optional[str]
+    sigma_id: Optional[str]
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class DnaDecision(BaseModel):
+    note: Optional[str] = Field(None, max_length=500)

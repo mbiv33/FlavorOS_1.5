@@ -18,6 +18,7 @@ export const ADMIN_TILES = [
   { slug: "outbound", title: "Outbound actions" },
   { slug: "logs", title: "Logs" },
   { slug: "config", title: "Config" },
+  { slug: "dna", title: "DNA Review" },
 ] as const;
 
 export type AdminTileSlug = (typeof ADMIN_TILES)[number]["slug"];
@@ -117,6 +118,15 @@ export const ADMIN_SURFACES: Record<string, AdminSurfaceSpec> = {
       "Every edit writes an audit event.",
     ],
   },
+  dna: {
+    title: "DNA Review",
+    subtitle: "Client DNA candidate HITL verify & adoption queue",
+    liveData: true,
+    notes: [
+      "Pending candidates from account sweep LLM extraction — contacts, locations, entities, projects.",
+      "Accept promotes to GBrain durable memory. Reject returns to queue; 3× rejection purges.",
+    ],
+  },
 };
 
 export function getAdminSurface(slug: string): AdminSurfaceSpec | undefined {
@@ -156,6 +166,8 @@ export function formatTileMeta(
       return `${overview.auditRecent} recent audit events`;
     case "config":
       return "Workflow + briefing flags";
+    case "dna":
+      return "Pending HITL review";
     default:
       return "";
   }

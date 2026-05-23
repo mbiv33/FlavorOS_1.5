@@ -128,6 +128,62 @@ export async function listOutboundActions(
   return adminRequest<OutboundActionRead[]>(path, session);
 }
 
+export type ClientDnaCandidateRead = {
+  id: string;
+  client_id: string;
+  workflow_run_id: string | null;
+  source_item_id: string | null;
+  domain: string;
+  status: string;
+  verification_attempts: number;
+  confidence: number | null;
+  sweep_window: string | null;
+  content: string;
+  gbrain_record_id: string | null;
+  sigma_id: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export async function listDnaCandidates(
+  session: FlavorOSSession,
+  domain?: string,
+  status?: string,
+): Promise<ClientDnaCandidateRead[]> {
+  const params = new URLSearchParams();
+  if (domain) params.set("domain", domain);
+  if (status) params.set("status", status);
+  const query = params.toString();
+  return adminRequest<ClientDnaCandidateRead[]>(
+    `/dna/candidates${query ? `?${query}` : ""}`,
+    session,
+  );
+}
+
+export async function acceptDnaCandidate(
+  session: FlavorOSSession,
+  id: string,
+  note?: string,
+): Promise<ClientDnaCandidateRead> {
+  return adminRequest<ClientDnaCandidateRead>(
+    `/dna/candidates/${id}/accept`,
+    session,
+    { method: "POST", body: JSON.stringify({ note: note ?? null }) },
+  );
+}
+
+export async function rejectDnaCandidate(
+  session: FlavorOSSession,
+  id: string,
+  note?: string,
+): Promise<ClientDnaCandidateRead> {
+  return adminRequest<ClientDnaCandidateRead>(
+    `/dna/candidates/${id}/reject`,
+    session,
+    { method: "POST", body: JSON.stringify({ note: note ?? null }) },
+  );
+}
+
 export async function listAuditEvents(
   session: FlavorOSSession,
   limit = 100,

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { Card, CardMeta, CardTitle } from "@/components/Card";
+import { DnaCandidatePanel } from "@/components/admin/DnaCandidatePanel";
 import {
   getAdminSession,
   listApprovals,
@@ -225,6 +226,10 @@ export function AdminSurfacePanel({ surface }: { surface: string }) {
   }, [surface, spec?.liveData, outboundStatusFilter]);
 
   if (!spec) return null;
+
+  if (surface === "dna") {
+    return <DnaCandidatePanel />;
+  }
 
   return (
     <div className="mx-auto max-w-4xl space-y-3">

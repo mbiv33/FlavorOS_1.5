@@ -16,6 +16,7 @@ from app.routers import (
     audit,
     auth,
     contexts,
+    dna,
     health,
     onboarding,
     outbound_actions,
@@ -81,6 +82,7 @@ def create_app() -> FastAPI:
     app.include_router(workflows.router)
     app.include_router(providers.router)
     app.include_router(audit.router)
+    app.include_router(dna.router)
     return app
 
 
