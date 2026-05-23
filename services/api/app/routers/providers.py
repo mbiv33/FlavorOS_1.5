@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 
 from app.adapters import ComposioAdapter, GBrainAdapter
 from app.deps import get_composio, get_db, get_gbrain, require_tenant_match
+from app.executor import dispatch_task
 from app.models import (
     AgentTask,
     AuditEvent,
@@ -36,7 +37,6 @@ from app.schemas import (
     ProviderSyncRead,
     ProviderSyncRequest,
 )
-from app.executor import dispatch_task
 from app.services.client_universe import record_provider_sync_completion
 
 router = APIRouter(prefix="/providers", tags=["providers"])

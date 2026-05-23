@@ -102,7 +102,12 @@ def _preview_rows_from_meta(preview_meta: dict[str, Any]) -> list[DraftEmailPrev
                 continue
             label = entry.get("label")
             value = entry.get("value")
-            if isinstance(label, str) and isinstance(value, str) and label.strip() and value.strip():
+            if (
+                isinstance(label, str)
+                and isinstance(value, str)
+                and label.strip()
+                and value.strip()
+            ):
                 rows.append(DraftEmailPreviewRow(label=label.strip(), value=value.strip()))
     return rows
 
