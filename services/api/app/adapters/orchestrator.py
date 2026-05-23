@@ -215,6 +215,10 @@ class InProcessOrchestratorAdapter:
             "agent": "sinclair",
             "task_type": "account_sweep",
         },
+        "client_dna_parse": {
+            "agent": "sinclair",
+            "task_type": "client_dna_parse",
+        },
     }
 
     async def list_workflows(self) -> list[WorkflowDefinition]:

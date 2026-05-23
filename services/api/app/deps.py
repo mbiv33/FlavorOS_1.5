@@ -142,6 +142,21 @@ def get_composio(settings: Annotated[Settings, Depends(get_settings)]) -> Compos
     return _composio_stub
 
 
+def get_gbrain_adapter() -> GBrainAdapter:
+    """Standalone GBrain adapter getter for use outside FastAPI request context (e.g. skills)."""
+    from app.config import get_settings as _get_settings
+    s = _get_settings()
+    if s.gbrain_adapter == "cli":
+        if s.gbrain_cli_path not in _gbrain_cli_cache:
+            _gbrain_cli_cache[s.gbrain_cli_path] = GBrainCliAdapter(cli_path=s.gbrain_cli_path)
+        return _gbrain_cli_cache[s.gbrain_cli_path]
+    if s.gbrain_adapter == "local_file":
+        if s.gbrain_store_dir not in _gbrain_file_cache:
+            _gbrain_file_cache[s.gbrain_store_dir] = LocalFileGBrainAdapter(s.gbrain_store_dir)
+        return _gbrain_file_cache[s.gbrain_store_dir]
+    return _gbrain_stub
+
+
 def get_gbrain(settings: Annotated[Settings, Depends(get_settings)]) -> GBrainAdapter:
     if settings.gbrain_adapter == "cli":
         if settings.gbrain_cli_path not in _gbrain_cli_cache:

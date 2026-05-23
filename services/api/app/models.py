@@ -10,8 +10,10 @@ from sqlalchemy import (
     JSON,
     Boolean,
     DateTime,
+    Float,
     ForeignKey,
     Index,
+    Integer,
     String,
     Text,
     UniqueConstraint,
@@ -899,4 +901,61 @@ class PacEvent(Base):
     detail: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+# ---------------------------------------------------------------------------
+# Client DNA Candidates (Lane Y — pre-HITL relational store)
+# ---------------------------------------------------------------------------
+
+
+class ClientDnaCandidate(Base):
+    """Pre-verification DNA candidate extracted from account sweep data.
+
+    status lifecycle: pending → accepted | rejected
+    accepted candidates are promoted to GBrain via store_sigma (sigma_type=client_dna)
+    and status moves to adopted. Candidates failing verification 3× are purged (Lane Z).
+
+    Storage decision: Postgres pre-HITL, GBrain post-accept (2026-05-23).
+    """
+
+    __tablename__ = "client_dna_candidates"
+    __table_args__ = (
+        Index("ix_client_dna_candidates_client_domain", "client_id", "domain"),
+        Index("ix_client_dna_candidates_client_status", "client_id", "status"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    client_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False
+    )
+    workflow_run_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("workflow_runs.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    source_item_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("normalized_items.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    domain: Mapped[str] = mapped_column(String(32), nullable=False)
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="pending")
+    verification_attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    confidence: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    sweep_window: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    raw_data: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    gbrain_record_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    sigma_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        server_onupdate=func.now(),
+        nullable=False,
     )
