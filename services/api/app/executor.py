@@ -34,6 +34,7 @@ import app.skills.comms_calendar  # noqa: F401
 import app.skills.morning_standup  # noqa: F401
 import app.skills.morning_standup_seed  # noqa: F401
 import app.skills.projects_review  # noqa: F401
+import app.skills.sinclair_account_sweep  # noqa: F401
 import app.skills.sinclair_comms_sweep  # noqa: F401
 import app.skills.sinclair_provider_review  # noqa: F401
 import app.skills.travel_research_seed  # noqa: F401

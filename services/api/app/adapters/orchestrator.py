@@ -211,6 +211,10 @@ class InProcessOrchestratorAdapter:
             "agent": "khadijah",
             "task_type": "projects_review",
         },
+        "account_sweep": {
+            "agent": "sinclair",
+            "task_type": "account_sweep",
+        },
     }
 
     async def list_workflows(self) -> list[WorkflowDefinition]:

@@ -119,6 +119,19 @@ _gbrain_cli_cache: dict[str, GBrainAdapter] = {}
 _orchestrator: OrchestratorAdapter = StubOrchestratorAdapter()
 
 
+def get_composio_adapter() -> ComposioAdapter:
+    """Standalone composio adapter getter for use outside FastAPI request context (e.g. skills)."""
+    from app.config import get_settings as _get_settings
+    s = _get_settings()
+    if s.composio_api_key:
+        if s.composio_api_key not in _composio_real_cache:
+            _composio_real_cache[s.composio_api_key] = RealComposioAdapter(
+                api_key=s.composio_api_key,
+            )
+        return _composio_real_cache[s.composio_api_key]
+    return _composio_stub
+
+
 def get_composio(settings: Annotated[Settings, Depends(get_settings)]) -> ComposioAdapter:
     if settings.composio_api_key:
         if settings.composio_api_key not in _composio_real_cache:

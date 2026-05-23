@@ -18,6 +18,7 @@ import asyncio
 import logging
 import uuid
 from dataclasses import dataclass, field
+from datetime import datetime
 from typing import Any, Protocol, runtime_checkable
 
 logger = logging.getLogger(__name__)
@@ -131,6 +132,21 @@ class ComposioAdapter(Protocol):
         """
         ...
 
+    async def fetch_window(
+        self,
+        client_id: uuid.UUID,
+        provider: str,
+        composio_user_id: str,
+        since: "datetime",
+        until: "datetime | None" = None,
+    ) -> SyncResult:
+        """Fetch all provider items in a date window for account sweep.
+
+        Used by the account_sweep workflow to pull historical data across
+        60d / 180d / 360d / prior_years windows into the CU DB.
+        """
+        ...
+
 
 class StubComposioAdapter:
     """Noop implementation that returns safe defaults for MVP development."""
@@ -193,6 +209,16 @@ class StubComposioAdapter:
         provider: str,
         composio_user_id: str | None = None,
         cursor: str | None = None,
+    ) -> SyncResult:
+        return SyncResult(provider=provider, records_synced=0)
+
+    async def fetch_window(
+        self,
+        client_id: uuid.UUID,
+        provider: str,
+        composio_user_id: str,
+        since: "datetime",
+        until: "datetime | None" = None,
     ) -> SyncResult:
         return SyncResult(provider=provider, records_synced=0)
 
@@ -411,6 +437,96 @@ class RealComposioAdapter:
             items=items,
             next_cursor=next_cursor,
         )
+
+
+    async def fetch_window(
+        self,
+        client_id: uuid.UUID,
+        provider: str,
+        composio_user_id: str,
+        since: "datetime",
+        until: "datetime | None" = None,
+    ) -> SyncResult:
+        import datetime as _dt
+
+        from composio import Action  # noqa: PLC0415
+
+        now = _dt.datetime.now(_dt.timezone.utc)
+        window_until = until or now
+
+        if provider == "gmail":
+            # Gmail search operator: after:YYYY/MM/DD before:YYYY/MM/DD
+            query = f"after:{since.strftime('%Y/%m/%d')} before:{window_until.strftime('%Y/%m/%d')}"
+            params: dict[str, Any] = {
+                "max_results": 50,
+                "query": query,
+            }
+            action = Action.GMAIL_FETCH_EMAILS
+        elif provider == "googlecalendar":
+            params = {
+                "time_min": since.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                "time_max": window_until.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                "max_results": 50,
+            }
+            action = Action.GOOGLECALENDAR_FIND_EVENT
+        else:
+            return SyncResult(
+                provider=provider,
+                records_synced=0,
+                errors=[f"fetch_window: unsupported provider {provider}"],
+            )
+
+        try:
+            raw = await asyncio.to_thread(
+                self._get_toolset().execute_action,
+                action=action,
+                params=params,
+                entity_id=composio_user_id,
+            )
+        except Exception as exc:
+            logger.warning("fetch_window failed for %s %s: %s", provider, composio_user_id, exc)
+            return SyncResult(provider=provider, records_synced=0, errors=[str(exc)])
+
+        data = raw if isinstance(raw, dict) else {}
+        inner = data.get("data") if isinstance(data.get("data"), dict) else data
+
+        if provider == "gmail":
+            messages = inner.get("messages", []) or []
+            items = [
+                {
+                    "subject": (
+                        m.get("subject")
+                        or _header(m, "subject")
+                        or "(no subject)"
+                    ),
+                    "snippet": m.get("snippet", ""),
+                    "message_id": m.get("id") or m.get("messageId", ""),
+                }
+                for m in (messages if isinstance(messages, list) else [])
+                if isinstance(m, dict)
+            ]
+        elif provider == "googlecalendar":
+            events = inner.get("items", []) or []
+            items = [
+                {
+                    "summary": e.get("summary", "(no title)"),
+                    "start": (
+                        (e.get("start") or {}).get("dateTime")
+                        or (e.get("start") or {}).get("date", "")
+                    ),
+                    "end": (
+                        (e.get("end") or {}).get("dateTime")
+                        or (e.get("end") or {}).get("date", "")
+                    ),
+                    "event_id": e.get("id") or e.get("eventId", ""),
+                }
+                for e in (events if isinstance(events, list) else [])
+                if isinstance(e, dict)
+            ]
+        else:
+            items = []
+
+        return SyncResult(provider=provider, records_synced=len(items), items=items)
 
 
 def _header(message: dict[str, Any], name: str) -> str | None:
