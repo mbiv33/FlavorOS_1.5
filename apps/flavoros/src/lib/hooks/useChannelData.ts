@@ -12,11 +12,7 @@ import {
   type ApprovalRead,
   type OutboundActionRead,
 } from "@/lib/api";
-import {
-  approvalToInboxItem,
-  artifactToInboxItem,
-  enrichInboxItemsWithOutbound,
-} from "@/lib/mappers";
+import { buildInboxItems } from "@/lib/mappers";
 import type { InboxItem } from "@/lib/fixtures";
 
 export type ChannelData = {
@@ -29,22 +25,6 @@ export type ChannelData = {
   refresh: () => void;
   applyDecideResult: (result: ApprovalDecideRead) => void;
 };
-
-function buildInboxItems(
-  artifactList: ArtifactRead[],
-  approvalList: ApprovalRead[],
-  outboundList: OutboundActionRead[],
-): InboxItem[] {
-  const outboundByApproval = new Map(
-    outboundList.map((o) => [o.approval_id, o]),
-  );
-  const artifactMap = new Map(artifactList.map((a) => [a.id, a]));
-  const items: InboxItem[] = [
-    ...approvalList.map((a) => approvalToInboxItem(a, artifactMap)),
-    ...artifactList.map((a) => artifactToInboxItem(a)),
-  ];
-  return enrichInboxItemsWithOutbound(items, outboundByApproval);
-}
 
 export function useChannelData(): ChannelData {
   const [artifacts, setArtifacts] = useState<ArtifactRead[]>([]);

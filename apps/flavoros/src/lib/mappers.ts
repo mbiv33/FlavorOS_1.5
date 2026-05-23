@@ -2,14 +2,16 @@ import type { PileListItem } from "@/components/PileItemList";
 import type { PileDef, PileTone } from "@/components/PileRow";
 import type { Stat, StatTone } from "@/components/StatStrip";
 
-import type { ArtifactRead, ApprovalRead, OutboundActionRead, OutboundStatus } from "./api";
+import type { ArtifactRead, ApprovalRead, NormalizedItemRead, OutboundActionRead, OutboundStatus } from "./api";
 import type {
   BriefingDefinition,
   BriefingPreparedStatus,
   BriefingType,
 } from "./briefings-config";
 import { BRIEFING_DEFINITIONS } from "./briefings-config";
+import type { CommsPile } from "./communications-config";
 import type { InboxItem, InboxPile, CardStatus } from "./fixtures";
+import type { DraftEmailPreview } from "./api";
 
 export function relativeTime(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
@@ -117,14 +119,76 @@ function agentForAction(action: string): "Sinclair" | "Khadijah" | "Regine" {
   return "Khadijah";
 }
 
+function metaRecord(meta: ArtifactRead["meta"]): Record<string, unknown> {
+  return meta && typeof meta === "object" ? meta : {};
+}
+
+export function artifactType(meta: ArtifactRead["meta"]): string | null {
+  const value = metaRecord(meta).artifact_type;
+  return typeof value === "string" ? value : null;
+}
+
+function commsChannelPile(meta: ArtifactRead["meta"]): CommsPile {
+  const channel = metaRecord(meta).channel;
+  if (channel === "sms" || channel === "voice") return "sms-voice";
+  if (channel === "social") return "social";
+  return "emails";
+}
+
+function sourceLinkLabelFromMeta(meta: ArtifactRead["meta"]): string | undefined {
+  const record = metaRecord(meta);
+  const links = record.source_links;
+  if (Array.isArray(links) && links.length > 0) {
+    const first = links[0];
+    if (first && typeof first === "object" && !Array.isArray(first)) {
+      const label = (first as Record<string, unknown>).label ?? (first as Record<string, unknown>).title;
+      if (typeof label === "string" && label.trim()) return label.trim();
+    }
+    if (typeof first === "string" && first.trim()) return first.trim();
+  }
+  if (typeof record.thread_id === "string" && record.thread_id) return "Gmail thread";
+  if (typeof record.message_id === "string" && record.message_id) return "Gmail message";
+  return undefined;
+}
+
+function detailFromPreview(approval: ApprovalRead): string {
+  const preview = approval.preview;
+  if (!preview) return approval.reason ?? "Pending your decision";
+  if (preview.inbound_summary) return preview.inbound_summary.slice(0, 120);
+  const parts = [preview.to, preview.subject].filter(Boolean);
+  if (parts.length > 0) return parts.join(" · ");
+  if (preview.body_excerpt) return preview.body_excerpt.slice(0, 120);
+  if (preview.body) return preview.body.slice(0, 120);
+  return approval.reason ?? "Pending your decision";
+}
+
+export function mapDraftEmailPreview(
+  preview: DraftEmailPreview,
+): NonNullable<InboxItem["preview"]> {
+  return {
+    to: preview.to,
+    subject: preview.subject,
+    bodyExcerpt: preview.body_excerpt,
+    inboundSummary: preview.inbound_summary,
+    body: preview.body,
+    rows: preview.rows,
+  };
+}
+
 export function approvalToInboxItem(
   approval: ApprovalRead,
   artifactMap?: Map<string, ArtifactRead>,
 ): InboxItem {
   const artifact = approval.artifact_id ? artifactMap?.get(approval.artifact_id) : undefined;
-  const detail = artifact?.body
-    ? artifact.body.slice(0, 120)
-    : (approval.reason ?? "Pending your decision");
+  const meta = artifact?.meta ?? null;
+  const isDraftEmail =
+    approval.governed_action === "send_communication_draft" ||
+    artifactType(meta) === "draft_email";
+  const detail = isDraftEmail
+    ? detailFromPreview(approval)
+    : artifact?.body
+      ? artifact.body.slice(0, 120)
+      : (approval.reason ?? "Pending your decision");
   return {
     id: `approval-${approval.id}`,
     pile: "urgent",
@@ -135,6 +199,13 @@ export function approvalToInboxItem(
     detail,
     when: relativeTime(approval.created_at),
     approvalId: approval.id,
+    canDefer: isDraftEmail,
+    sourceLinkLabel: approval.source_link_label ?? sourceLinkLabelFromMeta(meta),
+    channelPile: isDraftEmail ? commsChannelPile(meta) : undefined,
+    preview: approval.preview
+      ? mapDraftEmailPreview(approval.preview)
+      : undefined,
+    stakes: approval.stakes,
   };
 }
 
@@ -153,6 +224,9 @@ function artifactCardStatus(artifact: ArtifactRead): CardStatus {
 
 export function artifactToInboxItem(artifact: ArtifactRead): InboxItem {
   const pile = artifactPile(artifact);
+  const meta = artifact.meta;
+  const isCommsArtifact =
+    artifactType(meta) === "draft_email" || metaRecord(meta).channel != null;
   return {
     id: `artifact-${artifact.id}`,
     pile,
@@ -162,7 +236,79 @@ export function artifactToInboxItem(artifact: ArtifactRead): InboxItem {
     agent: "Khadijah",
     detail: artifact.body?.slice(0, 80) ?? "",
     when: relativeTime(artifact.updated_at),
+    channelPile: isCommsArtifact ? commsChannelPile(meta) : undefined,
+    sourceLinkLabel: sourceLinkLabelFromMeta(meta),
   };
+}
+
+export function buildInboxItems(
+  artifactList: ArtifactRead[],
+  approvalList: ApprovalRead[],
+  outboundList: OutboundActionRead[],
+): InboxItem[] {
+  const outboundByApproval = new Map(
+    outboundList.map((o) => [o.approval_id, o]),
+  );
+  const artifactMap = new Map(artifactList.map((a) => [a.id, a]));
+  const linkedArtifactIds = new Set(
+    approvalList
+      .map((a) => a.artifact_id)
+      .filter((id): id is string => id != null),
+  );
+  const items: InboxItem[] = [
+    ...approvalList.map((a) => approvalToInboxItem(a, artifactMap)),
+    ...artifactList
+      .filter((a) => !linkedArtifactIds.has(a.id))
+      .map((a) => artifactToInboxItem(a)),
+  ];
+  return enrichInboxItemsWithOutbound(items, outboundByApproval);
+}
+
+function normalizedItemToInboxItem(item: NormalizedItemRead): InboxItem {
+  const data = item.data ?? {};
+  const snippet =
+    typeof data.snippet === "string"
+      ? data.snippet
+      : typeof data.preview === "string"
+        ? data.preview
+        : "";
+  const subject =
+    typeof data.subject === "string" && data.subject.trim()
+      ? data.subject
+      : item.title;
+  return {
+    id: `normalized-${item.id}`,
+    pile: "updates",
+    kind: "update",
+    title: subject,
+    status: "Completed",
+    agent: "Sinclair",
+    detail: snippet.slice(0, 120) || "Synced from Gmail",
+    when: relativeTime(item.created_at),
+    channelPile: "emails",
+    sourceLinkLabel:
+      typeof data.message_id === "string" ? "Gmail message" : undefined,
+  };
+}
+
+function isCommunicationsInboxItem(item: InboxItem): boolean {
+  return item.channelPile != null;
+}
+
+/** Communications inbox: channel piles, deduped artifacts, plus inbound email rows. */
+export function buildCommunicationsInboxItems(
+  artifactList: ArtifactRead[],
+  approvalList: ApprovalRead[],
+  outboundList: OutboundActionRead[],
+  normalizedItems: NormalizedItemRead[] = [],
+): InboxItem[] {
+  const base = buildInboxItems(artifactList, approvalList, outboundList).filter(
+    isCommunicationsInboxItem,
+  );
+  const emailRows = normalizedItems
+    .filter((item) => item.item_type === "email" || item.item_type === "email_sync_receipt")
+    .map(normalizedItemToInboxItem);
+  return [...base, ...emailRows];
 }
 
 export function buildGreeting(displayName: string): string {
@@ -280,10 +426,19 @@ export function briefingAttentionItems(
   approvals: ApprovalRead[],
 ): InboxItem[] {
   const artifactMap = new Map(artifacts.map((a) => [a.id, a]));
+  const linkedArtifactIds = new Set(
+    approvals
+      .map((a) => a.artifact_id)
+      .filter((id): id is string => id != null),
+  );
   const items: InboxItem[] = [
     ...approvals.map((a) => approvalToInboxItem(a, artifactMap)),
     ...artifacts
-      .filter((a) => a.status === "ready" || a.status === "draft")
+      .filter(
+        (a) =>
+          !linkedArtifactIds.has(a.id) &&
+          (a.status === "ready" || a.status === "draft"),
+      )
       .map((a) => artifactToInboxItem(a)),
   ];
   return items.slice(0, 6);
@@ -302,6 +457,9 @@ export function mapInboxPileToSurface<K extends string>(
   item: InboxItem,
   pileOrder: readonly K[],
 ): K {
+  if (item.channelPile && pileOrder.includes(item.channelPile as K)) {
+    return item.channelPile as K;
+  }
   const idx = INBOX_PILE_ORDER.indexOf(item.pile);
   const safeIdx = idx < 0 ? pileOrder.length - 1 : Math.min(idx, pileOrder.length - 1);
   return pileOrder[safeIdx];
@@ -319,6 +477,8 @@ export function inboxItemToPileListItem(item: InboxItem): PileListItem {
     canDefer: item.canDefer,
     sourceLinkLabel: item.sourceLinkLabel,
     approvalId: item.approvalId,
+    preview: item.preview,
+    stakes: item.stakes,
   };
 }
 

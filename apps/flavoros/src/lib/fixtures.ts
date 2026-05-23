@@ -64,6 +64,15 @@ export const todayOperatingPicture = {
 // Dashboard · Client Inbox
 // -----------------------------------------------------------------------
 
+export type EmailPreviewFields = {
+  to?: string | null;
+  subject?: string | null;
+  bodyExcerpt?: string | null;
+  inboundSummary?: string | null;
+  body?: string | null;
+  rows?: { label: string; value: string }[];
+};
+
 export type InboxItem = {
   id: string;
   pile: InboxPile;
@@ -76,6 +85,9 @@ export type InboxItem = {
   canDefer?: boolean;
   sourceLinkLabel?: string;
   approvalId?: string;
+  channelPile?: CommsPile;
+  preview?: EmailPreviewFields;
+  stakes?: { kind: string; label: string }[];
 };
 
 export const inboxItems: InboxItem[] = [

@@ -114,6 +114,9 @@ export default function BriefingScreen() {
                   detail={a.detail}
                   status={a.status}
                   agent={a.agent}
+                  preview={a.preview}
+                  stakes={a.stakes}
+                  sourceLinkLabel={a.sourceLinkLabel}
                 />
               ))
             )}

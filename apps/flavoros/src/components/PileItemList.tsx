@@ -1,6 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import {
+  ApprovalEmailPreview,
+  type ApprovalEmailPreviewData,
+} from "./ApprovalEmailPreview";
 import { StatusChip } from "./StatusChip";
 import { decideApproval, loadSession, type ApprovalDecideRead } from "@/lib/api";
 import { statusAccentBorder } from "@/lib/statusAccent";
@@ -17,6 +21,8 @@ export type PileListItem = {
   canDefer?: boolean;
   sourceLinkLabel?: string;
   approvalId?: string;
+  preview?: ApprovalEmailPreviewData;
+  stakes?: { kind: string; label: string }[];
 };
 
 export function PileItemList({
@@ -64,9 +70,16 @@ export function PileItemList({
           <div className="flex items-start justify-between gap-3">
             <div className="space-y-1">
               <h3 className="text-sm font-medium">{item.title}</h3>
-              <p className="text-xs text-muted">
-                {item.agent} · {item.detail}
-              </p>
+              {item.preview ? (
+                <ApprovalEmailPreview preview={item.preview} />
+              ) : (
+                <p className="text-xs text-muted">
+                  {item.agent} · {item.detail}
+                </p>
+              )}
+              {item.stakes && item.stakes.length > 0 ? (
+                <StakeChips stakes={item.stakes} />
+              ) : null}
               {item.when ? (
                 <p className="text-xs text-muted">{item.when}</p>
               ) : null}
@@ -81,6 +94,21 @@ export function PileItemList({
         </li>
       ))}
     </ul>
+  );
+}
+
+function StakeChips({ stakes }: { stakes: { kind: string; label: string }[] }) {
+  return (
+    <div className="flex flex-wrap gap-1.5 pt-1">
+      {stakes.map((chip) => (
+        <span
+          key={`${chip.kind}-${chip.label}`}
+          className="rounded-full border border-border-strong bg-surface px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-strong"
+        >
+          {chip.label}
+        </span>
+      ))}
+    </div>
   );
 }
 

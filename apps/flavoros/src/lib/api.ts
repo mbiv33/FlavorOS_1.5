@@ -61,6 +61,25 @@ export type ArtifactRead = {
   updated_at: string;
 };
 
+export type DraftEmailPreviewRow = {
+  label: string;
+  value: string;
+};
+
+export type DraftEmailPreview = {
+  to?: string | null;
+  subject?: string | null;
+  body_excerpt?: string | null;
+  inbound_summary?: string | null;
+  body?: string | null;
+  rows?: DraftEmailPreviewRow[];
+};
+
+export type ApprovalStakeChip = {
+  kind: string;
+  label: string;
+};
+
 export type ApprovalRead = {
   id: string;
   client_id: string;
@@ -70,6 +89,19 @@ export type ApprovalRead = {
   decision: "pending" | "approved" | "rejected" | "expired";
   decided_by: string | null;
   decided_at: string | null;
+  created_at: string;
+  preview?: DraftEmailPreview | null;
+  stakes?: ApprovalStakeChip[];
+  source_link_label?: string | null;
+};
+
+export type NormalizedItemRead = {
+  id: string;
+  client_id: string;
+  provider_event_id: string;
+  item_type: string;
+  title: string;
+  data: Record<string, unknown> | null;
   created_at: string;
 };
 
@@ -291,6 +323,20 @@ export async function listOutboundActions(
   const qs = params.toString();
   return apiRequest<OutboundActionRead[]>(
     qs ? `/outbound-actions?${qs}` : "/outbound-actions",
+    session,
+  );
+}
+
+export async function listNormalizedItems(
+  session: FlavorOSSession,
+  filters?: { item_type?: string; limit?: number },
+): Promise<NormalizedItemRead[]> {
+  const params = new URLSearchParams();
+  if (filters?.item_type) params.set("item_type", filters.item_type);
+  if (filters?.limit) params.set("limit", String(filters.limit));
+  const qs = params.toString();
+  return apiRequest<NormalizedItemRead[]>(
+    qs ? `/providers/normalized-items?${qs}` : "/providers/normalized-items",
     session,
   );
 }
