@@ -28,6 +28,7 @@ on:
     branches: [main]
     paths:
       - "services/api/**"
+      - "scripts/**"
       - ".github/workflows/deploy-api.yml"
 
 concurrency:
@@ -94,7 +95,8 @@ jobs:
               .venv/bin/pip install -q -e . 2>/dev/null || true; \
               .venv/bin/alembic upgrade head; \
               systemctl restart flavoros-api; \
-              systemctl is-active --quiet flavoros-api"
+              systemctl is-active --quiet flavoros-api; \
+              (crontab -l 2>/dev/null | grep -v 'dispatch_outbound_due'; echo '* * * * * /opt/flavoros/api/repo/services/api/.venv/bin/python /opt/flavoros/api/repo/scripts/dispatch_outbound_due.py >> /var/log/flavoros-outbound-dispatch.log 2>&1') | crontab -"
 
       - name: Verify production health
         run: curl -sf --retry 5 --retry-delay 3 --retry-all-errors https://api.flavoros.cc/health
