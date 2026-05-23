@@ -39,12 +39,12 @@
 
 **Status:** Vertical slice (steps 1–5) is **complete**. Client DNA adoption is **post-MVP enrichment** — independent of merge/hardening lanes **R, S, T, V**.
 
-| Lane | Goal | Allowed paths | Depends on |
-|------|------|---------------|------------|
-| **W** | DNA canon & storage design | `docs/**` only | — |
-| **X** | Account sweep MVP | `services/api/app/workflows/`, `services/api/app/skills/`, `adapters/orchestrator.py`, `routers/providers.py`, `alembic/` | W |
-| **Y** | Parse & synthesize | `services/api/app/skills/`, `adapters/gbrain.py`, `models.py`, `alembic/`, workflows | X |
-| **Z** | HITL verify & adoption | `services/api/app/routers/`, `apps/flavoros/src/app/admin/**`, `admin-api.ts`, workflows | Y |
+| Lane | Goal | Allowed paths | Depends on | Status |
+|------|------|---------------|------------|--------|
+| **W** | DNA canon & storage design | `docs/**` only | — | **Done (docs)** |
+| **X** | Account sweep MVP | `services/api/app/workflows/`, `services/api/app/skills/`, `adapters/orchestrator.py`, `routers/providers.py`, `alembic/` | W | Ready |
+| **Y** | Parse & synthesize | `services/api/app/skills/`, `adapters/gbrain.py`, `models.py`, `alembic/`, workflows | X | Ready |
+| **Z** | HITL verify & adoption | `services/api/app/routers/`, `apps/flavoros/src/app/admin/**`, `admin-api.ts`, workflows | Y | Ready |
 
 **Canon:** [`docs/workflows/client_dna_adoption_model.md`](../workflows/client_dna_adoption_model.md), [`client_dna_adoption_build_plan.md`](./client_dna_adoption_build_plan.md). **TODOS:** TODO-7–10.
 
@@ -56,11 +56,12 @@
 
 | Lane | Blocked by | Status | Notes |
 |---|---|---|---|
+| AA — Outbound scheduled send | Nothing | **Done (working tree)** | `scheduled_send_at`, `dispatch_outbound_due.py`, Communications UI; migration `20260522_0008` → `0008`; 88 API tests pass — 2026-05-22 |
 | R — Merge deploy-api.yml | Nothing | **Done** | Cherry-picked `6fa9549` onto main (`c608062`) — 2026-05-22 |
 | S — Merge invite/registration | Nothing | **Done** | Cherry-picked `cc0f5cf` onto main (`d0bf663`); no conflicts — 2026-05-22 |
 | T — Full client_onboarding skill | Lane S (optional) | **Done** | Provider expectations + seed fan-out + readiness (`c99f993`); contexts created upstream — 2026-05-22 |
-| V — Sync dedup + async | Nothing | Ready | Per-message ProviderEvent rows + migrate inline sync to orchestrator (TODO-5/6) |
-| W — DNA canon & storage | Nothing | Ready | Docs only — `client_dna_adoption_*` model + Phase 8 (TODO-7) |
+| V — Sync dedup + async | Nothing | **Done** | Per-message ProviderEvent idempotency + sync LLM off HTTP thread (2026-05-22) |
+| W — DNA canon & storage | Nothing | **Done (docs)** | Canon + build plan + storage options doc; human picks schema (TODO-7) |
 | X — Account sweep MVP | Lane W | Ready | `account_sweep` + SyncCheckpoint windows; 180d Gmail+Calendar (TODO-8) |
 | Y — Parse & synthesize | Lane X | Ready | `client_dna_parse`, GBrain `client_dna_candidate` (TODO-9) |
 | Z — HITL verify & adoption | Lane Y | Ready | Admin DNA queue + `client_dna_adoption` (TODO-10) |
@@ -139,6 +140,9 @@ When done: move your lane out of Active parallel lanes, update the Completed lan
 
 | Timestamp | Agent | Lane | Action |
 |---|---|---|---|
+| 2026-05-22 | Cursor agent | Autonomous | **Outbound scheduled send** (working tree): `scheduled_send_at` on `outbound_actions`, `dispatch_outbound_due.py`, client Communications schedule UI; migration `20260522_0008` chains from invite `0008`; 19 outbound tests pass |
+| 2026-05-22 | Cursor agent | V | **Lane V done:** per-message `ProviderEvent` idempotency in `sync_provider`; HTTP sync dispatches `provider_first_sync_review` via `asyncio.create_task` (no inline `process_provider_first_sync`); test updated for skill artifact title |
+| 2026-05-22 | Cursor agent | W | **Lane W done (docs):** storage A/B/hybrid pros-cons in build plan; Phase 8 stub already in `current_build_plan.md`; human must pick storage before Lane X |
 | 2026-05-22 | Claude Code | T | **Lane T done:** `client_onboarding` orchestration (`c99f993`) — provider_expectations + seed fan-out + readiness; 4 tests. Note: parallel Cursor outbound work uncommitted in tree (migration `20260522_0008` needs down_revision→`0008`) |
 | 2026-05-22 | Claude Code | OpenRouter | `app/llm.py` `call_llm()` OpenRouter-primary/Anthropic-fallback; all 10 skills refactored; deploy writes `/etc/flavoros/api.env` from Secrets |
 | 2026-05-22 | Claude Code | S | **Lane S done:** cherry-picked `cc0f5cf` → `d0bf663`; invite_tokens migration 0008; 53 tests pass; run `alembic upgrade head` on VPS |

@@ -39,7 +39,9 @@ The bottleneck has shifted to **integration depth and invite-based multi-user**:
 - **GitHub Actions auto-deploy** — `deploy-api.yml` ready on `origin/parallel/lane-p-deploy`; needs cherry-pick (Lane R — fast, 1 file).
 - **User invite/registration** — `invite_tokens` + routes + tests ready on `origin/parallel/lane-q-invite`; needs cherry-pick with conflict resolution (Lane S).
 - **Real Gmail send** — `StubGmailOutboundAdapter` still in place; approved drafts don't actually send (TODO-4, Lane U).
-- **Provider sync hardening** — per-message dedup and async first-sync LLM call still open (TODO-5/6, Lane V).
+- **Provider sync hardening** — TODO-5/6 done (2026-05-22): per-message dedup + async skill dispatch off HTTP thread (Lane V).
+- **Client DNA** — docs/canon done (Lane W); **human** must pick storage model before Lane X implementation.
+- **Outbound scheduling** — implemented in working tree (uncommitted); needs merge + VPS migration/cron.
 - **Full `client_onboarding` orchestration** — skill exists but only writes a summary; does not create governed universe or fan-out to seed workflows (TODO-2b, Lane T).
 
 **Next agents:** read [`next_session_handoff.md`](./next_session_handoff.md) before claiming work.

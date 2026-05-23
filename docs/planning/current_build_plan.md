@@ -1,6 +1,6 @@
 # Current Build Plan
 
-**Last updated:** 2026-05-21 EDT
+**Last updated:** 2026-05-22 EDT
 
 ## Purpose
 
@@ -205,6 +205,22 @@ Required outcomes:
 - outbound action staging.
 
 Current status: skills/protocols are strong; runtime execution remains partial.
+
+### Phase 8: Client DNA Adoption (post-MVP enrichment)
+
+Goal: after governed onboarding, backfill historical provider context and promote verified relationship DNA into Client Universe and GBrain.
+
+Required outcomes:
+
+- account sweeps by time window (60/180/360/prior years), starting with 180d Gmail + Calendar,
+- four-domain client DNA parsing (contacts, locations, entities, projects),
+- GBrain synthesis and SIGMA `client_dna` drafts,
+- DNA-specific HITL verify and 3× unverified purge/cross-reference,
+- `client_dna_adoption` promotion only after acceptance.
+
+Current status: **Phase 8 docs complete** (workflow model + build plan + open storage decision table). Implementation tracked in lanes W–Z ([`client_dna_adoption_build_plan.md`](./client_dna_adoption_build_plan.md)); **human must pick** relational vs GBrain-only vs hybrid before Lane X code.
+
+**Does not block:** merge/hardening lanes R, S, T, V. Onboarding (Phase 4) completes before sweeps per product rule.
 
 ## Retained But Not First Proof Loop
 

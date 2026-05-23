@@ -136,6 +136,65 @@ decision_history: []
 external_action_status: queued | executed | cancelled | not_applicable
 ```
 
+## `draft_email` Client Artifact + Approval projection
+
+Email reply drafts are the canonical Communications HITL artifact. The API stores them as `artifacts` rows with `kind=client` and `meta.artifact_type=draft_email`. When outbound send requires approval, a linked `approvals` row uses `governed_action=send_communication_draft`.
+
+### Meta shape (authoritative)
+
+```yaml
+artifact_type: draft_email
+channel: email                    # drives Communications pile → emails
+to: string
+subject: string
+body: string                      # optional; may also live on artifact.body
+status: draft | ready             # API artifact.status; see mapping below
+preview:                          # optional; projected to Approval Card
+  inbound_summary: string | null  # plain-English inbound context (1–2 sentences)
+  body: string | null             # full draft body for expanded preview
+  body_excerpt: string | null     # compact excerpt when body omitted
+  to: string | null               # override display to (defaults to meta.to)
+  subject: string | null          # override display subject (defaults to meta.subject)
+  rows:                           # compact label/value rows (To, Subject, …)
+    - label: string
+      value: string
+source_links:                     # Link Card below decision row (docs/ui/06-command-components.md)
+  - label: string                 # e.g. "Gmail thread"
+    url: string | null            # provider deep link when available
+thread_id: string | null          # fallback source link label → "Gmail thread"
+message_id: string | null
+stakes:                           # optional map → Approval stakes chips
+  public_facing: boolean | string
+  irreversible: boolean | string
+  time_sensitive: string | null
+```
+
+Runtime references: `services/api/app/workflows/communications_outbound.py`, `services/api/app/seed.py`, legacy mock ` _migration/intake/old_ui/app_web/lib/mock/approvals.ts`.
+
+### Status mapping (canon vs API)
+
+| Product canon | API `artifacts.status` | Approval Card chip |
+|---|---|---|
+| Draft ready for review | `ready` | Ready to approve |
+| Work in progress | `draft` | Draft ready |
+| Approved / sent path | `approved` | Completed / Sent (via outbound) |
+
+Seed and sync processors may create `ready` drafts immediately after Sinclair prepares the reply.
+
+### Approval projection fields
+
+`GET /approvals` (and decide responses) enrich pending rows when `artifact_id` points at a `draft_email`:
+
+| API field | Source |
+|---|---|
+| `preview` | `meta.preview` merged with `meta.to` / `meta.subject` / `artifact.body` |
+| `stakes` | `meta.stakes` or default communication chips |
+| `source_link_label` | first `source_links[].label` or thread/message fallback |
+
+UI maps these to Approval Card / pile list: preview block (inbound summary, rows, body excerpt), stakes chips, source link, and decision row (`Approve`, `Modify`, `I'll do myself`, optional `Defer`). See `docs/ui/06-command-components.md` and `apps/flavoros/src/components/ApprovalCard.tsx`.
+
+Communications pile routing uses `meta.channel` (`email` → Emails pile). Inbound-only rows come from `GET /providers/normalized-items?item_type=email` (see `docs/ui/14-channel-surfaces.md`).
+
 ## SIGMA Artifact Fields
 
 ```yaml

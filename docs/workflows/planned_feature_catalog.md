@@ -63,6 +63,7 @@ Build priorities are:
 | Context accounts | `partial` | Provider account aliases attach to client contexts without storing secrets |
 | OAuth connection metadata | `partial` | Consent/grant metadata is tracked separately from secret material |
 | Relationship discovery onboarding | `missing_implementation` | Future onboarding step extracts contacts and recent participants, validates them, and initializes relationship memory in Client Universe/GBrain |
+| Client DNA Adoption Flow | `canonical_doc` | Post-onboarding historical sweeps (60/180/360/prior years), four-domain parse (contacts/locations/entities/projects), GBrain synthesis, SIGMA `client_dna`, HITL verify, 3× unverified purge, adoption into Client Universe/GBrain. See [`client_dna_adoption_model.md`](./client_dna_adoption_model.md) and [`../planning/client_dna_adoption_build_plan.md`](../planning/client_dna_adoption_build_plan.md). Parallel lanes W–Z; does not block R/S/T/V. |
 
 ## Communication And Scheduling
 
