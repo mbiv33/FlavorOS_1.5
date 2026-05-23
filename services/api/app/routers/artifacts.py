@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from app.deps import get_db, require_tenant_match
 from app.models import Artifact, Tenant, User
 from app.schemas import ArtifactCreate, ArtifactRead, ArtifactUpdate
+from app.services.artifact_meta import validate_client_artifact_meta
 
 router = APIRouter(prefix="/artifacts", tags=["artifacts"])
 
@@ -39,6 +40,8 @@ def list_artifacts(
 @router.post("", response_model=ArtifactRead, status_code=status.HTTP_201_CREATED)
 def create_artifact(body: ArtifactCreate, tu: TenantUser, db: DB):
     tenant, _ = tu
+    if body.kind == "client":
+        validate_client_artifact_meta(body.meta)
     artifact = Artifact(client_id=tenant.id, **body.model_dump())
     db.add(artifact)
     db.commit()
@@ -65,7 +68,10 @@ def update_artifact(artifact_id: uuid.UUID, body: ArtifactUpdate, tu: TenantUser
     ).scalar_one_or_none()
     if not artifact:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Artifact not found")
-    for field, value in body.model_dump(exclude_unset=True).items():
+    updates = body.model_dump(exclude_unset=True)
+    if artifact.kind == "client" and "meta" in updates:
+        validate_client_artifact_meta(updates["meta"])
+    for field, value in updates.items():
         setattr(artifact, field, value)
     db.commit()
     db.refresh(artifact)

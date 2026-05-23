@@ -315,7 +315,18 @@ def test_sync_endpoint_materializes_artifact_and_approval(
         headers=auth_headers_a,
     )
     assert sync.status_code == 200
-    assert sync.json()["workflow_run_id"]
+    run_id = sync.json()["workflow_run_id"]
+
+    db.expire_all()
+    run = db.get(WorkflowRun, uuid.UUID(run_id))
+    assert run is not None
+    if run.status != "completed":
+        # TestClient may return before background dispatch_task finishes; dev replay is valid.
+        proc = client.post(f"/workflows/{run_id}/process", headers=auth_headers_a)
+        assert proc.status_code == 200
+        db.expire_all()
+        run = db.get(WorkflowRun, uuid.UUID(run_id))
+    assert run.status == "completed"
 
     artifacts = db.execute(
         select(Artifact).where(Artifact.client_id == tenant_a.id)
@@ -325,13 +336,14 @@ def test_sync_endpoint_materializes_artifact_and_approval(
     ).scalars().all()
     assert len(artifacts) >= 1
     report = next(a for a in artifacts if a.kind == "report")
-    assert report.title == "First inbox sweep"
+    # Skill path (provider_first_sync_review) runs off the HTTP thread via dispatch_task.
+    assert report.title == "Provider Sync Review"
     assert report.status == "ready"
 
     assert len(approvals) == 1
     assert approvals[0].decision == "pending"
     assert approvals[0].artifact_id == report.id
-    assert approvals[0].governed_action == "provider_first_sync_review"
+    assert approvals[0].governed_action == "provider_sync_review"
 
 
 # ---------------------------------------------------------------------------

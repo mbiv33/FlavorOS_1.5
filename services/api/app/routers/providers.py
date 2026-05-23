@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import uuid
 from datetime import datetime, timezone
 from typing import Annotated
@@ -25,6 +26,7 @@ from app.models import (
 )
 from app.onboarding import provider_catalog
 from app.schemas import (
+    NormalizedItemRead,
     ProviderCallbackRead,
     ProviderCatalogItem,
     ProviderConnectionRead,
@@ -34,11 +36,15 @@ from app.schemas import (
     ProviderSyncRead,
     ProviderSyncRequest,
 )
+from app.executor import dispatch_task
 from app.services.client_universe import record_provider_sync_completion
-from app.workflows.communication_sweep import process_communication_sweep
-from app.workflows.provider_first_sync import process_provider_first_sync
 
 router = APIRouter(prefix="/providers", tags=["providers"])
+
+
+def _schedule_workflow_dispatch(agent_task_id: uuid.UUID) -> None:
+    """Run the queued AgentTask via the in-process executor (same path as orchestrator.launch)."""
+    asyncio.create_task(dispatch_task(agent_task_id))
 
 TenantUser = Annotated[tuple[Tenant, User], Depends(require_tenant_match)]
 DB = Annotated[Session, Depends(get_db)]
@@ -402,27 +408,26 @@ async def sync_provider(
     )
     db.add(workflow_run)
     db.flush()
-    db.add(
-        AgentTask(
-            client_id=tenant.id,
-            workflow_run_id=workflow_run.id,
-            agent=workflow_run.agent or "khadijah",
-            task_type=task_type,
-            status="queued",
-            payload={
-                "schema_version": "flavoros.agent_task.v1",
-                "workflow_run_id": str(workflow_run.id),
-                "client_id": str(tenant.id),
-                "target_agent": workflow_run.agent,
-                "task_type": task_type,
-                "source_refs": {
-                    "provider_event_id": str(provider_event.id),
-                    "normalized_item_id": str(normalized_item.id),
-                },
-                "inputs": workflow_run.input_data,
+    queued_agent_task = AgentTask(
+        client_id=tenant.id,
+        workflow_run_id=workflow_run.id,
+        agent=workflow_run.agent or "khadijah",
+        task_type=task_type,
+        status="queued",
+        payload={
+            "schema_version": "flavoros.agent_task.v1",
+            "workflow_run_id": str(workflow_run.id),
+            "client_id": str(tenant.id),
+            "target_agent": workflow_run.agent,
+            "task_type": task_type,
+            "source_refs": {
+                "provider_event_id": str(provider_event.id),
+                "normalized_item_id": str(normalized_item.id),
             },
-        )
+            "inputs": workflow_run.input_data,
+        },
     )
+    db.add(queued_agent_task)
     db.add(
         AuditEvent(
             client_id=tenant.id,
@@ -446,11 +451,9 @@ async def sync_provider(
     db.refresh(conn)
     db.refresh(provider_event)
     db.refresh(workflow_run)
+    db.refresh(queued_agent_task)
 
-    if is_first_sync:
-        process_provider_first_sync(db, workflow_run.id)
-    else:
-        process_communication_sweep(db, workflow_run.id)
+    _schedule_workflow_dispatch(queued_agent_task.id)
 
     record_provider_sync_completion(
         db,
@@ -488,6 +491,24 @@ async def sync_provider(
         "provider_event_id": provider_event.id,
         "workflow_run_id": workflow_run.id,
     }
+
+
+@router.get("/normalized-items", response_model=list[NormalizedItemRead])
+def list_normalized_items(
+    tu: TenantUser,
+    db: DB,
+    item_type: str | None = Query(None),
+    limit: int = Query(50, ge=1, le=200),
+):
+    """Tenant-scoped normalized ingest rows for Communications piles."""
+    tenant, _ = tu
+    q = select(NormalizedItem).where(NormalizedItem.client_id == tenant.id)
+    if item_type == "email":
+        q = q.where(NormalizedItem.item_type.in_(("email", "email_sync_receipt")))
+    elif item_type:
+        q = q.where(NormalizedItem.item_type == item_type)
+    q = q.order_by(NormalizedItem.created_at.desc()).limit(limit)
+    return db.execute(q).scalars().all()
 
 
 @router.get("/{provider_id}", response_model=ProviderConnectionRead)

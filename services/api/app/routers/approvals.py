@@ -11,7 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.deps import get_db, require_tenant_match
-from app.models import Approval, AuditEvent, Tenant, User
+from app.models import Approval, Artifact, AuditEvent, Tenant, User
 from app.schemas import (
     ApprovalCreate,
     ApprovalDecide,
@@ -19,12 +19,34 @@ from app.schemas import (
     ApprovalRead,
     OutboundActionRead,
 )
+from app.services.artifact_meta import project_approval_read
 from app.workflows import calendar_outbound, communications_outbound
 
 router = APIRouter(prefix="/approvals", tags=["approvals"])
 
 TenantUser = Annotated[tuple[Tenant, User], Depends(require_tenant_match)]
 DB = Annotated[Session, Depends(get_db)]
+
+
+def _load_artifact_map(db: Session, approvals: list[Approval]) -> dict[uuid.UUID, Artifact]:
+    artifact_ids = [a.artifact_id for a in approvals if a.artifact_id is not None]
+    if not artifact_ids:
+        return {}
+    rows = db.execute(
+        select(Artifact).where(Artifact.id.in_(artifact_ids))
+    ).scalars().all()
+    return {row.id: row for row in rows}
+
+
+def _project_approvals(db: Session, approvals: list[Approval]) -> list[ApprovalRead]:
+    artifact_map = _load_artifact_map(db, approvals)
+    return [
+        project_approval_read(
+            approval,
+            artifact_map.get(approval.artifact_id) if approval.artifact_id else None,
+        )
+        for approval in approvals
+    ]
 
 
 @router.get("", response_model=list[ApprovalRead])
@@ -38,7 +60,8 @@ def list_approvals(
     if decision:
         q = q.where(Approval.decision == decision)
     q = q.order_by(Approval.created_at.desc())
-    return db.execute(q).scalars().all()
+    approvals = db.execute(q).scalars().all()
+    return _project_approvals(db, list(approvals))
 
 
 @router.post("", response_model=ApprovalRead, status_code=status.HTTP_201_CREATED)
@@ -48,7 +71,7 @@ def create_approval(body: ApprovalCreate, tu: TenantUser, db: DB):
     db.add(approval)
     db.commit()
     db.refresh(approval)
-    return approval
+    return _project_approvals(db, [approval])[0]
 
 
 @router.get("/{approval_id}", response_model=ApprovalRead)
@@ -59,7 +82,7 @@ def get_approval(approval_id: uuid.UUID, tu: TenantUser, db: DB):
     ).scalar_one_or_none()
     if not approval:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Approval not found")
-    return approval
+    return _project_approvals(db, [approval])[0]
 
 
 @router.post("/{approval_id}/decide", response_model=ApprovalDecideRead)
@@ -112,7 +135,9 @@ def decide_approval(approval_id: uuid.UUID, body: ApprovalDecide, tu: TenantUser
 
     db.commit()
     db.refresh(approval)
-    base = ApprovalRead.model_validate(approval).model_dump()
+    artifact_map = _load_artifact_map(db, [approval])
+    artifact = artifact_map.get(approval.artifact_id) if approval.artifact_id else None
+    base = project_approval_read(approval, artifact).model_dump()
     if outbound_action is not None:
         base["outbound_action"] = OutboundActionRead.model_validate(outbound_action)
     return ApprovalDecideRead(**base)

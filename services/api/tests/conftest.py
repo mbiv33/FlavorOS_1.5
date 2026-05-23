@@ -61,6 +61,13 @@ def db() -> Generator[Session, None, None]:
         Base.metadata.drop_all(bind=TEST_ENGINE)
 
 
+@pytest.fixture(autouse=True)
+def bind_background_db_to_test_engine(monkeypatch) -> None:
+    """Background asyncio tasks (dispatch_task) must use the in-memory test DB."""
+    monkeypatch.setattr("app.database.SessionLocal", TestSession)
+    monkeypatch.setattr("app.executor.SessionLocal", TestSession)
+
+
 @pytest.fixture()
 def settings() -> Settings:
     return Settings(

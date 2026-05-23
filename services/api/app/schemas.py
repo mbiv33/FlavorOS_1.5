@@ -186,6 +186,25 @@ class ArtifactUpdate(BaseModel):
 APPROVAL_DECISIONS = {"pending", "approved", "rejected", "expired"}
 
 
+class DraftEmailPreviewRow(BaseModel):
+    label: str
+    value: str
+
+
+class DraftEmailPreview(BaseModel):
+    to: Optional[str] = None
+    subject: Optional[str] = None
+    body_excerpt: Optional[str] = None
+    inbound_summary: Optional[str] = None
+    body: Optional[str] = None
+    rows: list[DraftEmailPreviewRow] = Field(default_factory=list)
+
+
+class ApprovalStakeChip(BaseModel):
+    kind: str
+    label: str
+
+
 class ApprovalRead(BaseModel):
     id: uuid.UUID
     client_id: uuid.UUID
@@ -196,6 +215,9 @@ class ApprovalRead(BaseModel):
     decided_by: Optional[uuid.UUID]
     decided_at: Optional[datetime]
     created_at: datetime
+    preview: Optional[DraftEmailPreview] = None
+    stakes: list[ApprovalStakeChip] = Field(default_factory=list)
+    source_link_label: Optional[str] = None
 
     model_config = {"from_attributes": True}
 
