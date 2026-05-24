@@ -259,6 +259,13 @@ export async function listArtifacts(session: FlavorOSSession): Promise<ArtifactR
   return apiRequest<ArtifactRead[]>("/artifacts", session);
 }
 
+export async function getArtifact(
+  session: FlavorOSSession,
+  artifactId: string,
+): Promise<ArtifactRead> {
+  return apiRequest<ArtifactRead>(`/artifacts/${artifactId}`, session);
+}
+
 export type ArtifactCreatePayload = {
   kind: "client" | "sigma";
   title: string;
@@ -299,6 +306,13 @@ export async function listApprovals(
 ): Promise<ApprovalRead[]> {
   const path = decision ? `/approvals?decision=${decision}` : "/approvals";
   return apiRequest<ApprovalRead[]>(path, session);
+}
+
+export async function getApproval(
+  session: FlavorOSSession,
+  approvalId: string,
+): Promise<ApprovalRead> {
+  return apiRequest<ApprovalRead>(`/approvals/${approvalId}`, session);
 }
 
 export async function decideApproval(

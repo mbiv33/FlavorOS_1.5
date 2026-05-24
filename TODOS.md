@@ -1,6 +1,6 @@
 # FlavorOS TODOS
 
-**Last updated:** 2026-05-22 — TODO-5/6 done (Lane V); TODO-7 docs done (storage pick human); outbound scheduling in working tree; R/S/T/U merged.
+**Last updated:** 2026-05-24 — TODO-2b done (Lane T orchestration wired + step 4 UI); TODO-7/X/Y/Z done; outbound cron shipped.
 
 ---
 
@@ -45,19 +45,13 @@
 
 ---
 
-### TODO-2b: Full client_onboarding orchestration
+### TODO-2b: Full client_onboarding orchestration — ✅ DONE (2026-05-24)
 
-**What:** Expand `skills/client_onboarding.py` from the current summary-only implementation into a real multi-step onboarding workflow: create governed Client Universe contexts, set provider expectations, and chain the `morning_standup_seed` + `travel_research_seed` workflows.
+**What:** Full multi-step onboarding orchestration: provider expectations, Khadijah LLM orientation summary, HITL approval gate, seed workflow fan-out, readiness KV.
 
-**Why:** Onboarding is the entry-point workflow and the most complex. The initial skill only reads existing contexts/providers and writes a confirmation artifact — it does not yet *create* the governed universe or fan out to seed workflows.
-
-**Scope note:** Superseded **in scope** by DNA **Lane W** canon for relationship to **TODO-7** (historical sweeps and four-domain parse are not part of TODO-2b). **Lane T** remains orchestration-only unless product merges T into W. DNA sweeps start after onboarding readiness — see [`docs/workflows/client_dna_adoption_model.md`](docs/workflows/client_dna_adoption_model.md).
-
-**Where to start:** `services/api/app/skills/client_onboarding.py`, `docs/workflows/client_onboarding_model.md`, the seed skills as fan-out targets.
-
-**Effort:** human ~3-4 days / CC ~4-6h
-**Priority:** P2
-**Depends on:** TODO-2 (done)
+**Done:**
+- Lane T (2026-05-22): `skills/client_onboarding.py` — provider expectations, LLM summary, HITL gate, seed fan-out, readiness KV. 4 tests pass.
+- 2026-05-24: Fixed wrong `task_type` in `save_onboarding` (`"onboarding_readiness_review"` → `"client_onboarding"`); removed dead seed `_queue_agent_task` calls (skill handles fan-out). Added `getArtifact`/`getApproval` to `lib/api.ts`. Rewired step 4 of `apps/flavoros/src/app/onboarding/page.tsx` to launch the workflow on entry, poll to completion, show Khadijah summary + HITL approval card.
 
 ---
 

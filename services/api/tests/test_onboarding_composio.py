@@ -120,14 +120,13 @@ def test_onboarding_save_plans_oauth_provider_connections(
     universe = db.execute(select(ClientUniverseEntry)).scalars().all()
     assert not {e.category for e in universe} & DEPRECATED_KV_CATEGORIES
 
+    # save_onboarding queues only client_onboarding; seed fan-out happens inside the skill
     workflows = db.execute(select(WorkflowRun)).scalars().all()
     workflow_types = {run.workflow_type for run in workflows}
-    assert {"client_onboarding", "morning_standup_seed", "travel_research_seed"}.issubset(
-        workflow_types
-    )
+    assert "client_onboarding" in workflow_types
 
     tasks = db.execute(select(AgentTask)).scalars().all()
-    assert {task.agent for task in tasks} >= {"khadijah", "regine"}
+    assert {task.agent for task in tasks} >= {"khadijah"}
     assert all(str(tenant_id := tasks[0].client_id) == str(task.client_id) for task in tasks)
 
     sigma = db.execute(select(Artifact).where(Artifact.kind == "sigma")).scalar_one()

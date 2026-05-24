@@ -9,14 +9,19 @@ import {
   apiRequest,
   ClientContext,
   ContextProviderDef,
+  decideApproval,
+  getArtifact,
+  getApproval,
   listContexts,
   listProviderConnections,
   loadSession,
   OnboardingSaveResponse,
   ProviderConnection,
   ProviderConnectLinkResponse,
-  FlavorOSSession,
+  type ApprovalRead,
+  type FlavorOSSession,
 } from "@/lib/api";
+import { useWorkflowLaunch } from "@/lib/hooks/useWorkflowLaunch";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -358,6 +363,13 @@ function OnboardingInner() {
   const oauthCallbackHandledRef = useRef(false);
   /** Slot index we advanced from when OAuth opened in another tab (avoid refresh snapping back). */
   const oauthAdvanceFromIndexRef = useRef<number | null>(null);
+
+  // Step 4 — orchestration
+  const { state: workflowState, launch: launchOnboarding } = useWorkflowLaunch();
+  const [khadijahSummary, setKhadijahSummary] = useState<string | null>(null);
+  const [onboardingApproval, setOnboardingApproval] = useState<ApprovalRead | null>(null);
+  const [approvalDone, setApprovalDone] = useState(false);
+  const [approvalBusy, setApprovalBusy] = useState(false);
 
   const slotId = useCallback(
     (s: ProviderSlot) => `${s.contextKey}__${s.provider}`,
@@ -839,6 +851,40 @@ function OnboardingInner() {
   // ── Computed for step 4 ───────────────────────────────────────────────────
   const connectedCount = slots.filter((s) => isConnected(s.connection)).length;
 
+  // ── Step 4: launch client_onboarding workflow once on entry ───────────────
+  useEffect(() => {
+    if (step !== 4 || workflowState.phase !== "idle") return;
+    void launchOnboarding("client_onboarding");
+  }, [step, workflowState.phase, launchOnboarding]);
+
+  // ── Step 4: fetch artifact + approval once workflow completes ─────────────
+  useEffect(() => {
+    if (workflowState.phase !== "completed" || !session) return;
+    const { output_data } = workflowState.run;
+    const artifactId = output_data?.artifact_id as string | undefined;
+    const approvalId = output_data?.approval_id as string | undefined;
+    if (!artifactId || !approvalId) return;
+    void Promise.all([getArtifact(session, artifactId), getApproval(session, approvalId)])
+      .then(([artifact, approval]) => {
+        setKhadijahSummary(artifact.body ?? null);
+        setOnboardingApproval(approval);
+      })
+      .catch(() => {/* non-fatal — step 4 still shows the CTA */});
+  }, [workflowState, session]);
+
+  async function handleApprove() {
+    if (!session || !onboardingApproval) return;
+    setApprovalBusy(true);
+    try {
+      await decideApproval(session, onboardingApproval.id, "approved");
+      setApprovalDone(true);
+    } catch {
+      // non-fatal
+    } finally {
+      setApprovalBusy(false);
+    }
+  }
+
   // ── No session guard ──────────────────────────────────────────────────────
   if (!session) {
     return (
@@ -1302,6 +1348,49 @@ function OnboardingInner() {
             </p>
           </div>
 
+          {/* Khadijah orientation: loading */}
+          {(workflowState.phase === "launching" ||
+            workflowState.phase === "polling") && (
+            <div className="rounded-lg border border-border bg-surface p-5 text-center">
+              <p className="text-sm text-muted">
+                Khadijah is reviewing your setup&hellip;
+              </p>
+            </div>
+          )}
+
+          {/* Khadijah orientation: summary */}
+          {khadijahSummary && (
+            <div className="rounded-lg border border-border bg-surface p-5">
+              <p className="mb-3 text-xs font-medium uppercase tracking-widest text-muted">
+                Khadijah — Setup Review
+              </p>
+              <p className="whitespace-pre-wrap text-sm leading-relaxed">
+                {khadijahSummary}
+              </p>
+            </div>
+          )}
+
+          {/* HITL approval card */}
+          {onboardingApproval && !approvalDone && (
+            <div className="rounded-lg border border-border bg-surface p-5">
+              <p className="text-sm font-medium">Confirm your setup</p>
+              <p className="mt-1 text-sm text-muted">
+                {onboardingApproval.reason}
+              </p>
+              <div className="mt-4">
+                <button
+                  type="button"
+                  disabled={approvalBusy}
+                  onClick={() => void handleApprove()}
+                  className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-accent-foreground hover:opacity-90 disabled:opacity-50"
+                >
+                  {approvalBusy ? "Confirming…" : "Looks right — activate"}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Summary card */}
           <div className="rounded-lg border border-border bg-surface p-5">
             <dl className="space-y-3 text-sm">
               <div className="flex justify-between gap-4">
@@ -1366,6 +1455,13 @@ function OnboardingInner() {
           <p className="text-xs text-muted">
             You can connect more accounts later in Settings.
           </p>
+
+          {workflowState.phase === "failed" && (
+            <p className="text-sm text-rose-700">
+              Setup review couldn&apos;t complete — your accounts are still
+              saved. Continue to Command Center whenever you&apos;re ready.
+            </p>
+          )}
 
           <div className="flex justify-end pt-2">
             <Link

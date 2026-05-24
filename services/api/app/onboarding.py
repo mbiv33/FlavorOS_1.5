@@ -417,7 +417,7 @@ def save_onboarding(
         tenant=tenant,
         workflow_type="client_onboarding",
         agent="khadijah",
-        task_type="onboarding_readiness_review",
+        task_type="client_onboarding",
         payload={
             "trigger": ONBOARDING_TRIGGER,
             "onboarding_status": next_status,
@@ -425,34 +425,6 @@ def save_onboarding(
             "provider_connections": len(provider_connections),
         },
     )
-    _queue_agent_task(
-        db,
-        tenant=tenant,
-        workflow_type="morning_standup_seed",
-        agent="khadijah",
-        task_type="briefing_seed_from_onboarding",
-        payload={
-            "trigger": ONBOARDING_TRIGGER,
-            "profile_display_name": (
-                body.identity.display_name
-                if body.identity
-                else (profile.display_name if profile else "")
-            ),
-            "onboarding_status": next_status,
-        },
-    )
-    if any(context.context_id in {"travel", "business"} for context in body.contexts):
-        _queue_agent_task(
-            db,
-            tenant=tenant,
-            workflow_type="travel_research_seed",
-            agent="regine",
-            task_type="travel_research_context_seed",
-            payload={
-                "trigger": ONBOARDING_TRIGGER,
-                "contexts": [context.context_id for context in body.contexts],
-            },
-        )
 
     sigma = _create_onboarding_sigma(
         db,
