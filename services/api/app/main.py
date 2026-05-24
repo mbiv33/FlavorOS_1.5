@@ -25,7 +25,7 @@ from app.routers import (
     universe,
     workflows,
 )
-from app.seed import seed_if_empty
+from app.seed import seed_if_empty, sync_dev_demo_passwords
 
 logger = logging.getLogger(__name__)
 
@@ -47,6 +47,7 @@ async def lifespan(_app: FastAPI):
     db = SessionLocal()
     try:
         seed_if_empty(db)
+        sync_dev_demo_passwords(db)
     except OperationalError as exc:
         logger.warning(
             "Startup seed skipped — database unreachable or credentials mismatch (%s). "

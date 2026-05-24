@@ -140,6 +140,8 @@ Open `http://localhost:3000/login`.
 
 Dev seed uses `.local` emails; API schemas use plain `str` for email fields (not Pydantic `EmailStr`) so `.local` addresses validate.
 
+On every API startup (when `API_SKIP_STARTUP_SEED` is not set), `sync_dev_demo_passwords` re-hashes `client@demo.local` and `admin@demo.local` for tenant `demo` if the stored bcrypt no longer matches `DEV_CLIENT_PASSWORD` / `DEV_ADMIN_PASSWORD`. That fixes “login UI says devclient but API returns 401” after an old seed or a VPS env mismatch. Set `NEXT_PUBLIC_FLAVOROS_API_URL=http://127.0.0.1:8001` in `apps/flavoros/.env.local` so the browser hits the same port as `uvicorn` (see `.env.example`).
+
 ## Vertical slice smoke path
 
 1. **Login** at `/login` with demo client credentials.

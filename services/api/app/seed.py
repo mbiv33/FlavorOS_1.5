@@ -14,11 +14,49 @@ from app.workflows.calendar_outbound import CALENDAR_SEND_GOVERNED_ACTION
 from app.workflows.communications_outbound import COMMUNICATIONS_SEND_GOVERNED_ACTION
 
 _pwd = CryptContext(schemes=["bcrypt"], deprecated="auto")
-_settings = get_settings()
+
+DEMO_TENANT_SLUG = "demo"
+DEMO_CLIENT_EMAIL = "client@demo.local"
+DEMO_ADMIN_EMAIL = "admin@demo.local"
 
 
 def _hash(password: str) -> str:
     return _pwd.hash(password)
+
+
+def sync_dev_demo_passwords(db: Session) -> bool:
+    """Re-hash demo login users from current Settings (idempotent).
+
+    seed_if_empty only runs on an empty database; existing VPS/cloud DBs may
+    have stale bcrypt hashes from an old DEV_*_PASSWORD. This keeps login UI
+    credentials (tenant demo, devclient/devadmin) aligned with config on every
+    API startup.
+    """
+    settings = get_settings()
+    tenant = db.execute(
+        select(Tenant).where(Tenant.slug == DEMO_TENANT_SLUG)
+    ).scalar_one_or_none()
+    if tenant is None:
+        return False
+
+    updated = False
+    for email, plain in (
+        (DEMO_CLIENT_EMAIL, settings.dev_client_password),
+        (DEMO_ADMIN_EMAIL, settings.dev_admin_password),
+    ):
+        user = db.execute(
+            select(User).where(User.tenant_id == tenant.id, User.email == email)
+        ).scalar_one_or_none()
+        if user is None:
+            continue
+        if _pwd.verify(plain, user.hashed_password):
+            continue
+        user.hashed_password = _hash(plain)
+        updated = True
+
+    if updated:
+        db.commit()
+    return updated
 
 
 def seed_if_empty(db: Session) -> None:
@@ -39,14 +77,14 @@ def seed_if_empty(db: Session) -> None:
         tenant_id=demo_id,
         email="client@demo.local",
         role="client",
-        hashed_password=_hash(_settings.dev_client_password),
+        hashed_password=_hash(get_settings().dev_client_password),
     )
     admin_user = User(
         id=uuid.uuid4(),
         tenant_id=demo_id,
         email="admin@demo.local",
         role="developer_admin",
-        hashed_password=_hash(_settings.dev_admin_password),
+        hashed_password=_hash(get_settings().dev_admin_password),
     )
     db.add_all([client_user, admin_user])
     db.flush()

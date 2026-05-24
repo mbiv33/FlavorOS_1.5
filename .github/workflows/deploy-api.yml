@@ -80,6 +80,8 @@ jobs:
             printf 'COMPOSIO_REDIRECT_URI=https://api.flavoros.cc/providers/callback\n' >> "$ENV_FILE"
             printf 'API_ORIGINS=https://flavoros.vercel.app\n' >> "$ENV_FILE"
             printf 'ORCHESTRATOR_ADAPTER=in_process\n' >> "$ENV_FILE"
+            printf 'DEV_CLIENT_PASSWORD=devclient\n' >> "$ENV_FILE"
+            printf 'DEV_ADMIN_PASSWORD=devadmin\n' >> "$ENV_FILE"
 
             # Ship the env file, then run the deploy script remotely.
             scp $SSH_OPTS "$ENV_FILE" "$SSH_USER@$SSH_HOST:/tmp/flavoros-api.env"
