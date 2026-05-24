@@ -418,6 +418,7 @@ function OnboardingInner() {
 
       const fromIndex = oauthAdvanceFromIndexRef.current;
       if (options?.preserveUiAdvance && fromIndex !== null) {
+        const pendingResolved = isConnected(expected[fromIndex]?.connection);
         const nextAfterPending = expected.findIndex(
           (s, i) => i > fromIndex && !isConnected(s.connection),
         );
@@ -427,6 +428,13 @@ function OnboardingInner() {
             ? Math.max(fromIndex + 1, firstUnconnectedSlotIndex(expected))
             : nextAfterPending,
         );
+        // Once the slot that triggered OAuth is connected, the round-trip is
+        // done — stop the awaiting state so the 1.2s poll doesn't keep wiping
+        // the next slot's input or overriding Skip.
+        if (pendingResolved) {
+          setAwaitingOAuthReturn(false);
+          oauthAdvanceFromIndexRef.current = null;
+        }
         return;
       }
 
