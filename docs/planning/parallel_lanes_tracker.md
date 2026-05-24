@@ -62,9 +62,9 @@
 | T — Full client_onboarding skill | Lane S (optional) | **Done** | Provider expectations + seed fan-out + readiness (`c99f993`); contexts created upstream — 2026-05-22 |
 | V — Sync dedup + async | Nothing | **Done** | Per-message ProviderEvent idempotency + sync LLM off HTTP thread (2026-05-22) |
 | W — DNA canon & storage | Nothing | **Done (docs)** | Canon + build plan + storage options doc; human picks schema (TODO-7) |
-| X — Account sweep MVP | Lane W | Ready | `account_sweep` + SyncCheckpoint windows; 180d Gmail+Calendar (TODO-8) |
-| Y — Parse & synthesize | Lane X | Ready | `client_dna_parse`, GBrain `client_dna_candidate` (TODO-9) |
-| Z — HITL verify & adoption | Lane Y | Ready | Admin DNA queue + `client_dna_adoption` (TODO-10) |
+| X — Account sweep MVP | Lane W | **Done** | `a801bcb` 2026-05-23 — account sweep MVP shipped (TODO-8) |
+| Y — Parse & synthesize | Lane X | **Done** | `825f10b` 2026-05-23 — client DNA parse, four-domain extraction (TODO-9) |
+| Z — HITL verify & adoption | Lane Y | **Done** | `b1cb23c`/`48215db` 2026-05-23 — admin DNA queue + HITL adoption (TODO-10) |
 
 ## Coordination checklist (every agent, every session)
 
@@ -140,6 +140,8 @@ When done: move your lane out of Active parallel lanes, update the Completed lan
 
 | Timestamp | Agent | Lane | Action |
 |---|---|---|---|
+| 2026-05-24 | Claude Code | Prod verify | **Production live-data verified end-to-end.** Fixed: Vercel `NEXT_PUBLIC_FLAVOROS_API_URL` empty (→`https://api.flavoros.cc`), Composio key invalid (GitHub Secret updated + redeployed), OpenRouter key redeployed, onboarding `awaitingOAuthReturn` never cleared (`b8fba38` — poll wiped next-slot input + broke Skip). Triggered manual Gmail sync: 22 emails ingested, Command Center live. Approved outbound draft executed via Composio → delivered to `marcus@bivinesgroup.com`. **Open gaps:** (1) auto-sync not triggered on onboarding completion, (2) `client_onboarding` workflow: 58 queued runs, zero ever executed — created outside dispatch path, (3) outbound batch windows block immediate sends. |
+| 2026-05-23 | Cursor agent | X/Y/Z | **Lanes X, Y, Z done:** account sweep MVP (`a801bcb`), client DNA parse (`825f10b`), HITL verify + adoption (`b1cb23c`/`48215db`). TODOs 8–10 closed. |
 | 2026-05-22 | Cursor agent | Autonomous | **Outbound scheduled send** (working tree): `scheduled_send_at` on `outbound_actions`, `dispatch_outbound_due.py`, client Communications schedule UI; migration `20260522_0008` chains from invite `0008`; 19 outbound tests pass |
 | 2026-05-22 | Cursor agent | V | **Lane V done:** per-message `ProviderEvent` idempotency in `sync_provider`; HTTP sync dispatches `provider_first_sync_review` via `asyncio.create_task` (no inline `process_provider_first_sync`); test updated for skill artifact title |
 | 2026-05-22 | Cursor agent | W | **Lane W done (docs):** storage A/B/hybrid pros-cons in build plan; Phase 8 stub already in `current_build_plan.md`; human must pick storage before Lane X |

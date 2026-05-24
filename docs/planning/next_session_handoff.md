@@ -1,6 +1,6 @@
 # Next Session Handoff
 
-**Last updated:** 2026-05-23 (repo cleanup complete: services/ down to api-only, gbrain scripts → scripts/gbrain/, stub services → docs/architecture/planned_services.md, root stubs workflows/personas/runtime/ removed, CLAUDE.md layer map added, handoff zones added; next: human DNA storage pick, Lane X)  
+**Last updated:** 2026-05-24 (production live-data verification complete; onboarding poll bug fixed; Lanes X/Y/Z done; open gaps: auto-sync not triggered on onboarding, client_onboarding workflow never executes, outbound batch windows)  
 **Purpose:** Single entry point for a new agent session. Read this first, then the linked docs.
 
 ---
@@ -77,9 +77,9 @@ Before first commit: update your lane row in [parallel_lanes_tracker.md](./paral
 
 ## Ready work (pick one lane per session)
 
-**Completed this session (2026-05-22):** Lane **V** (TODO-5/6), Lane **W** docs (TODO-7 partial — storage decision still human). **Working tree (uncommitted):** outbound scheduled send (`20260522_0008` migration + dispatch script + Communications UI).
+**Completed this session (2026-05-24):** Production live-data verification (Phase A + B). Fixed onboarding `awaitingOAuthReturn` poll bug (`b8fba38`). Fixed Vercel `NEXT_PUBLIC_FLAVOROS_API_URL` (was empty string). Fixed Composio + OpenRouter API keys via GitHub Secrets redeploy. Triggered first real Gmail sync (22 emails); approved outbound draft delivered to `marcus@bivinesgroup.com`. TODO-2b done (`c2a4dfb`).
 
-**Merged on main (prior sessions):** R (`deploy-api.yml`), S (invite/registration), T (`client_onboarding` orchestration), U (Gmail send via Composio).
+**Merged on main (prior sessions):** R (`deploy-api.yml`), S (invite/registration), T (`client_onboarding` orchestration), U (Gmail send via Composio), V (sync dedup + async), AA (outbound scheduling), X (account sweep `a801bcb`), Y (DNA parse `825f10b`), Z (HITL adoption `b1cb23c`/`48215db`).
 
 ---
 
@@ -87,25 +87,21 @@ Before first commit: update your lane row in [parallel_lanes_tracker.md](./paral
 
 | Priority | Lane / item | Notes |
 |----------|-------------|--------|
-| 1 | **Human** — DNA storage model | Pick relational `client_dna_*` vs GBrain-only vs hybrid — see [`client_dna_adoption_build_plan.md`](./client_dna_adoption_build_plan.md) open decision table |
-| 2 | **X** — Account sweep MVP | Blocked on storage pick; then TODO-8 |
-| 3 | **Ops** — VPS `alembic upgrade head` for `20260522_0008` + outbound cron | After merge/commit of outbound + invite `0008` if not on VPS yet |
-| 4 | **Commit** — outbound scheduling + any API doc-only deltas | User did not request commit in autonomous session |
+| 1 | **Bug** — Auto-sync not triggered on onboarding | After OAuth connects, `last_sync=None` for all providers. Onboarding completion does not call `/providers/{provider}/sync`. User lands on empty Command Center. Fix: wire sync trigger in onboarding step 4 or `client_onboarding` skill. |
+| 2 | **Bug** — `client_onboarding` workflow never executes | 58 queued runs, zero ever reached `running`. Created via non-dispatch path (not `/workflows/launch`) or `dispatch_task` crashes silently before updating status. Executor works for `/workflows/launch` paths (proven with `provider_first_sync` today). Investigate `client_onboarding` creation path in onboarding step 4. |
+| 3 | **UX** — Outbound sends wait for 10/13/16 batch windows | Approved drafts queue until next batch window. Jarring for first-time users. Easy fix: `OUTBOUND_INLINE_EXECUTE_ON_APPROVE=true` env flag (already wired) or default to inline execute on approve and remove batch-only UI copy. |
+| 4 | **Ops** — `"orchestrator": "stub"` hardcoded in system-health | `health.py:61` always returns `"stub"` for orchestrator regardless of adapter. Low-priority cosmetic. |
 
 ### Client DNA adoption track (lanes W–Z)
 
 | Lane | Goal | Status |
 |------|------|--------|
-| **W** | DNA canon & storage design | **Done (docs)** — human must choose storage |
-| **X** | Account sweep MVP | Ready after human storage pick |
-| **Y** | Parse & synthesize (`client_dna_candidate`, SIGMA `client_dna`) | `skills/`, `adapters/gbrain.py`, `models.py`, `alembic/`, workflows | X |
-| **Z** | HITL verify & adoption | `routers/`, `apps/flavoros/.../admin/**`, `admin-api.ts`, workflows | Y |
+| **W** | DNA canon & storage design | **Done (docs)** |
+| **X** | Account sweep MVP | **Done** (`a801bcb` 2026-05-23) |
+| **Y** | Parse & synthesize | **Done** (`825f10b` 2026-05-23) |
+| **Z** | HITL verify & adoption | **Done** (`b1cb23c`/`48215db` 2026-05-23) |
 
-**Docs:** [`docs/workflows/client_dna_adoption_model.md`](../workflows/client_dna_adoption_model.md), [`client_dna_adoption_build_plan.md`](./client_dna_adoption_build_plan.md). **TODOS:** TODO-7 through TODO-10.
-
-**Sequencing:** App onboarding completes first; historical sweeps launch explicitly afterward (Lane T remains orchestration-only for `client_onboarding` — see TODO-2b scope note in `TODOS.md`).
-
-**Done (not a ready lane):** Lane **U** (real Gmail send) shipped 2026-05-22. Lane **R** (auto-deploy) shipped 2026-05-22 (`c608062`). Lane **S** (invite/registration) shipped 2026-05-22 (`d0bf663`) — run `alembic upgrade head` on VPS to apply migration 0008.
+**Docs:** [`docs/workflows/client_dna_adoption_model.md`](../workflows/client_dna_adoption_model.md), [`client_dna_adoption_build_plan.md`](./client_dna_adoption_build_plan.md). **TODOs 7–10: all closed.**
 
 ---
 
@@ -125,10 +121,11 @@ flowchart TD
 
 | Week | Focus | Outcome |
 |---|---|---|
-| Done (2026-05-22) | R, S, T, U, V, W (docs) | Deploy, invite, onboarding orchestration, Gmail send, sync dedup + async |
-| Next | Human storage decision | Unblocks Lane X migrations |
-| Next | Lane X → Y → Z | Client DNA adoption implementation |
-| Ops | Commit outbound scheduling + VPS alembic/cron | See working tree + migration `20260522_0008` |
+| Done (2026-05-22) | R, S, T, U, V, W (docs), AA | Deploy, invite, onboarding orchestration, Gmail send, sync dedup + async, outbound scheduling |
+| Done (2026-05-23) | X, Y, Z | Account sweep, DNA parse, HITL adoption |
+| Done (2026-05-24) | Prod verification | Phase A (live Gmail) + Phase B (outbound send) verified on production |
+| **Next** | Bug: auto-sync + client_onboarding workflow | Users land on empty Command Center; onboarding skill runs but never executes |
+| **Next** | UX: inline outbound on approve | Remove batch-window friction for first-time use |
 
 ---
 
